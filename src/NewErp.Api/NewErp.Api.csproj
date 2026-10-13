@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewErp.Application\NewErp.Application.csproj" />
+    <ProjectReference Include="..\NewErp.Infrastructure\NewErp.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

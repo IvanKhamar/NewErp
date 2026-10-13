@@ -1,0 +1,5 @@
+@NewErp.Api_HostAddress = http://localhost:5092
+
+GET {{NewErp.Api_HostAddress}}/health
+
+###
