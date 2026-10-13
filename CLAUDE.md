@@ -19,6 +19,13 @@ dotnet test
 dotnet run --project src/NewErp.Api   # GET /health
 ```
 
+## База даних і навчання
+
+- База: наявна MySQL від OpenCart. Працюємо database-first (`dotnet ef dbcontext scaffold`), таблиці OpenCart міграціями не змінюємо.
+- Нові власні таблиці створюємо лише з префіксом `erp_`.
+- Паролі й рядки підключення зберігаємо лише в `dotnet user-secrets`, ніколи в `appsettings.json`.
+- Користувач вчить C#/.NET: кожне нове поняття пояснюй 1–2 реченнями. Це виняток із правила про короткі відповіді.
+
 ## Git
 
 - Репозиторій: github.com/IvanKhamar/NewErp, гілка `main`. CLI `gh` не встановлено.
