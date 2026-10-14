@@ -67,3 +67,23 @@ CREATE TABLE `erp_user_login` (
   `last_login_at` datetime NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Виробництво: специфікації виробів (BOM). Структура наша: у старій системі аналог є, але його таблиць ми не бачили.
+-- product_id — це dd_product.product_id товару OpenCart. Зовнішнього ключа немає, бо таблиці OpenCart MyISAM.
+CREATE TABLE `erp_bom` (
+  `product_id` int NOT NULL,
+  `updated_by_user_id` int NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Скільки розхідника йде на одну одиницю виробу.
+CREATE TABLE `erp_bom_line` (
+  `product_id` int NOT NULL,
+  `stock_item_id` int NOT NULL,
+  `quantity` decimal(12,3) NOT NULL,
+  PRIMARY KEY (`product_id`, `stock_item_id`),
+  KEY `ix_erp_bom_line_stock_item` (`stock_item_id`),
+  CONSTRAINT `fk_erp_bom_line_bom` FOREIGN KEY (`product_id`) REFERENCES `erp_bom` (`product_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_erp_bom_line_stock_item` FOREIGN KEY (`stock_item_id`) REFERENCES `erp_stock_item` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

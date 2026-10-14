@@ -9,6 +9,7 @@ public partial class ErpDbContext
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
         ConfigureStock(modelBuilder);
+        ConfigureProduction(modelBuilder);
         ConfigureAuth(modelBuilder);
     }
 }

@@ -38,6 +38,7 @@ app.MapAuthEndpoints();
 app.MapOrderEndpoints();
 app.MapStaffEndpoints();
 app.MapStockEndpoints();
+app.MapProductionEndpoints();
 
 app.Run();
 

@@ -31,6 +31,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string Storekeeper = "петро";
     public const string Password = "test-password";
     public const int OrderId = 1;
+    public const int ProductId = 101; // товар у замовленні OrderId, 2 шт.
     public const int Pending = 1;
     public const int Completed = 5;
 
@@ -81,6 +82,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.DdOrders.Add(Order(OrderId, Pending, 1500m, new DateTime(2026, 10, 1, 12, 0, 0)));
         db.DdOrders.Add(Order(2, Completed, 2000m, new DateTime(2026, 10, 2, 12, 0, 0)));
         db.DdOrders.Add(Order(3, 0, 999m, new DateTime(2026, 10, 3, 12, 0, 0))); // незавершене, не має показуватися
+        db.DdOrderProducts.Add(new DdOrderProduct { OrderId = OrderId, ProductId = ProductId, Name = "Сукня", Model = "T-1", Quantity = 2, Price = 750m, Total = 1500m });
         db.ErpOrderManagers.Add(new ErpOrderManager { OrderId = 2, UserId = ActiveUserId, AssignedByUserId = ActiveUserId, AssignedAt = DateTime.Now });
 
         var category = new StockCategory("Тканини");
