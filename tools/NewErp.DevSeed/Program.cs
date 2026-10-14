@@ -7,6 +7,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
+using MySql.Data.MySqlClient;
+
 using NewErp.DevSeed;
 using NewErp.Infrastructure;
 using NewErp.Infrastructure.Persistence;
@@ -18,6 +20,17 @@ var configuration = new ConfigurationBuilder()
 
 var connectionString = configuration.GetConnectionString(DependencyInjection.ConnectionStringName)
     ?? throw new InvalidOperationException("Немає ConnectionStrings:ErpDb. Див. README, розділ про локальну базу.");
+
+// Запобіжник: сідер пише вигадані замовлення, тож працює лише з локальною базою розробки,
+// навіть якщо в user-secrets випадково опиниться підключення до справжньої бази магазину.
+const string DevDatabase = "newerp_dev";
+var target = new MySqlConnectionStringBuilder(connectionString);
+string[] localHosts = ["localhost", "127.0.0.1", "::1"];
+if (!localHosts.Contains(target.Server, StringComparer.OrdinalIgnoreCase) || !string.Equals(target.Database, DevDatabase, StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine($"Відмова: сідер працює лише з базою {DevDatabase} на localhost, а підключення вказує на {target.Database} на {target.Server}.");
+    return 2;
+}
 
 var options = new DbContextOptionsBuilder<ErpDbContext>().UseMySQL(connectionString).Options;
 await using var db = new ErpDbContext(options);
