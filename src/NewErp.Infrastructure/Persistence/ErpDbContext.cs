@@ -1,0 +1,337 @@
+﻿using System;
+using System.Collections.Generic;
+
+using Microsoft.EntityFrameworkCore;
+
+using NewErp.Infrastructure.Persistence.Legacy;
+
+namespace NewErp.Infrastructure.Persistence;
+
+public partial class ErpDbContext : DbContext
+{
+    public ErpDbContext(DbContextOptions<ErpDbContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<DdOrder> DdOrders { get; set; }
+
+    public virtual DbSet<DdOrderProduct> DdOrderProducts { get; set; }
+
+    public virtual DbSet<DdOrderSource> DdOrderSources { get; set; }
+
+    public virtual DbSet<DdOrderStatus> DdOrderStatuses { get; set; }
+
+    public virtual DbSet<DdOrderStatusLog> DdOrderStatusLogs { get; set; }
+
+    public virtual DbSet<DdUser> DdUsers { get; set; }
+
+    public virtual DbSet<ErpOrderManager> ErpOrderManagers { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DdOrder>(entity =>
+        {
+            entity.HasKey(e => e.OrderId).HasName("PRIMARY");
+
+            entity.ToTable("dd_order");
+
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.AcceptLanguage)
+                .HasMaxLength(255)
+                .HasColumnName("accept_language");
+            entity.Property(e => e.AffiliateId).HasColumnName("affiliate_id");
+            entity.Property(e => e.Comment)
+                .HasColumnType("text")
+                .HasColumnName("comment");
+            entity.Property(e => e.Commission)
+                .HasPrecision(15, 4)
+                .HasColumnName("commission");
+            entity.Property(e => e.CurrencyCode)
+                .HasMaxLength(3)
+                .HasColumnName("currency_code");
+            entity.Property(e => e.CurrencyId).HasColumnName("currency_id");
+            entity.Property(e => e.CurrencyValue)
+                .HasPrecision(15, 8)
+                .HasDefaultValueSql("'1.00000000'")
+                .HasColumnName("currency_value");
+            entity.Property(e => e.CustomField)
+                .HasColumnType("text")
+                .HasColumnName("custom_field");
+            entity.Property(e => e.CustomerGroupId).HasColumnName("customer_group_id");
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.DateModified)
+                .HasColumnType("datetime")
+                .HasColumnName("date_modified");
+            entity.Property(e => e.Email)
+                .HasMaxLength(96)
+                .HasColumnName("email");
+            entity.Property(e => e.Fax)
+                .HasMaxLength(32)
+                .HasColumnName("fax");
+            entity.Property(e => e.Firstname)
+                .HasMaxLength(32)
+                .HasColumnName("firstname");
+            entity.Property(e => e.ForwardedIp)
+                .HasMaxLength(40)
+                .HasColumnName("forwarded_ip");
+            entity.Property(e => e.InvoiceNo).HasColumnName("invoice_no");
+            entity.Property(e => e.InvoicePrefix)
+                .HasMaxLength(26)
+                .HasColumnName("invoice_prefix");
+            entity.Property(e => e.Ip)
+                .HasMaxLength(40)
+                .HasColumnName("ip");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Lastname)
+                .HasMaxLength(32)
+                .HasColumnName("lastname");
+            entity.Property(e => e.MarketingId).HasColumnName("marketing_id");
+            entity.Property(e => e.OrderSourceId).HasColumnName("order_source_id");
+            entity.Property(e => e.OrderStatusId).HasColumnName("order_status_id");
+            entity.Property(e => e.PaymentAddress1)
+                .HasMaxLength(128)
+                .HasColumnName("payment_address_1");
+            entity.Property(e => e.PaymentAddress2)
+                .HasMaxLength(128)
+                .HasColumnName("payment_address_2");
+            entity.Property(e => e.PaymentAddressFormat)
+                .HasColumnType("text")
+                .HasColumnName("payment_address_format");
+            entity.Property(e => e.PaymentCity)
+                .HasMaxLength(128)
+                .HasColumnName("payment_city");
+            entity.Property(e => e.PaymentCode)
+                .HasMaxLength(128)
+                .HasColumnName("payment_code");
+            entity.Property(e => e.PaymentCompany)
+                .HasMaxLength(60)
+                .HasColumnName("payment_company");
+            entity.Property(e => e.PaymentCountry)
+                .HasMaxLength(128)
+                .HasColumnName("payment_country");
+            entity.Property(e => e.PaymentCountryId).HasColumnName("payment_country_id");
+            entity.Property(e => e.PaymentCustomField)
+                .HasColumnType("text")
+                .HasColumnName("payment_custom_field");
+            entity.Property(e => e.PaymentFirstname)
+                .HasMaxLength(32)
+                .HasColumnName("payment_firstname");
+            entity.Property(e => e.PaymentLastname)
+                .HasMaxLength(32)
+                .HasColumnName("payment_lastname");
+            entity.Property(e => e.PaymentMethod)
+                .HasMaxLength(128)
+                .HasColumnName("payment_method");
+            entity.Property(e => e.PaymentPostcode)
+                .HasMaxLength(10)
+                .HasColumnName("payment_postcode");
+            entity.Property(e => e.PaymentZone)
+                .HasMaxLength(128)
+                .HasColumnName("payment_zone");
+            entity.Property(e => e.PaymentZoneId).HasColumnName("payment_zone_id");
+            entity.Property(e => e.ShippingAddress1)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_address_1");
+            entity.Property(e => e.ShippingAddress2)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_address_2");
+            entity.Property(e => e.ShippingAddressFormat)
+                .HasColumnType("text")
+                .HasColumnName("shipping_address_format");
+            entity.Property(e => e.ShippingCity)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_city");
+            entity.Property(e => e.ShippingCode)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_code");
+            entity.Property(e => e.ShippingCompany)
+                .HasMaxLength(40)
+                .HasColumnName("shipping_company");
+            entity.Property(e => e.ShippingCountry)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_country");
+            entity.Property(e => e.ShippingCountryId).HasColumnName("shipping_country_id");
+            entity.Property(e => e.ShippingCustomField)
+                .HasColumnType("text")
+                .HasColumnName("shipping_custom_field");
+            entity.Property(e => e.ShippingFirstname)
+                .HasMaxLength(32)
+                .HasColumnName("shipping_firstname");
+            entity.Property(e => e.ShippingLastname)
+                .HasMaxLength(32)
+                .HasColumnName("shipping_lastname");
+            entity.Property(e => e.ShippingMethod)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_method");
+            entity.Property(e => e.ShippingPostcode)
+                .HasMaxLength(10)
+                .HasColumnName("shipping_postcode");
+            entity.Property(e => e.ShippingZone)
+                .HasMaxLength(128)
+                .HasColumnName("shipping_zone");
+            entity.Property(e => e.ShippingZoneId).HasColumnName("shipping_zone_id");
+            entity.Property(e => e.StoreId).HasColumnName("store_id");
+            entity.Property(e => e.StoreName)
+                .HasMaxLength(64)
+                .HasColumnName("store_name");
+            entity.Property(e => e.StoreUrl)
+                .HasMaxLength(255)
+                .HasColumnName("store_url");
+            entity.Property(e => e.Telephone)
+                .HasMaxLength(32)
+                .HasColumnName("telephone");
+            entity.Property(e => e.Total)
+                .HasPrecision(15, 4)
+                .HasColumnName("total");
+            entity.Property(e => e.Tracking)
+                .HasMaxLength(64)
+                .HasColumnName("tracking");
+            entity.Property(e => e.UserAgent)
+                .HasMaxLength(255)
+                .HasColumnName("user_agent");
+        });
+
+        modelBuilder.Entity<DdOrderProduct>(entity =>
+        {
+            entity.HasKey(e => e.OrderProductId).HasName("PRIMARY");
+
+            entity.ToTable("dd_order_product");
+
+            entity.HasIndex(e => e.OrderId, "order_id");
+
+            entity.Property(e => e.OrderProductId).HasColumnName("order_product_id");
+            entity.Property(e => e.Model)
+                .HasMaxLength(64)
+                .HasColumnName("model");
+            entity.Property(e => e.Name)
+                .HasMaxLength(255)
+                .HasColumnName("name");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.Price)
+                .HasPrecision(15, 4)
+                .HasColumnName("price");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Reward).HasColumnName("reward");
+            entity.Property(e => e.Tax)
+                .HasPrecision(15, 4)
+                .HasColumnName("tax");
+            entity.Property(e => e.Total)
+                .HasPrecision(15, 4)
+                .HasColumnName("total");
+        });
+
+        modelBuilder.Entity<DdOrderSource>(entity =>
+        {
+            entity.HasKey(e => new { e.OrderSourceId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_order_source");
+
+            entity.Property(e => e.OrderSourceId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("order_source_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdOrderStatus>(entity =>
+        {
+            entity.HasKey(e => new { e.OrderStatusId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_order_status");
+
+            entity.Property(e => e.OrderStatusId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("order_status_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(32)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdOrderStatusLog>(entity =>
+        {
+            entity.HasKey(e => e.OrderStatusLogId).HasName("PRIMARY");
+
+            entity.ToTable("dd_order_status_log");
+
+            entity.HasIndex(e => e.OrderId, "order_id");
+
+            entity.Property(e => e.OrderStatusLogId).HasColumnName("order_status_log_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.NewStatusId).HasColumnName("new_status_id");
+            entity.Property(e => e.OldStatusId).HasColumnName("old_status_id");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+        });
+
+        modelBuilder.Entity<DdUser>(entity =>
+        {
+            entity.HasKey(e => e.UserId).HasName("PRIMARY");
+
+            entity.ToTable("dd_user");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Code)
+                .HasMaxLength(40)
+                .HasColumnName("code");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.Email)
+                .HasMaxLength(96)
+                .HasColumnName("email");
+            entity.Property(e => e.Firstname)
+                .HasMaxLength(32)
+                .HasColumnName("firstname");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasColumnName("image");
+            entity.Property(e => e.Ip)
+                .HasMaxLength(40)
+                .HasColumnName("ip");
+            entity.Property(e => e.Lastname)
+                .HasMaxLength(32)
+                .HasColumnName("lastname");
+            entity.Property(e => e.Password)
+                .HasMaxLength(40)
+                .HasColumnName("password");
+            entity.Property(e => e.Salt)
+                .HasMaxLength(9)
+                .HasColumnName("salt");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.UserGroupId).HasColumnName("user_group_id");
+            entity.Property(e => e.Username)
+                .HasMaxLength(20)
+                .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<ErpOrderManager>(entity =>
+        {
+            entity.HasKey(e => e.OrderId).HasName("PRIMARY");
+
+            entity.ToTable("erp_order_manager");
+
+            entity.HasIndex(e => e.UserId, "ix_erp_order_manager_user");
+
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.AssignedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("assigned_at");
+            entity.Property(e => e.AssignedByUserId).HasColumnName("assigned_by_user_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+        });
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}

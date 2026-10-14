@@ -1,5 +1,54 @@
-@NewErp.Api_HostAddress = http://localhost:5092
+# Запити для перевірки API прямо з Visual Studio (кнопка "Send request" над кожним запитом).
+# Спершу запустіть NewErp.Api. Інтерактивна документація: http://localhost:5092/scalar
 
-GET {{NewErp.Api_HostAddress}}/health
+@host = http://localhost:5092
+
+GET {{host}}/health
+
+### Замовлення: список з фільтрами (усі параметри необов'язкові)
+GET {{host}}/orders?statusId=5&from=2026-09-01&to=2026-10-31&page=1&pageSize=20
+
+### Пошук за телефоном, прізвищем, email або номером замовлення
+GET {{host}}/orders?search=067
+
+### Картка замовлення: товари та історія статусів
+GET {{host}}/orders/1
+
+### Довідники
+GET {{host}}/orders/statuses
 
 ###
+GET {{host}}/orders/sources
+
+### Змінити статус (userId: хто змінює; поки немає входу в систему)
+PUT {{host}}/orders/1/status
+Content-Type: application/json
+
+{ "statusId": 3, "userId": 1 }
+
+### Призначити менеджера
+PUT {{host}}/orders/1/manager
+Content-Type: application/json
+
+{ "managerId": 2, "userId": 1 }
+
+### Бонуси менеджерів за період (обидві дати включно)
+GET {{host}}/staff/bonuses?from=2026-10-01&to=2026-10-31
+
+### Склад: що треба дозамовити
+GET {{host}}/stock/items?belowMinimumOnly=true
+
+### Прихід (+) або витрата (-)
+POST {{host}}/stock/items/1/adjustments
+Content-Type: application/json
+
+{ "delta": -2.5, "reason": "Пошиття замовлення №1", "userId": 1 }
+
+### Журнал руху позиції
+GET {{host}}/stock/items/1/movements
+
+### Нова позиція
+POST {{host}}/stock/items
+Content-Type: application/json
+
+{ "categoryId": 1, "supplierId": null, "name": "Нитки чорні", "unit": "шт", "minQuantity": 20 }
