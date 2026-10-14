@@ -30,4 +30,5 @@ if (await db.DdOrders.AnyAsync())
 
 var counts = await new DevDataSeeder(db, seed: 2026).SeedAsync(orderCount: 400);
 Console.WriteLine($"Готово: {counts}");
+Console.WriteLine($"Вхід (пароль {DevDataSeeder.DevPassword}): admin — Admin, sklad — Storekeeper, manager1…manager4 — Manager (manager5 вимкнено).");
 return 0;

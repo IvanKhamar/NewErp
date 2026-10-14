@@ -12,3 +12,12 @@ public sealed class MySqlFactAttribute : FactAttribute
             Skip = $"Задайте {TestDatabase.EnvVar}, щоб запустити інтеграційні тести (див. README).";
     }
 }
+/// <summary>Те саме для тестів з параметрами ([InlineData]).</summary>
+public sealed class MySqlTheoryAttribute : TheoryAttribute
+{
+    public MySqlTheoryAttribute()
+    {
+        if (string.IsNullOrEmpty(TestDatabase.ServerConnectionString))
+            Skip = $"Задайте {TestDatabase.EnvVar}, щоб запустити інтеграційні тести (див. README).";
+    }
+}

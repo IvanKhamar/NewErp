@@ -1,6 +1,8 @@
 using Bogus;
 
+using NewErp.Application.Auth;
 using NewErp.Domain.Stock;
+using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
 
@@ -10,6 +12,9 @@ namespace NewErp.DevSeed;
 public sealed class DevDataSeeder(ErpDbContext db, int seed)
 {
     private const int LanguageId = 1;
+
+    /// <summary>Пароль усіх тестових користувачів.</summary>
+    public const string DevPassword = "dev";
 
     // Стандартні id статусів OpenCart 3, назви українською.
     private static readonly (int Id, string Name)[] Statuses =
@@ -40,8 +45,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
 
         var userFaker = new Faker<DdUser>("uk")
             .RuleFor(u => u.UserGroupId, 10)
-            .RuleFor(u => u.Firstname, f => f.Name.FirstName())
-            .RuleFor(u => u.Lastname, f => f.Name.LastName())
+            .RuleFor(u => u.Firstname, f => f.Person.FirstName)
+            .RuleFor(u => u.Lastname, f => f.Person.LastName)
             .RuleFor(u => u.Username, f => $"manager{f.IndexFaker + 1}")
             .RuleFor(u => u.Email, (f, u) => f.Internet.Email(u.Firstname, u.Lastname, "example.com"))
             .RuleFor(u => u.Password, "")
@@ -53,12 +58,23 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             .RuleFor(u => u.DateAdded, f => f.Date.Past(2, now));
         var users = userFaker.Generate(5);
         users[^1].Status = false; // один звільнений менеджер, щоб було що перевіряти
-        db.DdUsers.AddRange(users);
+        var admin = userFaker.Generate();
+        admin.Username = "admin";
+        var storekeeper = userFaker.Generate();
+        storekeeper.Username = "sklad";
+        db.DdUsers.AddRange([.. users, admin, storekeeper]);
+        await db.SaveChangesAsync();
+
+        // Сіль зберігається всередині хешу, тому один хеш підходить усім тестовим користувачам.
+        var hash = new Pbkdf2PasswordHasher().Hash(DevPassword);
+        db.UserLogins.AddRange(users.Select(u => new ErpUserLogin { UserId = u.UserId, PasswordHash = hash, Role = Roles.Manager }));
+        db.UserLogins.Add(new ErpUserLogin { UserId = admin.UserId, PasswordHash = hash, Role = Roles.Admin });
+        db.UserLogins.Add(new ErpUserLogin { UserId = storekeeper.UserId, PasswordHash = hash, Role = Roles.Storekeeper });
         await db.SaveChangesAsync();
 
         var orderFaker = new Faker<DdOrder>("uk")
-            .RuleFor(o => o.Firstname, f => f.Name.FirstName())
-            .RuleFor(o => o.Lastname, f => f.Name.LastName())
+            .RuleFor(o => o.Firstname, f => f.Person.FirstName)
+            .RuleFor(o => o.Lastname, f => f.Person.LastName)
             .RuleFor(o => o.Email, (f, o) => f.Internet.Email(o.Firstname, o.Lastname, "example.com"))
             .RuleFor(o => o.Telephone, f => f.Phone.PhoneNumber("+38067#######"))
             .RuleFor(o => o.ShippingCity, f => f.Address.City())
@@ -134,8 +150,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
 
-        var stockItems = await SeedStockAsync(users[0].UserId, now);
-        return $"{users.Count} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу.";
+        var stockItems = await SeedStockAsync(storekeeper.UserId, now);
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу.";
     }
 
     private async Task<int> SeedStockAsync(int userId, DateTime now)

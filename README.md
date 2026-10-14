@@ -12,6 +12,7 @@
 | **Замовлення** | Список з фільтрами (статус, джерело, менеджер, період, пошук за телефоном, ім'ям, email чи номером) і пагінацією. Картка з товарами та історією статусів. Довідники статусів і джерел | `GET /orders`, `GET /orders/{id}`, `GET /orders/statuses`, `GET /orders/sources` |
 | **Дії із замовленням** | Зміна статусу із записом у журнал (хто, коли, з якого на який). Призначення відповідального менеджера. Перевірка, що статус існує, а користувач активний | `PUT /orders/{id}/status`, `PUT /orders/{id}/manager` |
 | **Бонуси менеджерів** | Розрахунок за період: кількість замовлень, виручка, бонус. Відсоток і статуси, що зараховуються, задаються в `appsettings.json` | `GET /staff/bonuses?from=&to=` |
+| **Вхід і ролі** | Вхід через cookie, ролі Admin, Manager, Storekeeper. Без входу API повертає 401, без потрібної ролі 403. Замовлення бачать Admin і Manager, склад Admin і Storekeeper, бонуси лише Admin | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | **Склад: розхідники** | Категорії, постачальники, позиції з мінімальним залишком. Прихід і витрата з журналом руху. Список того, що треба дозамовити. Залишок не може піти в мінус | `/stock/categories`, `/stock/suppliers`, `/stock/items`, `/stock/items/{id}/adjustments`, `/stock/items/{id}/movements` |
 
 Повний список з описами доступний в інтерактивній документації `/scalar` після запуску. Готові запити для Visual Studio лежать у [NewErp.Api.http](src/NewErp.Api/NewErp.Api.http).
@@ -73,7 +74,7 @@ db/
    ```
    dotnet run --project tools/NewErp.DevSeed
    ```
-5. Запустіть API й відкрийте http://localhost:5092/scalar:
+5. Запустіть API й відкрийте http://localhost:5092/scalar. Спершу виконайте `POST /auth/login` з `{ "username": "admin", "password": "dev" }`: браузер збереже cookie, і решта запитів у Scalar працюватиме. Інші тестові логіни DevSeed виводить після заповнення бази.
    ```
    dotnet run --project src/NewErp.Api
    ```

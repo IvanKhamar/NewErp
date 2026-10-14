@@ -1,9 +1,13 @@
+using System.Net.Http.Json;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
+using NewErp.Application.Auth;
 using NewErp.Domain.Stock;
+using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
 
@@ -19,6 +23,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public const int ActiveUserId = 1;
     public const int InactiveUserId = 2;
+    public const int ManagerUserId = 3;
+    public const int StorekeeperUserId = 4;
+    public const string Admin = "олена";
+    public const string Inactive = "ігор";
+    public const string Manager = "марта";
+    public const string Storekeeper = "петро";
+    public const string Password = "test-password";
     public const int OrderId = 1;
     public const int Pending = 1;
     public const int Completed = 5;
@@ -56,7 +67,17 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             new DdOrderStatus { OrderStatusId = Pending, LanguageId = 1, Name = "Очікує" },
             new DdOrderStatus { OrderStatusId = Completed, LanguageId = 1, Name = "Виконано" });
         db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = 1, LanguageId = 1, Name = "Instagram" });
-        db.DdUsers.AddRange(User(ActiveUserId, "Олена", active: true), User(InactiveUserId, "Ігор", active: false));
+        db.DdUsers.AddRange(
+            User(ActiveUserId, "Олена", active: true),
+            User(InactiveUserId, "Ігор", active: false),
+            User(ManagerUserId, "Марта", active: true),
+            User(StorekeeperUserId, "Петро", active: true));
+        var hash = new Pbkdf2PasswordHasher().Hash(Password);
+        db.UserLogins.AddRange(
+            new ErpUserLogin { UserId = ActiveUserId, PasswordHash = hash, Role = Roles.Admin },
+            new ErpUserLogin { UserId = InactiveUserId, PasswordHash = hash, Role = Roles.Manager },
+            new ErpUserLogin { UserId = ManagerUserId, PasswordHash = hash, Role = Roles.Manager },
+            new ErpUserLogin { UserId = StorekeeperUserId, PasswordHash = hash, Role = Roles.Storekeeper });
         db.DdOrders.Add(Order(OrderId, Pending, 1500m, new DateTime(2026, 10, 1, 12, 0, 0)));
         db.DdOrders.Add(Order(2, Completed, 2000m, new DateTime(2026, 10, 2, 12, 0, 0)));
         db.DdOrders.Add(Order(3, 0, 999m, new DateTime(2026, 10, 3, 12, 0, 0))); // незавершене, не має показуватися
@@ -65,6 +86,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var category = new StockCategory("Тканини");
         db.StockCategories.Add(category);
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>Клієнт, який увійшов як вказаний користувач. Cookie сесії клієнт зберігає сам.</summary>
+    public async Task<HttpClient> LoginAsync(string username)
+    {
+        var client = CreateClient();
+        var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest(username, Password));
+        response.EnsureSuccessStatusCode();
+        return client;
     }
 
     private static DdUser User(int id, string name, bool active) => new()

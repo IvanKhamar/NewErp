@@ -56,3 +56,14 @@ CREATE TABLE `erp_stock_movement` (
   KEY `ix_erp_stock_movement_item` (`item_id`, `created_at`),
   CONSTRAINT `fk_erp_stock_movement_item` FOREIGN KEY (`item_id`) REFERENCES `erp_stock_item` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Вхід у NewErp: хеш пароля й роль користувача (Admin, Manager, Storekeeper).
+-- Сам користувач (логін, ім'я, активність) лишається в dd_user, тут лише те, чого там немає.
+-- Зовнішнього ключа на dd_user немає, бо та таблиця MyISAM і ключів не підтримує.
+CREATE TABLE `erp_user_login` (
+  `user_id` int NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` varchar(32) NOT NULL,
+  `last_login_at` datetime NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

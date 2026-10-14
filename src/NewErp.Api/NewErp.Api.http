@@ -5,6 +5,15 @@
 
 GET {{host}}/health
 
+### Вхід. Без нього решта запитів поверне 401. Тестові логіни виводить DevSeed, пароль: dev
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "dev" }
+
+### Хто зараз увійшов
+GET {{host}}/auth/me
+
 ### Замовлення: список з фільтрами (усі параметри необов'язкові)
 GET {{host}}/orders?statusId=5&from=2026-09-01&to=2026-10-31&page=1&pageSize=20
 
@@ -20,17 +29,17 @@ GET {{host}}/orders/statuses
 ###
 GET {{host}}/orders/sources
 
-### Змінити статус (userId: хто змінює; поки немає входу в систему)
+### Змінити статус (хто змінює, сервер бере із сесії)
 PUT {{host}}/orders/1/status
 Content-Type: application/json
 
-{ "statusId": 3, "userId": 1 }
+{ "statusId": 3 }
 
 ### Призначити менеджера
 PUT {{host}}/orders/1/manager
 Content-Type: application/json
 
-{ "managerId": 2, "userId": 1 }
+{ "managerId": 2 }
 
 ### Бонуси менеджерів за період (обидві дати включно)
 GET {{host}}/staff/bonuses?from=2026-10-01&to=2026-10-31
@@ -42,7 +51,7 @@ GET {{host}}/stock/items?belowMinimumOnly=true
 POST {{host}}/stock/items/1/adjustments
 Content-Type: application/json
 
-{ "delta": -2.5, "reason": "Пошиття замовлення №1", "userId": 1 }
+{ "delta": -2.5, "reason": "Пошиття замовлення №1" }
 
 ### Журнал руху позиції
 GET {{host}}/stock/items/1/movements

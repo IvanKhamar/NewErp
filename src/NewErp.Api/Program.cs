@@ -1,4 +1,5 @@
 using NewErp.Api;
+using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
 using NewErp.Application.Staff;
@@ -12,6 +13,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ErrorHandler>();
 builder.Services.AddHealthChecks();
+builder.Services.AddErpAuth();
 
 builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusOptions.SectionName));
 builder.Services.AddApplication();
@@ -23,13 +25,16 @@ app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference(); // інтерактивна документація: /scalar
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous(); // інтерактивна документація: /scalar
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication(); // читає cookie й визначає, хто робить запит
+app.UseAuthorization();  // перевіряє, чи має він доступ до ендпоінта
 
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").AllowAnonymous();
+app.MapAuthEndpoints();
 app.MapOrderEndpoints();
 app.MapStaffEndpoints();
 app.MapStockEndpoints();

@@ -4,7 +4,7 @@ using NewErp.Domain.Stock;
 
 namespace NewErp.Infrastructure.Persistence;
 
-// Друга половина partial-класу. ErpDbContext.cs згенеровано командою
+// Частина partial-класу. ErpDbContext.cs згенеровано командою
 // dotnet ef dbcontext scaffold (таблиці dd_*), а тут вручну описано наші таблиці erp_stock_*,
 // які зберігають доменні класи склада напряму. Перегенерація не зачіпає цей файл.
 public partial class ErpDbContext
@@ -17,7 +17,7 @@ public partial class ErpDbContext
 
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
+    private static void ConfigureStock(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StockCategory>(e =>
         {

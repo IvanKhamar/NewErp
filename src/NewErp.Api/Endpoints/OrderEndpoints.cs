@@ -1,3 +1,6 @@
+using System.Security.Claims;
+
+using NewErp.Api.Auth;
 using NewErp.Application.Orders;
 
 namespace NewErp.Api.Endpoints;
@@ -6,7 +9,7 @@ public static class OrderEndpoints
 {
     public static void MapOrderEndpoints(this IEndpointRouteBuilder app)
     {
-        var orders = app.MapGroup("/orders").WithTags("Замовлення");
+        var orders = app.MapGroup("/orders").WithTags("Замовлення").RequireAuthorization(Policies.Orders);
 
         // [AsParameters] збирає параметри рядка запиту (?statusId=5&page=2) в один record OrderFilter.
         orders.MapGet("/", (IOrderQueries queries, [AsParameters] OrderFilter filter, CancellationToken ct) =>
@@ -23,16 +26,16 @@ public static class OrderEndpoints
         orders.MapGet("/sources", (IOrderQueries queries, CancellationToken ct) => queries.ListSourcesAsync(ct))
             .WithSummary("Довідник джерел замовлення");
 
-        orders.MapPut("/{id:int}/status", async (int id, ChangeOrderStatusRequest request, OrderService service, CancellationToken ct) =>
+        orders.MapPut("/{id:int}/status", async (int id, ChangeOrderStatusRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
         {
-            await service.ChangeStatusAsync(id, request, ct);
+            await service.ChangeStatusAsync(id, request, user.GetUserId(), ct);
             return Results.NoContent();
         })
         .WithSummary("Змінити статус (із записом у журнал)");
 
-        orders.MapPut("/{id:int}/manager", async (int id, AssignManagerRequest request, OrderService service, CancellationToken ct) =>
+        orders.MapPut("/{id:int}/manager", async (int id, AssignManagerRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
         {
-            await service.AssignManagerAsync(id, request, ct);
+            await service.AssignManagerAsync(id, request, user.GetUserId(), ct);
             return Results.NoContent();
         })
         .WithSummary("Призначити відповідального менеджера");

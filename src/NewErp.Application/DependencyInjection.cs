@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
+using NewErp.Application.Auth;
 using NewErp.Application.Orders;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<OrderService>();
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
+        services.AddScoped<AuthService>();
         return services;
     }
 }

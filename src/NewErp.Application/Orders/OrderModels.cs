@@ -49,7 +49,7 @@ public sealed record OrderDetails(
     IReadOnlyList<OrderProductLine> Products,
     IReadOnlyList<OrderStatusHistoryEntry> StatusHistory);
 
-/// <summary>Поки немає входу в систему, тому id користувача, який виконує дію, передається в запиті.</summary>
-public sealed record ChangeOrderStatusRequest(int StatusId, int UserId);
+/// <summary>Хто змінює статус, сервер бере з сесії, а не з тіла запиту, тому підробити його не можна.</summary>
+public sealed record ChangeOrderStatusRequest(int StatusId);
 
-public sealed record AssignManagerRequest(int ManagerId, int UserId);
+public sealed record AssignManagerRequest(int ManagerId);

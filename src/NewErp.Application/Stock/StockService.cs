@@ -39,12 +39,12 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
         return item.Id;
     }
 
-    public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request, CancellationToken ct)
+    public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request, int userId, CancellationToken ct)
     {
         var item = await repository.FindItemAsync(itemId, ct)
             ?? throw new NotFoundException($"Позицію складу {itemId} не знайдено.");
 
-        var movement = item.Adjust(request.Delta, request.Reason, request.UserId, clock.GetLocalNow().DateTime);
+        var movement = item.Adjust(request.Delta, request.Reason, userId, clock.GetLocalNow().DateTime);
         repository.Add(movement);
         await repository.SaveChangesAsync(ct);
 

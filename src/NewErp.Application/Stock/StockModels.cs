@@ -23,6 +23,6 @@ public sealed record CreateStockSupplierRequest(string Name, string? Phone, stri
 public sealed record CreateStockItemRequest(int CategoryId, int? SupplierId, string Name, string Unit, decimal MinQuantity);
 
 /// <summary>Delta: плюс = прихід, мінус = витрата.</summary>
-public sealed record AdjustStockRequest(decimal Delta, string Reason, int UserId);
+public sealed record AdjustStockRequest(decimal Delta, string Reason);
 
 public sealed record StockItemFilter(int? CategoryId = null, bool BelowMinimumOnly = false);

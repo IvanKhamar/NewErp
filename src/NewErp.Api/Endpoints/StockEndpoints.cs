@@ -1,3 +1,6 @@
+using System.Security.Claims;
+
+using NewErp.Api.Auth;
 using NewErp.Application.Stock;
 
 namespace NewErp.Api.Endpoints;
@@ -6,7 +9,7 @@ public static class StockEndpoints
 {
     public static void MapStockEndpoints(this IEndpointRouteBuilder app)
     {
-        var stock = app.MapGroup("/stock").WithTags("Склад: розхідники");
+        var stock = app.MapGroup("/stock").WithTags("Склад: розхідники").RequireAuthorization(Policies.Stock);
 
         stock.MapGet("/categories", (IStockRepository repo, CancellationToken ct) => repo.ListCategoriesAsync(ct));
 
@@ -37,8 +40,8 @@ public static class StockEndpoints
             return Results.Created($"/stock/items/{id}", new { id });
         });
 
-        stock.MapPost("/items/{id:int}/adjustments", (int id, AdjustStockRequest request, StockService service, CancellationToken ct) =>
-            service.AdjustAsync(id, request, ct))
+        stock.MapPost("/items/{id:int}/adjustments", (int id, AdjustStockRequest request, ClaimsPrincipal user, StockService service, CancellationToken ct) =>
+            service.AdjustAsync(id, request, user.GetUserId(), ct))
             .WithSummary("Прихід (+) або витрата (-) з записом у журнал руху");
 
         stock.MapPut("/items/{id:int}/min-quantity", async (int id, decimal minQuantity, StockService service, CancellationToken ct) =>

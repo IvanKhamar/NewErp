@@ -25,7 +25,7 @@ public class OrderServiceTests
     [Fact]
     public async Task ChangeStatus_SavesChangeWithOldStatusAndTime()
     {
-        await _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(StatusId: 5, UserId: 1), CancellationToken.None);
+        await _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(StatusId: 5), userId: 1, CancellationToken.None);
 
         var saved = Assert.Single(_store.SavedChanges);
         Assert.Equal(new OrderStatusChange(100, 1, 5, 1, new DateTime(2026, 10, 14, 9, 0, 0)), saved);
@@ -34,25 +34,25 @@ public class OrderServiceTests
     [Fact]
     public async Task ChangeStatus_UnknownOrder_NotFound() =>
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _service.ChangeStatusAsync(999, new ChangeOrderStatusRequest(5, 1), CancellationToken.None));
+            _service.ChangeStatusAsync(999, new ChangeOrderStatusRequest(5), userId: 1, CancellationToken.None));
 
     [Fact]
     public async Task ChangeStatus_UnknownStatus_Rejected()
     {
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(42, 1), CancellationToken.None));
+            _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(42), userId: 1, CancellationToken.None));
         Assert.Empty(_store.SavedChanges);
     }
 
     [Fact]
     public async Task ChangeStatus_InactiveUser_Rejected() =>
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(5, UserId: 3), CancellationToken.None));
+            _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(5), userId: 3, CancellationToken.None));
 
     [Fact]
     public async Task AssignManager_SavesManager()
     {
-        await _service.AssignManagerAsync(100, new AssignManagerRequest(ManagerId: 2, UserId: 1), CancellationToken.None);
+        await _service.AssignManagerAsync(100, new AssignManagerRequest(ManagerId: 2), userId: 1, CancellationToken.None);
 
         Assert.Equal((2, 1), _store.Managers[100]);
     }
@@ -61,7 +61,7 @@ public class OrderServiceTests
     public async Task AssignManager_InactiveManager_Rejected()
     {
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.AssignManagerAsync(100, new AssignManagerRequest(ManagerId: 3, UserId: 1), CancellationToken.None));
+            _service.AssignManagerAsync(100, new AssignManagerRequest(ManagerId: 3), userId: 1, CancellationToken.None));
         Assert.Empty(_store.Managers);
     }
 

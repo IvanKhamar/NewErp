@@ -8,12 +8,12 @@ namespace NewErp.IntegrationTests;
 
 public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
-
     [MySqlFact]
     public async Task List_HidesUnfinishedOrders_AndJoinsLookups()
     {
-        var page = await _client.GetFromJsonAsync<PagedResult<OrderListItem>>("/orders?from=2026-10-01&to=2026-10-31");
+        var client = await factory.LoginAsync(ApiFactory.Admin);
+
+        var page = await client.GetFromJsonAsync<PagedResult<OrderListItem>>("/orders?from=2026-10-01&to=2026-10-31");
 
         Assert.NotNull(page);
         Assert.DoesNotContain(page.Items, o => o.Id == 3);
@@ -26,7 +26,9 @@ public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [MySqlFact]
     public async Task List_FiltersByManager()
     {
-        var page = await _client.GetFromJsonAsync<PagedResult<OrderListItem>>($"/orders?managerId={ApiFactory.ActiveUserId}");
+        var client = await factory.LoginAsync(ApiFactory.Admin);
+
+        var page = await client.GetFromJsonAsync<PagedResult<OrderListItem>>($"/orders?managerId={ApiFactory.ActiveUserId}");
 
         Assert.Equal([2], page!.Items.Select(o => o.Id));
     }
@@ -34,30 +36,25 @@ public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [MySqlFact]
     public async Task ChangeStatus_UpdatesOrderAndWritesHistory()
     {
-        var response = await _client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status",
-            new ChangeOrderStatusRequest(ApiFactory.Completed, ApiFactory.ActiveUserId));
+        var client = await factory.LoginAsync(ApiFactory.Admin);
+
+        var response = await client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status",
+            new ChangeOrderStatusRequest(ApiFactory.Completed));
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        var order = await _client.GetFromJsonAsync<OrderDetails>($"/orders/{ApiFactory.OrderId}");
+        var order = await client.GetFromJsonAsync<OrderDetails>($"/orders/{ApiFactory.OrderId}");
         Assert.Equal(ApiFactory.Completed, order!.StatusId);
         var entry = Assert.Single(order.StatusHistory);
         Assert.Equal((ApiFactory.Pending, ApiFactory.Completed), (entry.OldStatusId, entry.NewStatusId));
-    }
-
-    [MySqlFact]
-    public async Task ChangeStatus_InactiveUser_Returns400WithMessage()
-    {
-        var response = await _client.PutAsJsonAsync("/orders/2/status",
-            new ChangeOrderStatusRequest(ApiFactory.Pending, ApiFactory.InactiveUserId));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("вимкнено", await response.Content.ReadAsStringAsync());
+        Assert.Equal(ApiFactory.ActiveUserId, entry.UserId); // хто змінив, сервер узяв із сесії
     }
 
     [MySqlFact]
     public async Task Get_UnknownOrder_Returns404()
     {
-        var response = await _client.GetAsync("/orders/12345");
+        var client = await factory.LoginAsync(ApiFactory.Admin);
+
+        var response = await client.GetAsync("/orders/12345");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
