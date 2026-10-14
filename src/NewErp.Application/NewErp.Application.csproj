@@ -4,4 +4,9 @@
     <ProjectReference Include="..\NewErp.Domain\NewErp.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+  </ItemGroup>
+
 </Project>
