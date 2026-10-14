@@ -16,12 +16,17 @@
 ```
 dotnet build
 dotnet test
-dotnet run --project src/NewErp.Api   # GET /health
+dotnet run --project src/NewErp.Api   # /scalar — документація API
+dotnet run --project tools/NewErp.DevSeed   # вигадані дані в порожню базу
+dotnet tool restore && dotnet ef ...  # dotnet-ef закріплено в dotnet-tools.json
 ```
+
+Інтеграційні тести вмикаються змінною `NEWERP_TEST_DB` (див. README), без неї пропускаються.
 
 ## База даних і навчання
 
-- Справжньої бази OpenCart немає, і персональних даних клієнтів не використовуємо. Працюємо з локальною MySQL 8 `newerp_dev`, створеною з `db/schema.sql`: це структура, відновлена з `install/opencart.sql` старого сайту, з префіксом `dd_`.
+- Справжньої бази OpenCart немає, і персональних даних клієнтів не використовуємо. Працюємо з локальною MySQL 8 `newerp_dev`, створеною з `db/schema.sql` (структура з `install/opencart.sql` старого сайту, префікс `dd_`), `db/reconstructed.sql` (наша реконструкція власних таблиць старої ERP) і `db/erp.sql` (нові таблиці `erp_*`). Дані лише вигадані, з `tools/NewErp.DevSeed`.
+- Провайдер EF Core: `MySql.EntityFrameworkCore` (Oracle), бо Pomelo ще не підтримує EF Core 10. Класи `dd_*` згенеровано scaffold у `Infrastructure/Persistence/Legacy`, руками їх не правимо; таблиці `erp_stock_*` описано в `ErpDbContext.Stock.cs`.
 - Працюємо database-first (`dotnet ef dbcontext scaffold`), таблиці OpenCart міграціями не змінюємо.
 - Таблиць і колонок, яких немає в `db/schema.sql`, не вигадуємо мовчки. Кожну реконструкцію позначаємо як нашу.
 - Нові власні таблиці створюємо лише з префіксом `erp_`.
