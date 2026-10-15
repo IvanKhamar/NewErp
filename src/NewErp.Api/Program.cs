@@ -45,6 +45,11 @@ app.MapStaffEndpoints();
 app.MapStockEndpoints();
 app.MapProductionEndpoints();
 
+// Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
+// інакше не відкрилася б сторінка входу; дані однаково захищає API.
+app.MapStaticAssets().AllowAnonymous();
+app.MapFallbackToFile("app/{*path:nonfile}", "app/index.html").AllowAnonymous();
+
 app.Run();
 
 // Потрібно, щоб інтеграційні тести могли запустити застосунок через WebApplicationFactory<Program>.

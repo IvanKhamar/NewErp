@@ -1,0 +1,19 @@
+@* Меню: кожен розділ видно лише ролям, яким його відкриває API (див. Auth/Access.cs). *@
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Головна</MudNavLink>
+    <AuthorizeView Roles="@Access.Stock">
+        <MudNavLink Href="stock" Icon="@Icons.Material.Filled.Inventory2">Склад</MudNavLink>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Production">
+        <MudNavLink Href="production" Icon="@Icons.Material.Filled.ContentCut">Виробництво</MudNavLink>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Orders">
+        <MudNavLink Href="orders" Icon="@Icons.Material.Filled.ShoppingCart">Замовлення</MudNavLink>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Bonuses">
+        <MudNavLink Href="bonuses" Icon="@Icons.Material.Filled.Paid">Бонуси</MudNavLink>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Users">
+        <MudNavLink Href="users" Icon="@Icons.Material.Filled.People">Користувачі</MudNavLink>
+    </AuthorizeView>
+</MudNavMenu>

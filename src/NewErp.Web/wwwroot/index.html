@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NewErp</title>
+    <!-- Інтерфейс живе під /app/, адреси API (/orders, /stock...) лишаються вільними. -->
+    <base href="/app/" />
+    <!-- Файли пакетів (MudBlazor) сервер роздає з кореня /_content/, тому шлях абсолютний. -->
+    <link rel="preload" id="webassembly" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="stylesheet" href="/_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Сталася непередбачена помилка.
+        <a href="." class="reload">Оновити сторінку</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="/_content/MudBlazor/MudBlazor.min.js"></script>
+</body>
+
+</html>

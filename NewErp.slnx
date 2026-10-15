@@ -4,10 +4,12 @@
     <Project Path="src/NewErp.Application/NewErp.Application.csproj" />
     <Project Path="src/NewErp.Domain/NewErp.Domain.csproj" />
     <Project Path="src/NewErp.Infrastructure/NewErp.Infrastructure.csproj" />
+    <Project Path="src/NewErp.Web/NewErp.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NewErp.IntegrationTests/NewErp.IntegrationTests.csproj" />
     <Project Path="tests/NewErp.UnitTests/NewErp.UnitTests.csproj" />
+    <Project Path="tests/NewErp.Web.Tests/NewErp.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/NewErp.DevSeed/NewErp.DevSeed.csproj" />

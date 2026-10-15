@@ -1,0 +1,10 @@
+@inherits LayoutComponentBase
+
+@* Макет без меню для сторінки входу. *@
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudSnackbarProvider />
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="d-flex align-center" Style="min-height: 100vh">
+    @Body
+</MudContainer>

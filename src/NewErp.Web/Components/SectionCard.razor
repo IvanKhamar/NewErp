@@ -1,0 +1,20 @@
+@* Картка розділу на головній сторінці. *@
+<MudCard Elevation="1" Style="height: 100%">
+    <MudCardContent>
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@Icon" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@Title</MudText>
+        </div>
+        <MudText Typo="Typo.body2">@Text</MudText>
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Href="@Href" Variant="Variant.Text" Color="Color.Primary">Відкрити</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+}

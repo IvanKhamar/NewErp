@@ -1,0 +1,35 @@
+@page "/"
+@attribute [Authorize]
+
+<PageTitle>NewErp</PageTitle>
+
+<AuthorizeView>
+    <MudText Typo="Typo.h4" GutterBottom="true">Вітаємо, @context.User.Identity?.Name!</MudText>
+</AuthorizeView>
+
+<MudGrid>
+    <AuthorizeView Roles="@Access.Stock">
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="stock" Icon="@Icons.Material.Filled.Inventory2" Title="Склад"
+                         Text="Розхідники, прихід і витрата, що дозамовити, замовлення постачальникам." />
+        </MudItem>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Production">
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="production" Icon="@Icons.Material.Filled.ContentCut" Title="Виробництво"
+                         Text="Моделі й розміри, крій і пошив, що треба шити." />
+        </MudItem>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Orders">
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="orders" Icon="@Icons.Material.Filled.ShoppingCart" Title="Замовлення"
+                         Text="Список, статуси, менеджери, SMS клієнтам." />
+        </MudItem>
+    </AuthorizeView>
+    <AuthorizeView Roles="@Access.Users">
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="users" Icon="@Icons.Material.Filled.People" Title="Користувачі"
+                         Text="Доступ до NewErp, ролі, тимчасові паролі." />
+        </MudItem>
+    </AuthorizeView>
+</MudGrid>

@@ -1,0 +1,72 @@
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@inject ApiAuthenticationStateProvider Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Вхід — NewErp</PageTitle>
+
+<MudPaper Class="pa-6" Width="100%" Elevation="2">
+    <MudText Typo="Typo.h5" GutterBottom="true">Вхід у NewErp</MudText>
+    <EditForm Model="_model" OnValidSubmit="SubmitAsync">
+        <MudTextField @bind-Value="_model.Username" Label="Логін" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      AutoFocus="true" Required="true" RequiredError="Вкажіть логін" Class="mb-3" />
+        <MudTextField @bind-Value="_model.Password" Label="Пароль" InputType="InputType.Password" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Required="true" RequiredError="Вкажіть пароль" Class="mb-3" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-test="login-error">@_error</MudAlert>
+        }
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="_busy">
+            @(_busy ? "Входимо..." : "Увійти")
+        </MudButton>
+    </EditForm>
+</MudPaper>
+
+@code {
+    private readonly LoginModel _model = new();
+    private string? _error;
+    private bool _busy;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var user = await Auth.LoginAsync(new LoginRequest(_model.Username, _model.Password));
+            if (user is null)
+            {
+                _error = "Невірний логін або пароль.";
+                return;
+            }
+
+            // Тимчасовий пароль від адміна треба змінити до того, як працювати далі.
+            Navigation.NavigateTo(user.MustChangePassword ? "change-password" : SafeReturnUrl());
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Сервер недоступний. Спробуйте ще раз.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // Лише відносні адреси всередині інтерфейсу: так посилання ззовні не перекине після входу на чужий сайт.
+    private string SafeReturnUrl() =>
+        string.IsNullOrEmpty(ReturnUrl) || ReturnUrl.Contains(':') || ReturnUrl.StartsWith("//", StringComparison.Ordinal)
+            ? ""
+            : ReturnUrl;
+
+    private sealed class LoginModel
+    {
+        public string Username { get; set; } = "";
+
+        public string Password { get; set; } = "";
+    }
+}

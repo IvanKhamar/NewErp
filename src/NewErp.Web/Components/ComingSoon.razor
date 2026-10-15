@@ -1,0 +1,8 @@
+@* Заглушка розділу, екрани якого ще не зроблено. *@
+<MudText Typo="Typo.h4" GutterBottom="true">@Title</MudText>
+<MudAlert Severity="Severity.Info">Екрани цього розділу з'являться наступними кроками. Поки що все доступне через API: <MudLink Href="/scalar" Target="_blank">документація /scalar</MudLink>.</MudAlert>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = "";
+}

@@ -1,0 +1,44 @@
+using System.Net;
+using System.Net.Http.Json;
+
+using Microsoft.Extensions.DependencyInjection;
+
+using MudBlazor.Services;
+
+using NewErp.Web.Auth;
+
+namespace NewErp.Web.Tests;
+
+/// <summary>
+/// Спільне налаштування для тестів компонентів: MudBlazor, «API» з наперед заданими відповідями і стан входу.
+/// </summary>
+public abstract class WebTestContext : BunitContext
+{
+    protected WebTestContext()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose; // MudBlazor викликає JavaScript; у тестах ці виклики просто ігноруються
+        Services.AddMudServices();
+        Services.AddSingleton(new HttpClient(Api) { BaseAddress = new Uri("http://localhost/app/") });
+        Services.AddScoped<ApiAuthenticationStateProvider>();
+    }
+
+    protected FakeApi Api { get; } = new();
+
+    /// <summary>Підроблений API: відповідь за шляхом запиту, решта — 404.</summary>
+    protected sealed class FakeApi : HttpMessageHandler
+    {
+        private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = [];
+
+        public List<string> Requests { get; } = [];
+
+        public void Respond(string path, HttpStatusCode status, object? body = null) =>
+            _responses[path] = () => new HttpResponseMessage(status) { Content = body is null ? null : JsonContent.Create(body) };
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            Requests.Add(path);
+            return Task.FromResult(_responses.TryGetValue(path, out var respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+}

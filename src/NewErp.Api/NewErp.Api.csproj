@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -16,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NewErp.Application\NewErp.Application.csproj" />
     <ProjectReference Include="..\NewErp.Infrastructure\NewErp.Infrastructure.csproj" />
+    <ProjectReference Include="..\NewErp.Web\NewErp.Web.csproj" />
   </ItemGroup>
 
 </Project>

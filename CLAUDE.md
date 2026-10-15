@@ -6,6 +6,7 @@
 ## Структура та правила коду
 
 - Шари: `Domain ← Application ← Infrastructure ← Api`. Залежності спрямовані лише всередину, це перевіряє `tests/NewErp.UnitTests/LayerDependencyTests.cs`.
+- Веб-інтерфейс `NewErp.Web` (Blazor WebAssembly + MudBlazor) живе під `/app/`, роздається з `NewErp.Api` і говорить з сервером лише через HTTP API; з `NewErp.Application` бере тільки record-и запитів і відповідей. Адреси API пишемо з `/` на початку (`/stock/items`), бо `<base href="/app/">`. Ролі розділів — `Auth/Access.cs`, у парі з політиками в `NewErp.Api/Auth/AuthSetup.cs`.
 - Бізнес-модулі (Orders, Stock, Cashbox, Delivery…) — це папки всередині кожного шару, а не окремі проєкти.
 - Імена мають вигляд `NewErp.*`, акронім пишемо `Erp`, а не `ERP`.
 - Спільні налаштування збірки задано в `Directory.Build.props`, попередження там вважаються помилками.
