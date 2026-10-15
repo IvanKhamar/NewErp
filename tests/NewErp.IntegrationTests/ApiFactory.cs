@@ -37,6 +37,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const int Pending = 24;   // 1) Уточнюємо
     public const int Completed = 22; // 5) Відправлено
     public const int Manufacturing = 25; // 3) Виготовляється
+    public const int Accepted = 18;      // 2) Прийнято
+    public const int Cancelled = 19;     // Відмінено
+    public const int SizeMOptionValueId = 47; // у замовленні OrderId вибрано розмір M
+    // Замовлення з товаром, прив'язаним до моделі не напряму, а через категорію й назву (поза періодом інших тестів).
+    public const int CategoryOrderId = 4;
+    public const int CategoryProductId = 102; // «Сорочка лляна оверсайз», категорія CategoryId, розмір M, 1 шт.
+    public const int CategoryId = 5;
 
     public async Task InitializeAsync()
     {
@@ -70,7 +77,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.DdOrderStatuses.AddRange(
             new DdOrderStatus { OrderStatusId = Pending, LanguageId = LanguageId, Name = "1) Уточнюємо" },
             new DdOrderStatus { OrderStatusId = Completed, LanguageId = LanguageId, Name = "5) Відправлено" },
-            new DdOrderStatus { OrderStatusId = Manufacturing, LanguageId = LanguageId, Name = "3) Виготовляється" });
+            new DdOrderStatus { OrderStatusId = Manufacturing, LanguageId = LanguageId, Name = "3) Виготовляється" },
+            new DdOrderStatus { OrderStatusId = Accepted, LanguageId = LanguageId, Name = "2) Прийнято" },
+            new DdOrderStatus { OrderStatusId = Cancelled, LanguageId = LanguageId, Name = "Відмінено" });
         db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = 1, LanguageId = LanguageId, Name = "Instagram" });
         db.DdUsers.AddRange(
             User(ActiveUserId, "Олена", active: true),
@@ -86,7 +95,35 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.DdOrders.Add(Order(OrderId, Pending, 1500m, new DateTime(2026, 10, 1, 12, 0, 0)));
         db.DdOrders.Add(Order(2, Completed, 2000m, new DateTime(2026, 10, 2, 12, 0, 0)));
         db.DdOrders.Add(Order(3, 0, 999m, new DateTime(2026, 10, 3, 12, 0, 0))); // незавершене, не має показуватися
-        db.DdOrderProducts.Add(new DdOrderProduct { OrderId = OrderId, ProductId = ProductId, Name = "Сукня", Model = "T-1", Quantity = 2, Price = 750m, Total = 1500m });
+        db.DdOrderProducts.Add(new DdOrderProduct { OrderProductId = 1, OrderId = OrderId, ProductId = ProductId, Name = "Сукня", Model = "T-1", Quantity = 2, Price = 750m, Total = 1500m });
+        // Розмір M у замовленні: опція товару (product_option_value) і вибір покупця (order_option), як їх пише OpenCart.
+        db.DdProductOptionValues.Add(new DdProductOptionValue
+        {
+            ProductOptionValueId = 501, ProductOptionId = 50, ProductId = ProductId, OptionId = 11, OptionValueId = SizeMOptionValueId,
+            PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
+        });
+        db.DdOrderOptions.Add(new DdOrderOption
+        {
+            OrderId = OrderId, OrderProductId = 1, ProductOptionId = 50, ProductOptionValueId = 501, Name = "Розмір", Value = "M", Type = "radio",
+        });
+
+        db.DdOrders.Add(Order(CategoryOrderId, Pending, 900m, new DateTime(2026, 9, 1, 12, 0, 0)));
+        db.DdOrderProducts.Add(new DdOrderProduct { OrderProductId = 2, OrderId = CategoryOrderId, ProductId = CategoryProductId, Name = "Сорочка", Model = "T-2", Quantity = 1, Price = 900m, Total = 900m });
+        db.DdProductToCategories.Add(new DdProductToCategory { ProductId = CategoryProductId, CategoryId = CategoryId });
+        db.DdProductDescriptions.Add(new DdProductDescription
+        {
+            ProductId = CategoryProductId, LanguageId = LanguageId, Name = "Сорочка лляна оверсайз",
+            Description = "", Tag = "", MetaTitle = "", MetaDescription = "", MetaKeyword = "",
+        });
+        db.DdProductOptionValues.Add(new DdProductOptionValue
+        {
+            ProductOptionValueId = 502, ProductOptionId = 51, ProductId = CategoryProductId, OptionId = 11, OptionValueId = SizeMOptionValueId,
+            PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
+        });
+        db.DdOrderOptions.Add(new DdOrderOption
+        {
+            OrderId = CategoryOrderId, OrderProductId = 2, ProductOptionId = 51, ProductOptionValueId = 502, Name = "Розмір", Value = "M", Type = "radio",
+        });
         db.ErpOrderManagers.Add(new ErpOrderManager { OrderId = 2, UserId = ActiveUserId, AssignedByUserId = ActiveUserId, AssignedAt = DateTime.Now });
 
         var category = new StockCategory("Тканини");

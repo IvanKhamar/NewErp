@@ -37,6 +37,18 @@ public interface IProductionRepository
 
     Task<IReadOnlyList<ProductionLogDto>> ListLogAsync(ProductionLogFilter filter, CancellationToken ct);
 
+    /// <summary>Рядки замовлення з моделлю виробництва й опціями (порожньо, якщо замовлення без товарів).</summary>
+    Task<IReadOnlyList<OrderSizeLine>> GetOrderSizeLinesAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Моделі з розмірами для зміни залишків.</summary>
+    Task<IReadOnlyList<ProductionModel>> FindModelsAsync(IReadOnlyCollection<int> productionIds, CancellationToken ct);
+
+    /// <summary>
+    /// Скільки пошитих виробів кожного розміру це замовлення зараз тримає: списане з коментарем «Замовлення #id»
+    /// мінус повернене з «Скасування #id». Рахується за спільним журналом, тож враховує й дії старого сайту.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, decimal>> GetSewnHeldByOrderAsync(int orderId, CancellationToken ct);
+
     void Add(ProductionLogEntry entry);
 
     void Add(StockMovement movement);

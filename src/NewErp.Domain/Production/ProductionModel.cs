@@ -185,6 +185,29 @@ public class ProductionModel
         return Change(size, ProductionLogEntry.Sewn, -quantity, comment, userId, username, now);
     }
 
+    /// <summary>Коментар журналу, яким старий сайт позначає списання пошитих виробів під замовлення.</summary>
+    public static string OrderComment(int orderId) => $"Замовлення #{orderId}";
+
+    /// <summary>Коментар журналу для повернення виробів при виході замовлення зі статусів списання.</summary>
+    public static string CancelComment(int orderId) => $"Скасування #{orderId}";
+
+    /// <summary>
+    /// Замовлення забирає пошиті вироби розміру. Як і списання розхідників, бере те, що є:
+    /// замовлення не можна заблокувати через порожній склад. Повертає null, якщо брати нічого.
+    /// </summary>
+    public ProductionLogEntry? TakeSewnForOrder(int sizeId, decimal wanted, int orderId, int userId, string username, DateTime now)
+    {
+        var size = RequireSize(sizeId);
+        var amount = Math.Min(RequirePositive(wanted), Math.Max(0, size.SewnStock));
+        return amount > 0
+            ? Change(size, ProductionLogEntry.Sewn, -amount, OrderComment(orderId), userId, username, now)
+            : null;
+    }
+
+    /// <summary>Замовлення вийшло зі статусів списання: вироби повертаються на склад.</summary>
+    public ProductionLogEntry ReturnSewnFromOrder(int sizeId, decimal quantity, int orderId, int userId, string username, DateTime now) =>
+        Change(RequireSize(sizeId), ProductionLogEntry.Sewn, RequirePositive(quantity), CancelComment(orderId), userId, username, now);
+
     private ProductionLogEntry Change(
         ProductionSize size, string stage, decimal delta, string? comment, int userId, string username, DateTime now)
     {

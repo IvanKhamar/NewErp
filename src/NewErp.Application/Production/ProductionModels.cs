@@ -92,3 +92,23 @@ public sealed record ProductionLogDto(
 
 /// <summary>Stage: "cut" або "sewn".</summary>
 public sealed record ProductionLogFilter(int? ProductionId = null, string? Stage = null, int Limit = 100);
+
+// ── Замовлення ──
+
+/// <summary>Налаштування виробництва з розділу "Production" в appsettings.json.</summary>
+public sealed class ProductionOptions
+{
+    public const string SectionName = "Production";
+
+    /// <summary>
+    /// Статуси, у яких замовлення забирає пошиті вироби зі складу. Вхід у цей набір списує, вихід із нього повертає,
+    /// перехід усередині набору нічого не змінює (як у старому модулі StockTrack).
+    /// </summary>
+    public int[] OrderSubtractStatusIds { get; set; } = [];
+}
+
+/// <summary>
+/// Рядок замовлення з тим, що потрібно для складу: модель виробництва, до якої прив'язано товар
+/// (напряму чи через категорію), і значення опцій OpenCart, серед яких шукаємо розмір.
+/// </summary>
+public sealed record OrderSizeLine(int ProductId, string ProductName, int Quantity, int? ProductionId, IReadOnlyList<int> OptionValueIds);

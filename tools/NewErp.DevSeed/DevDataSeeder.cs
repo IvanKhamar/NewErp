@@ -1,11 +1,13 @@
 using Bogus;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 using NewErp.Application.Auth;
 using NewErp.Application.Production;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
+using NewErp.Infrastructure;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
@@ -164,6 +166,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await db.SaveChangesAsync();
 
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
+        await SeedSizeOptionsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
         return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, " +
@@ -176,7 +179,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// </summary>
     private async Task<int> SeedProductionOperationsAsync(int userId, string username)
     {
-        var service = new ProductionService(new ProductionRepository(db), TimeProvider.System);
+        var repository = new ProductionRepository(db, Options.Create(new ErpOptions { LanguageId = LanguageId }));
+        var service = new ProductionService(repository, TimeProvider.System);
         var warnings = 0;
         foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
         {
@@ -201,6 +205,47 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// Моделі виробництва для перших товарів зі списку Products: розміри, деталі крою, специфікації крою й пошиву.
     /// Залишки крою й пошиву нульові, тож усі моделі одразу видно в списку «треба шити».
     /// </summary>
+    // Вигадані id значень опції «Розмір» (dd_option_value), спільні для всіх товарів.
+    private const int SizeOptionId = 11;
+    private static readonly Dictionary<string, int> SizeOptionValues = new() { ["S"] = 46, ["M"] = 47, ["L"] = 48, ["XL"] = 49 };
+
+    /// <summary>
+    /// Кожен товар отримує опцію «Розмір» (dd_product_option_value), а кожен рядок замовлення — вибраний розмір
+    /// (dd_order_option), як це робить OpenCart при оформленні замовлення.
+    /// </summary>
+    private async Task SeedSizeOptionsAsync()
+    {
+        var optionValues = new Dictionary<(int ProductId, string Size), DdProductOptionValue>();
+        for (var i = 0; i < Products.Length; i++)
+        {
+            foreach (var (size, valueId) in SizeOptionValues)
+            {
+                var value = new DdProductOptionValue
+                {
+                    ProductOptionId = 1000 + i, ProductId = FirstProductId + i, OptionId = SizeOptionId, OptionValueId = valueId,
+                    Quantity = 0, Subtract = true, PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
+                };
+                db.DdProductOptionValues.Add(value);
+                optionValues[(FirstProductId + i, size)] = value;
+            }
+        }
+        await db.SaveChangesAsync();
+
+        var sizes = SizeOptionValues.Keys.ToArray();
+        foreach (var line in db.DdOrderProducts.ToList())
+        {
+            var size = sizes[_random.Next(sizes.Length)];
+            var value = optionValues[(line.ProductId, size)];
+            db.DdOrderOptions.Add(new DdOrderOption
+            {
+                OrderId = line.OrderId, OrderProductId = line.OrderProductId,
+                ProductOptionId = value.ProductOptionId, ProductOptionValueId = value.ProductOptionValueId,
+                Name = "Розмір", Value = size, Type = "radio",
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
     private async Task<int> SeedProductionAsync()
     {
         var item = db.StockItems.ToDictionary(i => i.Name, i => i.Id);
@@ -223,6 +268,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             model.SetLinks([FirstProductId + spec.Product], []);
             db.ProductionModels.Add(model);
             await db.SaveChangesAsync();
+            // Розміри моделі зв'язуються з тими самими значеннями опції «Розмір», що й у замовленнях.
+            model.SetSizeOptions(model.Sizes.Select(s => (s.Id, (int?)SizeOptionValues[s.Name])).ToList());
 
             var front = new ProductionComponent(model.Id, "Перед", 1);
             var back = new ProductionComponent(model.Id, "Спинка", 2);

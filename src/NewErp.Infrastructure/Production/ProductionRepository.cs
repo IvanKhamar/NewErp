@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 using NewErp.Application.Production;
 using NewErp.Domain.Production;
@@ -7,8 +8,82 @@ using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Production;
 
-public sealed class ProductionRepository(ErpDbContext db) : IProductionRepository
+public sealed class ProductionRepository(ErpDbContext db, IOptions<ErpOptions> options) : IProductionRepository
 {
+    private readonly int _languageId = options.Value.LanguageId;
+
+    public async Task<IReadOnlyList<OrderSizeLine>> GetOrderSizeLinesAsync(int orderId, CancellationToken ct)
+    {
+        var products = await db.DdOrderProducts.AsNoTracking()
+            .Where(p => p.OrderId == orderId)
+            .Select(p => new { p.OrderProductId, p.ProductId, p.Name, p.Quantity })
+            .ToListAsync(ct);
+        if (products.Count == 0)
+            return [];
+        var productIds = products.Select(p => p.ProductId).Distinct().ToList();
+
+        // Опція в замовленні посилається на product_option_value, а розмір моделі — на option_value_id із нього.
+        var options = await (
+            from o in db.DdOrderOptions
+            join v in db.DdProductOptionValues on o.ProductOptionValueId equals v.ProductOptionValueId
+            where o.OrderId == orderId
+            select new { o.OrderProductId, v.OptionValueId }
+        ).ToListAsync(ct);
+
+        var direct = await (
+            from l in db.Set<ProductionProductLink>()
+            join m in db.ProductionModels on l.ProductionId equals m.Id
+            where m.IsActive && productIds.Contains(l.ProductId)
+            select new { l.ProductId, l.ProductionId }
+        ).ToListAsync(ct);
+
+        // Прив'язка через категорію: порожній фільтр — уся категорія, інакше назва товару містить фільтр
+        // (або дорівнює йому, якщо match_exact). Як у старому модулі, порівняння без урахування регістру (collation бази).
+        var byCategory = await (
+            from c in db.Set<ProductionCategoryLink>()
+            join m in db.ProductionModels on c.ProductionId equals m.Id
+            join pc in db.DdProductToCategories on c.CategoryId equals pc.CategoryId
+            join pd in db.DdProductDescriptions on pc.ProductId equals pd.ProductId
+            where m.IsActive && pd.LanguageId == _languageId && productIds.Contains(pc.ProductId)
+                && (c.NameFilter == ""
+                    || (c.MatchExact && pd.Name == c.NameFilter)
+                    || (!c.MatchExact && pd.Name.Contains(c.NameFilter)))
+            select new { pc.ProductId, c.ProductionId, HasFilter = c.NameFilter != "" }
+        ).ToListAsync(ct);
+
+        // Пряма прив'язка важливіша за категорію, а категорія з фільтром — за всю категорію.
+        int? ProductionFor(int productId) =>
+            direct.Where(d => d.ProductId == productId).Select(d => (int?)d.ProductionId).Min()
+            ?? byCategory.Where(c => c.ProductId == productId)
+                .OrderByDescending(c => c.HasFilter).ThenBy(c => c.ProductionId)
+                .Select(c => (int?)c.ProductionId).FirstOrDefault();
+
+        return products
+            .Select(p => new OrderSizeLine(
+                p.ProductId, p.Name, p.Quantity, ProductionFor(p.ProductId),
+                options.Where(o => o.OrderProductId == p.OrderProductId).Select(o => o.OptionValueId).ToList()))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ProductionModel>> FindModelsAsync(IReadOnlyCollection<int> productionIds, CancellationToken ct) =>
+        await db.ProductionModels.Include(m => m.Sizes).Where(m => productionIds.Contains(m.Id)).ToListAsync(ct);
+
+    public async Task<IReadOnlyDictionary<int, decimal>> GetSewnHeldByOrderAsync(int orderId, CancellationToken ct)
+    {
+        var taken = ProductionModel.OrderComment(orderId);
+        var returned = ProductionModel.CancelComment(orderId);
+        var rows = await db.ProductionLog.AsNoTracking()
+            .Where(l => l.Stage == ProductionLogEntry.Sewn && (l.Comment == taken || l.Comment == returned))
+            .Select(l => new { l.SizeId, l.Direction, l.Comment, l.Quantity })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.SizeId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Where(r => r.Comment == taken && r.Direction == ProductionLogEntry.Out).Sum(r => r.Quantity)
+                   - g.Where(r => r.Comment == returned && r.Direction == ProductionLogEntry.In).Sum(r => r.Quantity));
+    }
     public async Task<IReadOnlyList<ProductionModelSummaryDto>> ListAsync(ProductionModelFilter filter, CancellationToken ct)
     {
         var models = db.ProductionModels.AsNoTracking().Where(m => m.IsActive);
