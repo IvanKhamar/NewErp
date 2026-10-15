@@ -82,3 +82,97 @@ CREATE TABLE `dd_stock_log` (
   PRIMARY KEY (`log_id`),
   KEY `item_id` (`item_id`, `date_added`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ═══ Виробництво (модуль StockTrack старого сайту) ═══
+-- Так само відновлено із запитів admin/model/tool/stocktrack.php і catalog/controller/extension/event/stocktrack.php.
+-- Типи, рушій і первинні ключі вгадані, звірити зі справжньою базою.
+
+-- Модель виробу. type: 'clothing' (власний пошив) або 'ready_made' (готовий товар від постачальника).
+-- min_total: якщо пошитих разом менше, модель потрапляє в список «треба шити». status = 0 означає «видалено».
+CREATE TABLE `dd_stock_production` (
+  `production_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `type` varchar(32) NOT NULL DEFAULT 'clothing',
+  `min_total` int(11) NOT NULL DEFAULT '50',
+  `sort_order` int(11) NOT NULL DEFAULT '0',
+  `status` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`production_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Розмір моделі: скільки розкроєно (cut_stock) і пошито (sewn_stock).
+-- oc_option_value_id зв'язує розмір з опцією товару OpenCart (dd_option_value).
+CREATE TABLE `dd_stock_production_sizes` (
+  `size_id` int(11) NOT NULL AUTO_INCREMENT,
+  `production_id` int(11) NOT NULL,
+  `size_name` varchar(32) NOT NULL,
+  `percent` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `cut_stock` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `sewn_stock` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `sort_order` int(11) NOT NULL DEFAULT '0',
+  `oc_option_value_id` int(11) NULL,
+  PRIMARY KEY (`size_id`),
+  KEY `production_id` (`production_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Товари OpenCart, прив'язані до моделі напряму.
+CREATE TABLE `dd_stock_production_products` (
+  `production_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  PRIMARY KEY (`production_id`, `product_id`),
+  KEY `product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Прив'язка через категорію OpenCart: усі товари категорії, назва яких містить name_filter
+-- (або точно дорівнює йому, якщо match_exact = 1). Порожній фільтр — уся категорія.
+CREATE TABLE `dd_stock_production_categories` (
+  `production_id` int(11) NOT NULL,
+  `oc_category_id` int(11) NOT NULL,
+  `name_filter` varchar(255) NOT NULL DEFAULT '',
+  `match_exact` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`production_id`, `oc_category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Компонент крою (деталь: перед, спинка, рукав...).
+CREATE TABLE `dd_stock_production_components` (
+  `component_id` int(11) NOT NULL AUTO_INCREMENT,
+  `production_id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`component_id`),
+  KEY `production_id` (`production_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Запас розкроєних деталей за розміром.
+CREATE TABLE `dd_stock_production_component_stock` (
+  `component_id` int(11) NOT NULL,
+  `size_id` int(11) NOT NULL,
+  `stock` decimal(12,3) NOT NULL DEFAULT '0.000',
+  PRIMARY KEY (`component_id`, `size_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Специфікація крою: скільки розхідника йде на одну деталь.
+-- size_id NULL — для всіх розмірів; рядок із конкретним size_id перекриває його для цього розміру.
+-- bom_id — НАШ ключ: старий модуль ним не користується (пише через DELETE + INSERT за іменами полів),
+-- тож якщо в справжній таблиці його немає, його можна додати без шкоди для старого сайту.
+CREATE TABLE `dd_stock_production_component_bom` (
+  `bom_id` int(11) NOT NULL AUTO_INCREMENT,
+  `component_id` int(11) NOT NULL,
+  `size_id` int(11) NULL,
+  `item_id` int(11) NOT NULL,
+  `qty_per_unit` decimal(12,4) NOT NULL,
+  PRIMARY KEY (`bom_id`),
+  KEY `component_id` (`component_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Специфікація пошиву: на один пошитий виріб ідуть деталі крою (component_id) і прямі розхідники (item_id: нитки, бірки).
+-- Перекриття за size_id і ключ bom_id — як у специфікації крою.
+CREATE TABLE `dd_stock_production_sewn_bom` (
+  `bom_id` int(11) NOT NULL AUTO_INCREMENT,
+  `production_id` int(11) NOT NULL,
+  `size_id` int(11) NULL,
+  `component_id` int(11) NULL,
+  `item_id` int(11) NULL,
+  `qty_per_unit` decimal(12,4) NOT NULL,
+  PRIMARY KEY (`bom_id`),
+  KEY `production_id` (`production_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

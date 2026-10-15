@@ -1,6 +1,7 @@
 using Bogus;
 
 using NewErp.Application.Auth;
+using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
@@ -159,7 +160,62 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await db.SaveChangesAsync();
 
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу.";
+        var models = await SeedProductionAsync();
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, {models} моделей виробництва.";
+    }
+
+    /// <summary>
+    /// Моделі виробництва для перших товарів зі списку Products: розміри, деталі крою, специфікації крою й пошиву.
+    /// Залишки крою й пошиву нульові, тож усі моделі одразу видно в списку «треба шити».
+    /// </summary>
+    private async Task<int> SeedProductionAsync()
+    {
+        var item = db.StockItems.ToDictionary(i => i.Name, i => i.Id);
+        int linen = item["Льон бежевий"], viscose = item["Віскоза принт"], knit = item["Трикотаж чорний"],
+            buttons = item["Ґудзики дерев'яні 15 мм"], zipper = item["Блискавка прихована 20 см"],
+            bag = item["Пакет кур'єрський 30x40"], tag = item["Бірка з логотипом"];
+
+        // (товар, тканина, метрів на перед, метрів на спинку, фурнітура на виріб)
+        (int Product, int Fabric, decimal Front, decimal Back, (int Item, decimal Qty) Fitting)[] specs =
+        [
+            (0, linen, 1.3m, 1.5m, (zipper, 1)),   // Сукня лляна
+            (1, viscose, 1.0m, 1.2m, (buttons, 8)), // Сорочка оверсайз
+            (3, knit, 1.4m, 1.7m, (zipper, 1)),    // Костюм трикотажний
+        ];
+
+        foreach (var spec in specs)
+        {
+            var model = new ProductionModel(Products[spec.Product], ProductionModel.Clothing, minTotal: 30, sortOrder: spec.Product);
+            model.SetSizes([("S", 25m), ("M", 40m), ("L", 25m), ("XL", 10m)]);
+            model.SetLinks([FirstProductId + spec.Product], []);
+            db.ProductionModels.Add(model);
+            await db.SaveChangesAsync();
+
+            var front = new ProductionComponent(model.Id, "Перед", 1);
+            var back = new ProductionComponent(model.Id, "Спинка", 2);
+            var sizeIds = model.Sizes.Select(s => s.Id).ToList();
+            var xl = model.Sizes.Single(s => s.Name == "XL").Id;
+            front.SetBom([(null, spec.Fabric, spec.Front), (xl, spec.Fabric, spec.Front + 0.2m)], sizeIds); // на XL тканини більше
+            back.SetBom([(null, spec.Fabric, spec.Back)], sizeIds);
+            db.ProductionComponents.AddRange(front, back);
+            await db.SaveChangesAsync();
+
+            // На один пошитий виріб: по одній деталі крою, фурнітура, бірка й пакет.
+            model.SetSewnBom(
+                [
+                    (null, front.Id, null, 1), (null, back.Id, null, 1),
+                    (null, null, spec.Fitting.Item, spec.Fitting.Qty), (null, null, tag, 1), (null, null, bag, 1),
+                ],
+                [front.Id, back.Id]);
+            await db.SaveChangesAsync();
+        }
+
+        var bagModel = new ProductionModel("Шопер (готовий, від постачальника)", ProductionModel.ReadyMade, minTotal: 10, sortOrder: 99);
+        bagModel.SetSizes([("Єдиний", 100m)]);
+        db.ProductionModels.Add(bagModel);
+        await db.SaveChangesAsync();
+
+        return specs.Length + 1;
     }
 
     private async Task<int> SeedStockAsync(int userId, string username, DateTime now)

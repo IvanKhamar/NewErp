@@ -1,0 +1,166 @@
+using NewErp.Domain.Common;
+using NewErp.Domain.Stock;
+
+namespace NewErp.Domain.Production;
+
+/// <summary>
+/// Модель виробу (dd_stock_production): розміри з залишками крою й пошиву, прив'язка до товарів магазину
+/// і специфікація пошиву. Компоненти крою — окремі об'єкти (<see cref="ProductionComponent"/>).
+/// </summary>
+public class ProductionModel
+{
+    /// <summary>Власний пошив: крій → пошив.</summary>
+    public const string Clothing = "clothing";
+
+    /// <summary>Готовий товар від постачальника: лише залишок «пошито».</summary>
+    public const string ReadyMade = "ready_made";
+
+    private readonly List<ProductionSize> _sizes = [];
+    private readonly List<ProductionProductLink> _productLinks = [];
+    private readonly List<ProductionCategoryLink> _categoryLinks = [];
+    private readonly List<SewnBomLine> _sewnBom = [];
+
+    private ProductionModel() { }
+
+    public ProductionModel(string name, string type, int minTotal, int sortOrder) => Update(name, type, minTotal, sortOrder);
+
+    public int Id { get; private set; }
+
+    public string Name { get; private set; } = "";
+
+    public string Type { get; private set; } = Clothing;
+
+    /// <summary>Якщо пошитих разом менше, модель потрапляє в список «треба шити».</summary>
+    public int MinTotal { get; private set; }
+
+    public int SortOrder { get; private set; }
+
+    /// <summary>false — «видалено»: старий модуль ставить status = 0, а не видаляє рядок.</summary>
+    public bool IsActive { get; private set; } = true;
+
+    public IReadOnlyList<ProductionSize> Sizes => _sizes;
+
+    public IReadOnlyList<ProductionProductLink> ProductLinks => _productLinks;
+
+    public IReadOnlyList<ProductionCategoryLink> CategoryLinks => _categoryLinks;
+
+    public IReadOnlyList<SewnBomLine> SewnBom => _sewnBom;
+
+    public decimal TotalSewn => _sizes.Sum(s => s.SewnStock);
+
+    public void Update(string name, string type, int minTotal, int sortOrder)
+    {
+        if (type is not (Clothing or ReadyMade))
+            throw new DomainException($"Тип моделі має бути {Clothing} або {ReadyMade}.");
+        if (minTotal < 0)
+            throw new DomainException("Мінімальний запас не може бути від'ємним.");
+
+        Name = StockItem.RequireText(name, "Назва моделі", 150);
+        Type = type;
+        MinTotal = minTotal;
+        SortOrder = sortOrder;
+    }
+
+    public void Deactivate() => IsActive = false;
+
+    /// <summary>
+    /// Задає перелік розмірів. Розміри зіставляються за назвою: наявні зберігають id і залишки,
+    /// нові додаються, а прибрати можна лише розмір без залишків і без рядків специфікації пошиву.
+    /// Старий модуль натомість перестворював усі розміри, через що змінювались їхні id.
+    /// </summary>
+    /// <returns>Id прибраних розмірів, щоб сценарій перевірив, що на них не посилаються інші дані.</returns>
+    public IReadOnlyList<int> SetSizes(IReadOnlyList<(string Name, decimal Percent)> sizes)
+    {
+        var names = sizes.Select(s => StockItem.RequireText(s.Name, "Назва розміру", 32)).ToList();
+        if (names.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1) is { } dup)
+            throw new DomainException($"Розмір \"{dup.Key}\" указано двічі.");
+        if (sizes.Any(s => s.Percent is < 0 or > 100))
+            throw new DomainException("Частка розміру має бути від 0 до 100 %.");
+
+        var removed = _sizes.Where(s => !names.Contains(s.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+        foreach (var size in removed)
+        {
+            if (size.CutStock != 0 || size.SewnStock != 0)
+                throw new DomainException($"Розмір \"{size.Name}\" не можна прибрати: на ньому є залишок.");
+            if (_sewnBom.Any(l => l.SizeId == size.Id))
+                throw new DomainException($"Розмір \"{size.Name}\" використовується в специфікації пошиву.");
+            _sizes.Remove(size);
+        }
+
+        for (var i = 0; i < names.Count; i++)
+        {
+            var existing = _sizes.Find(s => string.Equals(s.Name, names[i], StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                _sizes.Add(new ProductionSize(names[i], sizes[i].Percent, i + 1));
+            else
+            {
+                existing.Percent = sizes[i].Percent;
+                existing.SortOrder = i + 1;
+            }
+        }
+
+        return removed.Select(s => s.Id).ToList();
+    }
+
+    /// <summary>Замінює прив'язку до товарів OpenCart: напряму і через категорії з фільтром за назвою.</summary>
+    public void SetLinks(IReadOnlyCollection<int> productIds, IReadOnlyCollection<(int CategoryId, string? NameFilter, bool MatchExact)> categories)
+    {
+        if (productIds.Any(id => id <= 0) || categories.Any(c => c.CategoryId <= 0))
+            throw new DomainException("Id товарів і категорій мають бути додатними.");
+        if (categories.GroupBy(c => c.CategoryId).FirstOrDefault(g => g.Count() > 1) is { } dup)
+            throw new DomainException($"Категорію {dup.Key} указано двічі.");
+
+        var wanted = productIds.ToHashSet();
+        _productLinks.RemoveAll(l => !wanted.Contains(l.ProductId));
+        foreach (var id in wanted.Where(id => _productLinks.All(l => l.ProductId != id)))
+            _productLinks.Add(new ProductionProductLink(id));
+
+        _categoryLinks.RemoveAll(l => categories.All(c => c.CategoryId != l.CategoryId));
+        foreach (var (categoryId, filter, exact) in categories)
+        {
+            var nameFilter = filter?.Trim() ?? "";
+            if (_categoryLinks.Find(l => l.CategoryId == categoryId) is { } link)
+                (link.NameFilter, link.MatchExact) = (nameFilter, exact);
+            else
+                _categoryLinks.Add(new ProductionCategoryLink(categoryId, nameFilter, exact));
+        }
+    }
+
+    /// <summary>Зв'язує розміри моделі зі значеннями опції «Розмір» у товарах OpenCart.</summary>
+    public void SetSizeOptions(IReadOnlyCollection<(int SizeId, int? OptionValueId)> mappings)
+    {
+        foreach (var (sizeId, optionValueId) in mappings)
+            RequireSize(sizeId).OptionValueId = optionValueId;
+    }
+
+    /// <summary>
+    /// Замінює специфікацію пошиву. Кожен рядок — або деталь крою цієї моделі, або розхідник, не обидва.
+    /// </summary>
+    public void SetSewnBom(
+        IReadOnlyCollection<(int? SizeId, int? ComponentId, int? ItemId, decimal QtyPerUnit)> rows,
+        IReadOnlyCollection<int> componentIdsOfModel)
+    {
+        foreach (var row in rows)
+        {
+            if ((row.ComponentId is null) == (row.ItemId is null))
+                throw new DomainException("Рядок специфікації пошиву: вкажіть або деталь крою, або розхідник.");
+            if (row.QtyPerUnit <= 0)
+                throw new DomainException("Кількість на один виріб має бути більшою за нуль.");
+            if (row.SizeId is { } sizeId)
+                RequireSize(sizeId);
+            if (row.ComponentId is { } componentId && !componentIdsOfModel.Contains(componentId))
+                throw new DomainException($"Деталь {componentId} не належить цій моделі.");
+        }
+        if (rows.GroupBy(r => (r.SizeId, r.ComponentId, r.ItemId)).Any(g => g.Count() > 1))
+            throw new DomainException("Специфікація пошиву містить повторювані рядки.");
+
+        _sewnBom.Clear();
+        _sewnBom.AddRange(rows.Select(r => new SewnBomLine(r.SizeId, r.ComponentId, r.ItemId, r.QtyPerUnit)));
+    }
+
+    /// <summary>Прибирає деталь зі специфікації пошиву, коли її видаляють.</summary>
+    public void RemoveComponentFromSewnBom(int componentId) => _sewnBom.RemoveAll(l => l.ComponentId == componentId);
+
+    public ProductionSize RequireSize(int sizeId) =>
+        _sizes.Find(s => s.Id == sizeId) ?? throw new DomainException($"Розмір {sizeId} не належить моделі \"{Name}\".");
+}
