@@ -18,7 +18,7 @@ public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.NotNull(page);
         Assert.DoesNotContain(page.Items, o => o.Id == 3);
         var completed = Assert.Single(page.Items, o => o.Id == 2);
-        Assert.Equal("Виконано", completed.StatusName);
+        Assert.Equal("5) Відправлено", completed.StatusName);
         Assert.Equal("Instagram", completed.SourceName);
         Assert.Equal("Олена Тест", completed.ManagerName);
     }

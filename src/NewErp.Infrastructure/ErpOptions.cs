@@ -7,7 +7,8 @@ public sealed class ErpOptions
 
     /// <summary>
     /// Мова довідників OpenCart (dd_order_status, dd_order_source зберігають назви для кожної мови).
-    /// Значення треба звірити з таблицею dd_language старого сайту.
+    /// У справжній базі всі назви записані з language_id = 3; інші мови там так і не запрацювали.
+    /// Тому id мови задається лише тут, а не в кожному запиті.
     /// </summary>
-    public int LanguageId { get; set; } = 1;
+    public int LanguageId { get; set; } = 3;
 }

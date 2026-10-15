@@ -14,16 +14,20 @@ namespace NewErp.DevSeed;
 /// <summary>Генерує узгоджений набір вигаданих даних: довідники, менеджерів, замовлення, склад.</summary>
 public sealed class DevDataSeeder(ErpDbContext db, int seed)
 {
-    private const int LanguageId = 1;
+    // Як у справжній базі: усі довідники записані з language_id = 3.
+    private const int LanguageId = 3;
 
     /// <summary>Пароль усіх тестових користувачів.</summary>
     public const string DevPassword = "dev";
 
-    // Стандартні id статусів OpenCart 3, назви українською.
+    // Статуси справжнього сайту (id і назви взято з dd_order_status). З "1) Уточнюємо" замовлення починається.
+    private const int FirstStatusId = 24;
+
     private static readonly (int Id, string Name)[] Statuses =
     [
-        (1, "Очікує"), (2, "В обробці"), (3, "Відправлено"), (5, "Виконано"),
-        (7, "Скасовано"), (11, "Повернення"), (15, "Оплачено"), (17, "В пошиві"),
+        (24, "1) Уточнюємо"), (18, "2) Прийнято"), (25, "3) Виготовляється"), (21, "4) Чекає на відправку"),
+        (22, "5) Відправлено"), (20, "Виконано (B2B)"), (23, "Терміново"), (1, "Перевірити оплату"),
+        (17, "В обробці"), (19, "Відмінено"),
     ];
 
     // Id товару = FirstProductId + позиція в масиві, щоб специфікації (BOM) прив'язувались до тих самих товарів, що й у замовленнях.
@@ -142,13 +146,13 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                     AssignedAt = order.DateAdded.AddMinutes(15),
                 });
 
-                if (order.OrderStatusId != 1)
+                if (order.OrderStatusId != FirstStatusId)
                 {
                     db.DdOrderStatusLogs.Add(new DdOrderStatusLog
                     {
                         OrderId = order.OrderId,
                         UserId = manager.UserId,
-                        OldStatusId = 1,
+                        OldStatusId = FirstStatusId,
                         NewStatusId = order.OrderStatusId,
                         DateAdded = order.DateAdded.AddHours(_random.Next(1, 48)),
                     });

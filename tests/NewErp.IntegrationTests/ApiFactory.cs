@@ -32,9 +32,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string Password = "test-password";
     public const int OrderId = 1;
     public const int ProductId = 101; // товар у замовленні OrderId, 2 шт.
-    public const int Pending = 1;
-    public const int Completed = 5;
-    public const int InSewing = 17; // статус, у якому списуються розхідники
+    // Id статусів і мови як у справжній базі.
+    public const int LanguageId = 3;
+    public const int Pending = 24;   // 1) Уточнюємо
+    public const int Completed = 22; // 5) Відправлено
+    public const int InSewing = 25; // 3) Виготовляється — статус, у якому зараз списуються розхідники
 
     public async Task InitializeAsync()
     {
@@ -67,10 +69,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await using var db = new ErpDbContext(options);
 
         db.DdOrderStatuses.AddRange(
-            new DdOrderStatus { OrderStatusId = Pending, LanguageId = 1, Name = "Очікує" },
-            new DdOrderStatus { OrderStatusId = Completed, LanguageId = 1, Name = "Виконано" },
-            new DdOrderStatus { OrderStatusId = InSewing, LanguageId = 1, Name = "В пошиві" });
-        db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = 1, LanguageId = 1, Name = "Instagram" });
+            new DdOrderStatus { OrderStatusId = Pending, LanguageId = LanguageId, Name = "1) Уточнюємо" },
+            new DdOrderStatus { OrderStatusId = Completed, LanguageId = LanguageId, Name = "5) Відправлено" },
+            new DdOrderStatus { OrderStatusId = InSewing, LanguageId = LanguageId, Name = "3) Виготовляється" });
+        db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = 1, LanguageId = LanguageId, Name = "Instagram" });
         db.DdUsers.AddRange(
             User(ActiveUserId, "Олена", active: true),
             User(InactiveUserId, "Ігор", active: false),
