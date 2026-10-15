@@ -10,36 +10,65 @@ public class StockItemTests
     private static StockItem NewItem(decimal min = 10) => new(categoryId: 1, supplierId: null, "Льон", "м", min);
 
     [Fact]
-    public void Adjust_Income_IncreasesQuantityAndReturnsMovement()
+    public void Adjust_Income_IncreasesQuantityAndWritesRestockLikeOldLog()
     {
         var item = NewItem();
 
-        var movement = item.Adjust(25.5m, "Прихід від постачальника", userId: 1, Now);
+        var movement = item.Adjust(25.5m, "Прихід від постачальника", userId: 1, "sklad", Now);
 
         Assert.Equal(25.5m, item.Quantity);
+        Assert.Equal(StockMovement.Restock, movement.Action);
+        Assert.Equal(25.5m, movement.Quantity);
         Assert.Equal(25.5m, movement.Delta);
-        Assert.Equal(25.5m, movement.QuantityAfter);
-        Assert.Equal("Прихід від постачальника", movement.Reason);
+        Assert.Equal((0m, 25.5m), (movement.StockBefore, movement.StockAfter));
+        Assert.Equal("Прихід від постачальника", movement.Comment);
+        Assert.Equal(("Льон", "sklad"), (movement.ItemName, movement.Username));
         Assert.Same(item, movement.Item);
+    }
+
+    [Fact]
+    public void Adjust_Consumption_WritesUseWithPositiveQuantity()
+    {
+        var item = NewItem();
+        item.Adjust(10, "Прихід", 1, "sklad", Now);
+
+        var movement = item.Adjust(-4, "Пошиття", 1, "sklad", Now);
+
+        Assert.Equal(StockMovement.Use, movement.Action);
+        Assert.Equal(4, movement.Quantity);
+        Assert.Equal(-4, movement.Delta);
     }
 
     [Fact]
     public void Adjust_ConsumeMoreThanAvailable_ThrowsAndKeepsQuantity()
     {
         var item = NewItem();
-        item.Adjust(5, "Прихід", 1, Now);
+        item.Adjust(5, "Прихід", 1, "sklad", Now);
 
-        Assert.Throws<DomainException>(() => item.Adjust(-6, "Пошиття", 1, Now));
+        Assert.Throws<DomainException>(() => item.Adjust(-6, "Пошиття", 1, "sklad", Now));
         Assert.Equal(5, item.Quantity);
     }
 
     [Fact]
+    public void TakeUpTo_NotEnough_TakesWhatIsThereLikeOldModule()
+    {
+        var item = NewItem();
+        item.Adjust(3, "Прихід", 1, "sklad", Now);
+
+        var movement = item.TakeUpTo(5, "Крій", 1, "sklad", Now);
+
+        Assert.Equal(0, item.Quantity);
+        Assert.Equal(3, movement!.Quantity);
+        Assert.Null(item.TakeUpTo(1, "Крій", 1, "sklad", Now)); // порожньо — нічого не списується
+    }
+
+    [Fact]
     public void Adjust_Zero_Throws() =>
-        Assert.Throws<DomainException>(() => NewItem().Adjust(0, "?", 1, Now));
+        Assert.Throws<DomainException>(() => NewItem().Adjust(0, "?", 1, "sklad", Now));
 
     [Fact]
     public void Adjust_EmptyReason_Throws() =>
-        Assert.Throws<DomainException>(() => NewItem().Adjust(1, "  ", 1, Now));
+        Assert.Throws<DomainException>(() => NewItem().Adjust(1, "  ", 1, "sklad", Now));
 
     [Fact]
     public void IsBelowMinimum_TrueUntilMinimumReached()
@@ -47,16 +76,17 @@ public class StockItemTests
         var item = NewItem(min: 10);
         Assert.True(item.IsBelowMinimum);
 
-        item.Adjust(10, "Прихід", 1, Now);
+        item.Adjust(10, "Прихід", 1, "sklad", Now);
         Assert.False(item.IsBelowMinimum);
     }
 
     [Fact]
-    public void Ctor_TrimsAndValidatesName()
+    public void Ctor_TrimsAndValidates()
     {
-        Assert.Equal("Льон", new StockItem(1, null, "  Льон ", "м", 0).Name);
+        Assert.Equal("Льон", new StockItem(null, null, "  Льон ", "м", 0).Name);
         Assert.Throws<DomainException>(() => new StockItem(1, null, "", "м", 0));
         Assert.Throws<DomainException>(() => new StockItem(1, null, new string('x', 151), "м", 0));
         Assert.Throws<DomainException>(() => new StockItem(1, null, "Льон", "м", -1));
+        Assert.Throws<DomainException>(() => new StockItem(1, null, "Льон", "м", 0, price: -1));
     }
 }

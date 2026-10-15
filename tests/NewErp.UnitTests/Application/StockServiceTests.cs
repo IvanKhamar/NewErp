@@ -20,7 +20,7 @@ public class StockServiceTests
         var item = new StockItem(1, null, "Льон", "м", 5);
         _repo.Items[1] = item;
 
-        var result = await _service.AdjustAsync(1, new AdjustStockRequest(12, "Прихід"), userId: 2, CancellationToken.None);
+        var result = await _service.AdjustAsync(1, new AdjustStockRequest(12, "Прихід"), userId: 2, "sklad", CancellationToken.None);
 
         Assert.Equal(12, item.Quantity);
         Assert.Equal(12, result.QuantityAfter);
@@ -31,7 +31,7 @@ public class StockServiceTests
     [Fact]
     public async Task Adjust_UnknownItem_NotFound() =>
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            _service.AdjustAsync(42, new AdjustStockRequest(1, "Прихід"), userId: 1, CancellationToken.None));
+            _service.AdjustAsync(42, new AdjustStockRequest(1, "Прихід"), userId: 1, "sklad", CancellationToken.None));
 
     [Fact]
     public async Task Adjust_RuleViolation_DoesNotSave()
@@ -39,7 +39,7 @@ public class StockServiceTests
         _repo.Items[1] = new StockItem(1, null, "Льон", "м", 5);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.AdjustAsync(1, new AdjustStockRequest(-1, "Пошиття"), userId: 1, CancellationToken.None));
+            _service.AdjustAsync(1, new AdjustStockRequest(-1, "Пошиття"), userId: 1, "sklad", CancellationToken.None));
         Assert.Equal(0, _repo.SaveCount);
     }
 

@@ -28,6 +28,9 @@ public static class UserClaims
         int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("Користувач не увійшов у систему."), CultureInfo.InvariantCulture);
 
+    /// <summary>Логін із dd_user.username. Старі журнали (dd_stock_log тощо) зберігають його поруч з id.</summary>
+    public static string GetUsername(this ClaimsPrincipal principal) => principal.FindFirstValue(ClaimTypes.Name) ?? "";
+
     public static CurrentUser ToCurrentUser(this ClaimsPrincipal principal) => new(
         principal.GetUserId(),
         principal.FindFirstValue(ClaimTypes.Name) ?? "",

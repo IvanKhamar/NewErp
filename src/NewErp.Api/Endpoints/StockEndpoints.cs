@@ -41,7 +41,7 @@ public static class StockEndpoints
         });
 
         stock.MapPost("/items/{id:int}/adjustments", (int id, AdjustStockRequest request, ClaimsPrincipal user, StockService service, CancellationToken ct) =>
-            service.AdjustAsync(id, request, user.GetUserId(), ct))
+            service.AdjustAsync(id, request, user.GetUserId(), user.GetUsername(), ct))
             .WithSummary("Прихід (+) або витрата (-) з записом у журнал руху");
 
         stock.MapPut("/items/{id:int}/min-quantity", async (int id, decimal minQuantity, StockService service, CancellationToken ct) =>

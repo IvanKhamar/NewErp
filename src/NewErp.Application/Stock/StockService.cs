@@ -9,7 +9,7 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
 {
     public async Task<int> CreateCategoryAsync(CreateStockCategoryRequest request, CancellationToken ct)
     {
-        var category = new StockCategory(request.Name);
+        var category = new StockCategory(request.Name, request.SortOrder);
         if (await repository.CategoryNameTakenAsync(category.Name, ct))
             throw new DomainException($"Категорія \"{category.Name}\" вже існує.");
 
@@ -20,7 +20,7 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
 
     public async Task<int> CreateSupplierAsync(CreateStockSupplierRequest request, CancellationToken ct)
     {
-        var supplier = new StockSupplier(request.Name, request.Phone, request.Note);
+        var supplier = new StockSupplier(request.Name, request.Phone, request.Email, request.Categories, request.Notes);
         repository.Add(supplier);
         await repository.SaveChangesAsync(ct);
         return supplier.Id;
@@ -28,27 +28,28 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
 
     public async Task<int> CreateItemAsync(CreateStockItemRequest request, CancellationToken ct)
     {
-        if (!await repository.CategoryExistsAsync(request.CategoryId, ct))
-            throw new DomainException($"Категорії {request.CategoryId} не існує.");
+        if (request.CategoryId is { } categoryId && !await repository.CategoryExistsAsync(categoryId, ct))
+            throw new DomainException($"Категорії {categoryId} не існує.");
         if (request.SupplierId is { } supplierId && !await repository.SupplierExistsAsync(supplierId, ct))
             throw new DomainException($"Постачальника {supplierId} не існує.");
 
-        var item = new StockItem(request.CategoryId, request.SupplierId, request.Name, request.Unit, request.MinQuantity);
+        var item = new StockItem(
+            request.CategoryId, request.SupplierId, request.Name, request.Unit, request.MinQuantity, request.UsedFor, request.Price);
         repository.Add(item);
         await repository.SaveChangesAsync(ct);
         return item.Id;
     }
 
-    public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request, int userId, CancellationToken ct)
+    public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request, int userId, string username, CancellationToken ct)
     {
         var item = await repository.FindItemAsync(itemId, ct)
             ?? throw new NotFoundException($"Позицію складу {itemId} не знайдено.");
 
-        var movement = item.Adjust(request.Delta, request.Reason, userId, clock.GetLocalNow().DateTime);
-        repository.Add(movement);
+        var m = item.Adjust(request.Delta, request.Reason, userId, username, clock.GetLocalNow().DateTime);
+        repository.Add(m);
         await repository.SaveChangesAsync(ct);
 
-        return new StockMovementDto(movement.Id, item.Id, movement.Delta, movement.QuantityAfter, movement.Reason, movement.UserId, movement.CreatedAt);
+        return new StockMovementDto(m.Id, item.Id, m.Delta, m.StockBefore, m.StockAfter, m.Comment, m.UserId, m.Username, m.CreatedAt);
     }
 
     public async Task SetMinQuantityAsync(int itemId, decimal minQuantity, CancellationToken ct)

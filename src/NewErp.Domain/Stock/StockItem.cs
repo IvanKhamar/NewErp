@@ -3,25 +3,29 @@ using NewErp.Domain.Common;
 namespace NewErp.Domain.Stock;
 
 /// <summary>
-/// Розхідник на складі (тканина, фурнітура, пакування...).
-/// Залишок змінюється лише через <see cref="Adjust"/>, тому кожна зміна потрапляє в журнал.
+/// Розхідник на складі (тканина, фурнітура, пакування...), таблиця dd_stock_items старого сайту.
+/// Залишок змінюється лише через <see cref="Adjust"/> і <see cref="TakeUpTo"/>, тому кожна зміна потрапляє в журнал.
 /// </summary>
 public class StockItem
 {
     private StockItem() { }
 
-    public StockItem(int categoryId, int? supplierId, string name, string unit, decimal minQuantity)
+    public StockItem(int? categoryId, int? supplierId, string name, string unit, decimal minQuantity, string? usedFor = null, decimal price = 0)
     {
         CategoryId = categoryId;
         SupplierId = supplierId;
         Name = RequireText(name, "Назва позиції", 150);
         Unit = RequireText(unit, "Одиниця виміру", 16);
+        UsedFor = usedFor?.Trim() ?? "";
+        if (price < 0)
+            throw new DomainException("Ціна не може бути від'ємною.");
+        Price = price;
         SetMinQuantity(minQuantity);
     }
 
     public int Id { get; private set; }
 
-    public int CategoryId { get; private set; }
+    public int? CategoryId { get; private set; }
 
     public int? SupplierId { get; private set; }
 
@@ -33,18 +37,42 @@ public class StockItem
 
     public decimal MinQuantity { get; private set; }
 
+    /// <summary>Для чого використовується (вільний текст зі старого модуля).</summary>
+    public string UsedFor { get; private set; } = "";
+
+    /// <summary>Ціна за одиницю.</summary>
+    public decimal Price { get; private set; }
+
+    /// <summary>false — позицію «видалено»: старий модуль не видаляє рядки, а ставить status = 0.</summary>
+    public bool IsActive { get; private set; } = true;
+
     public bool IsBelowMinimum => Quantity < MinQuantity;
 
-    /// <summary>Змінює залишок на <paramref name="delta"/> (плюс = прихід, мінус = витрата).</summary>
-    public StockMovement Adjust(decimal delta, string reason, int userId, DateTime now)
+    /// <summary>
+    /// Ручна зміна залишку на <paramref name="delta"/> (плюс = прихід, мінус = витрата).
+    /// Строгіше за старий модуль: списати більше, ніж є, не можна.
+    /// </summary>
+    public StockMovement Adjust(decimal delta, string comment, int userId, string username, DateTime now)
     {
         if (delta == 0)
             throw new DomainException("Зміна залишку не може дорівнювати нулю.");
         if (Quantity + delta < 0)
             throw new DomainException($"Недостатньо залишку: є {Quantity} {Unit}, списується {-delta} {Unit}.");
 
-        Quantity += delta;
-        return new StockMovement(this, delta, RequireText(reason, "Причина", 255), userId, now);
+        return Change(delta, RequireText(comment, "Причина", 255), userId, username, now);
+    }
+
+    /// <summary>
+    /// Списання для виробництва, як у старому модулі: якщо залишку не вистачає, списується те, що є,
+    /// і залишок стає нулем. Повертає null, якщо списувати нічого.
+    /// </summary>
+    public StockMovement? TakeUpTo(decimal wanted, string comment, int userId, string username, DateTime now)
+    {
+        if (wanted <= 0)
+            throw new DomainException("Кількість для списання має бути більшою за нуль.");
+
+        var amount = Math.Min(wanted, Quantity);
+        return amount > 0 ? Change(-amount, RequireText(comment, "Причина", 255), userId, username, now) : null;
     }
 
     public void SetMinQuantity(decimal minQuantity)
@@ -52,6 +80,13 @@ public class StockItem
         if (minQuantity < 0)
             throw new DomainException("Мінімальний залишок не може бути від'ємним.");
         MinQuantity = minQuantity;
+    }
+
+    private StockMovement Change(decimal delta, string comment, int userId, string username, DateTime now)
+    {
+        var before = Quantity;
+        Quantity += delta;
+        return new StockMovement(this, delta, before, comment, userId, username, now);
     }
 
     internal static string RequireText(string? value, string field, int maxLength)

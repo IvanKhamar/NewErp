@@ -1,9 +1,6 @@
 using Bogus;
 
-using Microsoft.EntityFrameworkCore;
-
 using NewErp.Application.Auth;
-using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
@@ -161,19 +158,18 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
 
-        var stockItems = await SeedStockAsync(storekeeper.UserId, now);
-        var boms = await SeedBomsAsync(storekeeper.UserId, now);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, {boms} специфікацій.";
+        var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу.";
     }
 
-    private async Task<int> SeedStockAsync(int userId, DateTime now)
+    private async Task<int> SeedStockAsync(int userId, string username, DateTime now)
     {
         var fabric = new StockCategory("Тканини");
         var fittings = new StockCategory("Фурнітура");
         var packaging = new StockCategory("Пакування");
         db.StockCategories.AddRange(fabric, fittings, packaging);
-        var supplier = new StockSupplier("ТОВ \"Текстиль-Опт\" (вигаданий)", "+380441234567", null);
-        var supplier2 = new StockSupplier("ФОП Фурнітура (вигаданий)", null, "Доставка по вівторках");
+        var supplier = new StockSupplier("ТОВ \"Текстиль-Опт\" (вигаданий)", "+380441234567", null, "Тканини", null);
+        var supplier2 = new StockSupplier("ФОП Фурнітура (вигаданий)", null, null, "Фурнітура", "Доставка по вівторках");
         db.StockSuppliers.AddRange(supplier, supplier2);
         await db.SaveChangesAsync();
 
@@ -192,38 +188,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         {
             var item = new StockItem(x.Cat.Id, x.Sup?.Id, x.Name, x.Unit, x.Min);
             db.StockItems.Add(item);
-            db.StockMovements.Add(item.Adjust(x.Start, "Початковий залишок", userId, now.AddDays(-30)));
+            db.StockMovements.Add(item.Adjust(x.Start, "Початковий залишок", userId, username, now.AddDays(-30)));
         }
         await db.SaveChangesAsync();
         return items.Length;
-    }
-
-    /// <summary>Специфікації для перших шести товарів. Останні два лишаються без специфікації, щоб було видно й такий випадок.</summary>
-    private async Task<int> SeedBomsAsync(int userId, DateTime now)
-    {
-        var id = await db.StockItems.ToDictionaryAsync(i => i.Name, i => i.Id);
-        int linen = id["Льон бежевий"], knit = id["Трикотаж чорний"], viscose = id["Віскоза принт"],
-            buttons = id["Ґудзики дерев'яні 15 мм"], zipper = id["Блискавка прихована 20 см"],
-            bag = id["Пакет кур'єрський 30x40"], tag = id["Бірка з логотипом"];
-
-        (int StockItemId, decimal Quantity)[][] specs =
-        [
-            [(linen, 2.8m), (zipper, 1), (bag, 1), (tag, 1)],      // Сукня лляна
-            [(viscose, 2.2m), (buttons, 8), (bag, 1), (tag, 1)],   // Сорочка оверсайз
-            [(linen, 2.4m), (zipper, 1), (bag, 1), (tag, 1)],      // Штани палаццо
-            [(knit, 3.1m), (bag, 1), (tag, 1)],                    // Костюм трикотажний
-            [(viscose, 1.6m), (zipper, 1), (bag, 1), (tag, 1)],    // Спідниця міді
-            [(linen, 2.6m), (buttons, 3), (bag, 1), (tag, 1)],     // Жакет класичний
-        ];
-
-        for (var i = 0; i < specs.Length; i++)
-        {
-            var bom = new Bom(FirstProductId + i);
-            bom.SetLines(specs[i], userId, now);
-            db.Boms.Add(bom);
-        }
-        await db.SaveChangesAsync();
-        return specs.Length;
     }
 
     /// <summary>OpenCart вимагає NOT NULL у багатьох колонках, які нам не потрібні. Заповнюємо порожніми значеннями.</summary>

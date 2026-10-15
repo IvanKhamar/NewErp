@@ -28,7 +28,7 @@ public static class OrderEndpoints
 
         orders.MapPut("/{id:int}/status", (int id, ChangeOrderStatusRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
             service.ChangeStatusAsync(id, request, user.GetUserId(), ct))
-        .WithSummary("Змінити статус (із записом у журнал). У статусі з Production:WriteOffStatusId списує розхідники; warnings — про нестачу");
+        .WithSummary("Змінити статус (із записом у журнал). warnings — попередження від інших модулів");
 
         orders.MapPut("/{id:int}/manager", async (int id, AssignManagerRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
         {
