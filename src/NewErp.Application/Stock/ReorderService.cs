@@ -6,15 +6,17 @@ using Microsoft.Extensions.Options;
 namespace NewErp.Application.Stock;
 
 /// <summary>Звіт «що дозамовити»: позиції нижче мінімуму, згруповані за постачальниками.</summary>
-public sealed class ReorderService(IStockRepository repository, IOptions<StockOptions> options)
+public sealed class ReorderService(IStockRepository repository, IPurchaseOrderRepository purchaseOrders, IOptions<StockOptions> options)
 {
     public const string NoSupplierName = "Без постачальника";
 
+    /// <summary>Уже замовлене й ще не отримане віднімається, тож повторний звіт не пропонує те саме вдруге.</summary>
     public async Task<ReorderReportDto> GetReportAsync(CancellationToken ct)
     {
         var items = await repository.ListItemsAsync(new StockItemFilter(BelowMinimumOnly: true), ct);
         var suppliers = (await repository.ListSuppliersAsync(ct)).ToDictionary(s => s.Id);
-        return Build(items, suppliers, onOrder: new Dictionary<int, decimal>(), options.Value.ReorderTargetFactor);
+        var onOrder = await purchaseOrders.OnOrderAsync(ct);
+        return Build(items, suppliers, onOrder, options.Value.ReorderTargetFactor);
     }
 
     /// <summary>

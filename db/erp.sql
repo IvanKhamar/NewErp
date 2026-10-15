@@ -25,3 +25,34 @@ CREATE TABLE `erp_user_login` (
   `last_login_at` datetime NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Замовлення постачальнику розхідників. У старій системі такого немає, тож таблиці наші.
+-- status: draft (чернетка), ordered (надіслано постачальнику), received (усе отримано), cancelled.
+-- supplier_id і item_id посилаються на dd_stock_suppliers / dd_stock_items старого сайту; зовнішніх ключів немає,
+-- бо рушій тих таблиць на справжньому сайті невідомий.
+CREATE TABLE `erp_purchase_order` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `supplier_id` int NOT NULL,
+  `status` varchar(16) NOT NULL,
+  `comment` varchar(500) NOT NULL DEFAULT '',
+  `created_by_user_id` int NOT NULL,
+  `created_at` datetime NOT NULL,
+  `ordered_at` datetime NULL,
+  `closed_at` datetime NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_erp_purchase_order_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Рядок замовлення: скільки замовлено, за якою ціною і скільки вже отримано (приймати можна частинами).
+CREATE TABLE `erp_purchase_order_line` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` decimal(12,3) NOT NULL,
+  `price` decimal(15,4) NOT NULL DEFAULT 0,
+  `received_quantity` decimal(12,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `ix_erp_purchase_order_line_order` (`order_id`),
+  KEY `ix_erp_purchase_order_line_item` (`item_id`),
+  CONSTRAINT `fk_erp_purchase_order_line_order` FOREIGN KEY (`order_id`) REFERENCES `erp_purchase_order` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

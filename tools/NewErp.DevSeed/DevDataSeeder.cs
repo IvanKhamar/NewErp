@@ -309,20 +309,21 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         db.StockSuppliers.AddRange(supplier, supplier2);
         await db.SaveChangesAsync();
 
-        (StockCategory Cat, StockSupplier? Sup, string Name, string Unit, decimal Min, decimal Start)[] items =
+        // Ціни вигадані, лише щоб у звіті «що дозамовити» були суми.
+        (StockCategory Cat, StockSupplier? Sup, string Name, string Unit, decimal Min, decimal Start, decimal Price)[] items =
         [
-            (fabric, supplier, "Льон бежевий", "м", 30, 85.5m),
-            (fabric, supplier, "Трикотаж чорний", "м", 40, 22m),
-            (fabric, supplier, "Віскоза принт", "м", 20, 64m),
-            (fittings, supplier2, "Ґудзики дерев'яні 15 мм", "шт", 200, 1350),
-            (fittings, supplier2, "Блискавка прихована 20 см", "шт", 100, 45),
-            (packaging, null, "Пакет кур'єрський 30x40", "шт", 300, 520),
-            (packaging, null, "Бірка з логотипом", "шт", 500, 180),
+            (fabric, supplier, "Льон бежевий", "м", 30, 85.5m, 240),
+            (fabric, supplier, "Трикотаж чорний", "м", 40, 22m, 180),
+            (fabric, supplier, "Віскоза принт", "м", 20, 64m, 210),
+            (fittings, supplier2, "Ґудзики дерев'яні 15 мм", "шт", 200, 1350, 3.5m),
+            (fittings, supplier2, "Блискавка прихована 20 см", "шт", 100, 45, 12),
+            (packaging, null, "Пакет кур'єрський 30x40", "шт", 300, 520, 2.2m),
+            (packaging, null, "Бірка з логотипом", "шт", 500, 180, 1.8m),
         ];
 
         foreach (var x in items)
         {
-            var item = new StockItem(x.Cat.Id, x.Sup?.Id, x.Name, x.Unit, x.Min);
+            var item = new StockItem(x.Cat.Id, x.Sup?.Id, x.Name, x.Unit, x.Min, price: x.Price);
             db.StockItems.Add(item);
             db.StockMovements.Add(item.Adjust(x.Start, "Початковий залишок", userId, username, now.AddDays(-30)));
         }

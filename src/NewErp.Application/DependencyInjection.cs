@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
         services.AddScoped<ReorderService>();
+        services.AddScoped<PurchaseOrderService>();
         services.AddScoped<ProductionService>();
         services.AddScoped<SmsService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.

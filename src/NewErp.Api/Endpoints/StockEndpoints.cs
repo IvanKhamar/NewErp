@@ -34,7 +34,9 @@ public static class StockEndpoints
         stock.MapGet("/reorder", (ReorderService service, CancellationToken ct) => service.GetReportAsync(ct))
             .WithSummary("Що дозамовити: позиції нижче мінімуму за постачальниками, до 2× мінімуму, з готовим текстом замовлення");
 
-        stock.MapGet("/items/{id:int}",async (int id, IStockRepository repo, CancellationToken ct) =>
+        MapPurchaseOrders(stock.MapGroup("/purchase-orders").WithTags("Склад: замовлення постачальникам"));
+
+        stock.MapGet("/items/{id:int}", async (int id, IStockRepository repo, CancellationToken ct) =>
             await repo.GetItemDtoAsync(id, ct) is { } item ? Results.Ok(item) : Results.NotFound());
 
         stock.MapPost("/items", async (CreateStockItemRequest request, StockService service, CancellationToken ct) =>
@@ -56,5 +58,57 @@ public static class StockEndpoints
         stock.MapGet("/items/{id:int}/movements", (int id, IStockRepository repo, CancellationToken ct) =>
             repo.ListMovementsAsync(id, ct))
             .WithSummary("Журнал руху позиції");
+    }
+
+    private static void MapPurchaseOrders(RouteGroupBuilder orders)
+    {
+        orders.MapGet("/", (IPurchaseOrderRepository repo, [AsParameters] PurchaseOrderFilter filter, CancellationToken ct) =>
+            repo.ListAsync(filter, ct))
+            .WithSummary("Замовлення постачальникам; status = draft, ordered, received або cancelled");
+
+        orders.MapGet("/{id:int}", async (int id, IPurchaseOrderRepository repo, CancellationToken ct) =>
+            await repo.GetDtoAsync(id, ct) is { } order ? Results.Ok(order) : Results.NotFound())
+            .WithSummary("Замовлення з рядками, отриманим і готовим текстом для постачальника");
+
+        orders.MapPost("/", async (CreatePurchaseOrderRequest request, ClaimsPrincipal user, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            var id = await service.CreateAsync(request, user.GetUserId(), ct);
+            return Results.Created($"/stock/purchase-orders/{id}", new { id });
+        })
+            .WithSummary("Створити чернетку вручну");
+
+        orders.MapPost("/from-reorder/{supplierId:int}", async (int supplierId, ClaimsPrincipal user, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            var id = await service.CreateFromReorderAsync(supplierId, user.GetUserId(), ct);
+            return Results.Created($"/stock/purchase-orders/{id}", new { id });
+        })
+            .WithSummary("Створити чернетку для постачальника з того, що пропонує звіт «що дозамовити»");
+
+        orders.MapPut("/{id:int}/lines", async (int id, SetPurchaseOrderLinesRequest request, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            await service.SetLinesAsync(id, request, ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Змінити рядки чернетки");
+
+        orders.MapPost("/{id:int}/ordered", async (int id, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            await service.MarkOrderedAsync(id, ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Позначити, що замовлення надіслано постачальнику");
+
+        orders.MapPost("/{id:int}/receive", async (int id, ReceivePurchaseOrderRequest request, ClaimsPrincipal user, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            await service.ReceiveAsync(id, request, user.GetUserId(), user.GetUsername(), ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Прийняти товар (можна частинами): залишки зростають, у журналі складу — прихід");
+
+        orders.MapPost("/{id:int}/cancel", async (int id, PurchaseOrderService service, CancellationToken ct) =>
+        {
+            await service.CancelAsync(id, ct);
+            return Results.NoContent();
+        });
     }
 }
