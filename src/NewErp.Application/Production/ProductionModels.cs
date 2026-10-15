@@ -23,3 +23,17 @@ public sealed record OrderRequirementsDto(
     int OrderId,
     IReadOnlyList<MaterialRequirementDto> Materials,
     IReadOnlyList<OrderProductLine> ProductsWithoutBom);
+
+/// <summary>Shortage: скільки не вистачило на складі в момент списання.</summary>
+public sealed record OrderWriteOffLineDto(int StockItemId, string ItemName, string Unit, decimal Required, decimal WrittenOff, decimal Shortage);
+
+public sealed record OrderWriteOffDto(int OrderId, int UserId, DateTime CreatedAt, IReadOnlyList<OrderWriteOffLineDto> Lines);
+
+/// <summary>Налаштування виробництва з розділу "Production" в appsettings.json.</summary>
+public sealed class ProductionOptions
+{
+    public const string SectionName = "Production";
+
+    /// <summary>Статус замовлення, при переході в який списуються розхідники за специфікаціями. null — списання вимкнене.</summary>
+    public int? WriteOffStatusId { get; set; }
+}

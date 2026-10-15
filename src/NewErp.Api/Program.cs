@@ -2,6 +2,7 @@ using NewErp.Api;
 using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
+using NewErp.Application.Production;
 using NewErp.Application.Staff;
 using NewErp.Infrastructure;
 
@@ -16,6 +17,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddErpAuth();
 
 builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusOptions.SectionName));
+builder.Services.Configure<ProductionOptions>(builder.Configuration.GetSection(ProductionOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 

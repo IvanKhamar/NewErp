@@ -2,11 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 using NewErp.Application.Production;
 using NewErp.Domain.Production;
+using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Production;
 
-public sealed class BomRepository(ErpDbContext db) : IBomRepository
+public sealed class ProductionRepository(ErpDbContext db) : IProductionRepository
 {
     public async Task<IReadOnlyList<BomSummaryDto>> ListAsync(CancellationToken ct) =>
         await db.Boms.AsNoTracking()
@@ -62,9 +63,39 @@ public sealed class BomRepository(ErpDbContext db) : IBomRepository
             select new BomComponent(l.ProductId, l.StockItemId, i.Name, i.Unit, l.Quantity, i.Quantity)
         ).ToListAsync(ct);
 
+    public Task<bool> WriteOffExistsAsync(int orderId, CancellationToken ct) =>
+        db.OrderWriteOffs.AnyAsync(w => w.OrderId == orderId, ct);
+
+    public async Task<OrderWriteOffDto?> GetWriteOffDtoAsync(int orderId, CancellationToken ct)
+    {
+        var writeOff = await db.OrderWriteOffs.AsNoTracking()
+            .Where(w => w.OrderId == orderId)
+            .Select(w => new { w.UserId, w.CreatedAt })
+            .FirstOrDefaultAsync(ct);
+        if (writeOff is null)
+            return null;
+
+        var lines = await (
+            from l in db.OrderWriteOffLines.AsNoTracking()
+            join i in db.StockItems on l.StockItemId equals i.Id
+            where l.OrderId == orderId
+            orderby i.Name
+            select new OrderWriteOffLineDto(l.StockItemId, i.Name, i.Unit, l.Required, l.WrittenOff, l.Required - l.WrittenOff)
+        ).ToListAsync(ct);
+
+        return new OrderWriteOffDto(orderId, writeOff.UserId, writeOff.CreatedAt, lines);
+    }
+
+    public async Task<IReadOnlyList<StockItem>> FindStockItemsAsync(IReadOnlyCollection<int> stockItemIds, CancellationToken ct) =>
+        await db.StockItems.Where(i => stockItemIds.Contains(i.Id)).ToListAsync(ct);
+
     public void Add(Bom bom) => db.Boms.Add(bom);
 
     public void Remove(Bom bom) => db.Boms.Remove(bom);
+
+    public void Add(OrderWriteOff writeOff) => db.OrderWriteOffs.Add(writeOff);
+
+    public void Add(StockMovement movement) => db.StockMovements.Add(movement);
 
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

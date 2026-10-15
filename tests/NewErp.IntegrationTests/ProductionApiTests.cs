@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 
+using NewErp.Application.Orders;
 using NewErp.Application.Production;
 using NewErp.Application.Stock;
 
@@ -33,6 +34,30 @@ public class ProductionApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(5, linenNeed.Required); // 2 сукні × 2.5 м
         Assert.Equal(2, linenNeed.Shortage); // на складі 3 м
         Assert.Empty(requirements.ProductsWithoutBom);
+    }
+
+    [MySqlFact]
+    public async Task StatusInSewing_WritesOffOnceAndWarnsAboutShortage()
+    {
+        var client = await factory.LoginAsync(ApiFactory.Admin);
+        var linen = await CreateItemAsync(client, "Льон для списання", "м", income: 4);
+        var tags = await CreateItemAsync(client, "Бірки", "шт", income: 10);
+        (await client.PutAsJsonAsync($"/production/boms/{ApiFactory.ProductId}",
+            new SetBomRequest([new(linen, 2.5m), new(tags, 1)]))).EnsureSuccessStatusCode();
+
+        var response = await client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status", new ChangeOrderStatusRequest(ApiFactory.InSewing));
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<ChangeOrderStatusResult>();
+        Assert.Contains("Бракує 1 м", Assert.Single(result!.Warnings)); // 2 сукні × 2.5 м = 5 м, є 4 м
+
+        // Повернули статус назад і знову поставили «В пошиві»: другого списання немає.
+        (await client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status", new ChangeOrderStatusRequest(ApiFactory.Pending))).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status", new ChangeOrderStatusRequest(ApiFactory.InSewing))).EnsureSuccessStatusCode();
+
+        Assert.Equal(0, (await client.GetFromJsonAsync<StockItemDto>($"/stock/items/{linen}"))!.Quantity);
+        Assert.Equal(8, (await client.GetFromJsonAsync<StockItemDto>($"/stock/items/{tags}"))!.Quantity);
+        var writeOff = await client.GetFromJsonAsync<OrderWriteOffDto>($"/production/orders/{ApiFactory.OrderId}/writeoff");
+        Assert.Equal(1, writeOff!.Lines.Single(l => l.StockItemId == linen).Shortage);
     }
 
     [MySqlFact]

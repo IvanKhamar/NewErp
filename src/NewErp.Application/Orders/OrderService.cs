@@ -5,9 +5,9 @@ using NewErp.Domain.Orders;
 namespace NewErp.Application.Orders;
 
 /// <summary>Сценарії зміни замовлення: статус і відповідальний менеджер.</summary>
-public sealed class OrderService(IOrderStore store, TimeProvider clock)
+public sealed class OrderService(IOrderStore store, TimeProvider clock, IEnumerable<IOrderStatusHandler> handlers)
 {
-    public async Task ChangeStatusAsync(int orderId, ChangeOrderStatusRequest request, int userId, CancellationToken ct)
+    public async Task<ChangeOrderStatusResult> ChangeStatusAsync(int orderId, ChangeOrderStatusRequest request, int userId, CancellationToken ct)
     {
         var currentStatusId = await store.GetStatusIdAsync(orderId, ct)
             ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
@@ -17,7 +17,15 @@ public sealed class OrderService(IOrderStore store, TimeProvider clock)
         await RequireActiveUserAsync(userId, ct);
 
         var change = OrderStatusChange.Create(orderId, currentStatusId, request.StatusId, userId, Now());
+
+        // Обробники (наприклад, списання розхідників) працюють до збереження статусу: якщо котрийсь упаде,
+        // статус лишиться старим і дію можна просто повторити. Повторне списання вони відсікають самі.
+        var warnings = new List<string>();
+        foreach (var handler in handlers)
+            warnings.AddRange(await handler.OnStatusChangingAsync(change, ct));
+
         await store.SaveStatusChangeAsync(change, ct);
+        return new ChangeOrderStatusResult(warnings);
     }
 
     public async Task AssignManagerAsync(int orderId, AssignManagerRequest request, int userId, CancellationToken ct)

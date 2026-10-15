@@ -11,10 +11,10 @@ public static class ProductionEndpoints
     {
         var production = app.MapGroup("/production").WithTags("Виробництво: специфікації").RequireAuthorization(Policies.Stock);
 
-        production.MapGet("/boms", (IBomRepository repo, CancellationToken ct) => repo.ListAsync(ct))
+        production.MapGet("/boms", (IProductionRepository repo, CancellationToken ct) => repo.ListAsync(ct))
             .WithSummary("Товари, для яких задано специфікацію");
 
-        production.MapGet("/boms/{productId:int}", async (int productId, IBomRepository repo, CancellationToken ct) =>
+        production.MapGet("/boms/{productId:int}", async (int productId, IProductionRepository repo, CancellationToken ct) =>
             await repo.GetDtoAsync(productId, ct) is { } bom ? Results.Ok(bom) : Results.NotFound());
 
         production.MapPut("/boms/{productId:int}", async (int productId, SetBomRequest request, ClaimsPrincipal user, ProductionService service, CancellationToken ct) =>
@@ -33,5 +33,9 @@ public static class ProductionEndpoints
         production.MapGet("/orders/{orderId:int}/requirements", (int orderId, ProductionService service, CancellationToken ct) =>
             service.GetOrderRequirementsAsync(orderId, ct))
             .WithSummary("Скільки розхідників потрібно на замовлення і чого бракує на складі");
+
+        production.MapGet("/orders/{orderId:int}/writeoff", async (int orderId, IProductionRepository repo, CancellationToken ct) =>
+            await repo.GetWriteOffDtoAsync(orderId, ct) is { } writeOff ? Results.Ok(writeOff) : Results.NotFound())
+            .WithSummary("Що списано за замовленням і скільки не вистачило");
     }
 }

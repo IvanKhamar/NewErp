@@ -17,6 +17,8 @@ public static class DependencyInjection
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
         services.AddScoped<ProductionService>();
+        // Списання розхідників при зміні статусу замовлення. OrderService отримує всіх IOrderStatusHandler.
+        services.AddScoped<IOrderStatusHandler>(sp => sp.GetRequiredService<ProductionService>());
         services.AddScoped<AuthService>();
         return services;
     }

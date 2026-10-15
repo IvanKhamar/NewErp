@@ -26,12 +26,9 @@ public static class OrderEndpoints
         orders.MapGet("/sources", (IOrderQueries queries, CancellationToken ct) => queries.ListSourcesAsync(ct))
             .WithSummary("Довідник джерел замовлення");
 
-        orders.MapPut("/{id:int}/status", async (int id, ChangeOrderStatusRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
-        {
-            await service.ChangeStatusAsync(id, request, user.GetUserId(), ct);
-            return Results.NoContent();
-        })
-        .WithSummary("Змінити статус (із записом у журнал)");
+        orders.MapPut("/{id:int}/status", (int id, ChangeOrderStatusRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
+            service.ChangeStatusAsync(id, request, user.GetUserId(), ct))
+        .WithSummary("Змінити статус (із записом у журнал). У статусі з Production:WriteOffStatusId списує розхідники; warnings — про нестачу");
 
         orders.MapPut("/{id:int}/manager", async (int id, AssignManagerRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
         {

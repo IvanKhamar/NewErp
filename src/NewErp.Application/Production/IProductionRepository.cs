@@ -1,8 +1,9 @@
 using NewErp.Domain.Production;
+using NewErp.Domain.Stock;
 
 namespace NewErp.Application.Production;
 
-public interface IBomRepository
+public interface IProductionRepository
 {
     Task<IReadOnlyList<BomSummaryDto>> ListAsync(CancellationToken ct);
 
@@ -19,9 +20,20 @@ public interface IBomRepository
 
     Task<IReadOnlyList<BomComponent>> GetComponentsAsync(IReadOnlyCollection<int> productIds, CancellationToken ct);
 
+    Task<bool> WriteOffExistsAsync(int orderId, CancellationToken ct);
+
+    Task<OrderWriteOffDto?> GetWriteOffDtoAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Завантажує позиції складу для зміни залишку.</summary>
+    Task<IReadOnlyList<StockItem>> FindStockItemsAsync(IReadOnlyCollection<int> stockItemIds, CancellationToken ct);
+
     void Add(Bom bom);
 
     void Remove(Bom bom);
+
+    void Add(OrderWriteOff writeOff);
+
+    void Add(StockMovement movement);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

@@ -52,4 +52,7 @@ public sealed record OrderDetails(
 /// <summary>Хто змінює статус, сервер бере з сесії, а не з тіла запиту, тому підробити його не можна.</summary>
 public sealed record ChangeOrderStatusRequest(int StatusId);
 
+/// <summary>Warnings: попередження від інших модулів, наприклад про нестачу розхідників при списанні.</summary>
+public sealed record ChangeOrderStatusResult(IReadOnlyList<string> Warnings);
+
 public sealed record AssignManagerRequest(int ManagerId);

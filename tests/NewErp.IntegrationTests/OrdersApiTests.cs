@@ -40,7 +40,8 @@ public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await client.PutAsJsonAsync($"/orders/{ApiFactory.OrderId}/status",
             new ChangeOrderStatusRequest(ApiFactory.Completed));
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty((await response.Content.ReadFromJsonAsync<ChangeOrderStatusResult>())!.Warnings);
 
         var order = await client.GetFromJsonAsync<OrderDetails>($"/orders/{ApiFactory.OrderId}");
         Assert.Equal(ApiFactory.Completed, order!.StatusId);

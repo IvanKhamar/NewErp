@@ -87,3 +87,24 @@ CREATE TABLE `erp_bom_line` (
   CONSTRAINT `fk_erp_bom_line_bom` FOREIGN KEY (`product_id`) REFERENCES `erp_bom` (`product_id`) ON DELETE CASCADE,
   CONSTRAINT `fk_erp_bom_line_stock_item` FOREIGN KEY (`stock_item_id`) REFERENCES `erp_stock_item` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Списання розхідників за замовленням. Структура наша, правило списання реконструйоване (див. README).
+-- Один рядок на замовлення: так повторний перехід у той самий статус не списує вдруге.
+CREATE TABLE `erp_order_writeoff` (
+  `order_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Скільки потрібно було і скільки справді списано. Різниця — нестача на момент списання.
+CREATE TABLE `erp_order_writeoff_line` (
+  `order_id` int NOT NULL,
+  `stock_item_id` int NOT NULL,
+  `required` decimal(12,3) NOT NULL,
+  `written_off` decimal(12,3) NOT NULL,
+  PRIMARY KEY (`order_id`, `stock_item_id`),
+  KEY `ix_erp_order_writeoff_line_stock_item` (`stock_item_id`),
+  CONSTRAINT `fk_erp_order_writeoff_line_writeoff` FOREIGN KEY (`order_id`) REFERENCES `erp_order_writeoff` (`order_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_erp_order_writeoff_line_stock_item` FOREIGN KEY (`stock_item_id`) REFERENCES `erp_stock_item` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

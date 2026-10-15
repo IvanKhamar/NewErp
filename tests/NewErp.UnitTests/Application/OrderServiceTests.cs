@@ -19,7 +19,50 @@ public class OrderServiceTests
         _store.Orders[100] = 1;
         _store.Statuses.UnionWith([1, 5, 7]);
         _store.ActiveUsers.UnionWith([1, 2]);
-        _service = new OrderService(_store, _clock);
+        _handler = new FakeStatusHandler(_store);
+        _service = new OrderService(_store, _clock, [_handler]);
+    }
+
+    private readonly FakeStatusHandler _handler;
+
+    [Fact]
+    public async Task ChangeStatus_RunsHandlersBeforeSavingAndReturnsTheirWarnings()
+    {
+        _handler.Warnings = ["Бракує 2 м: Льон"];
+
+        var result = await _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(StatusId: 5), userId: 1, CancellationToken.None);
+
+        Assert.Equal(["Бракує 2 м: Льон"], result.Warnings);
+        Assert.Equal(0, _handler.SavedChangesSeen); // обробник працював ще до збереження статусу
+        Assert.Single(_store.SavedChanges);
+    }
+
+    [Fact]
+    public async Task ChangeStatus_HandlerFails_StatusNotSaved()
+    {
+        _handler.Fail = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ChangeStatusAsync(100, new ChangeOrderStatusRequest(StatusId: 5), userId: 1, CancellationToken.None));
+        Assert.Empty(_store.SavedChanges);
+    }
+
+    private sealed class FakeStatusHandler(FakeOrderStore store) : IOrderStatusHandler
+    {
+        public IReadOnlyList<string> Warnings { get; set; } = [];
+
+        public bool Fail { get; set; }
+
+        /// <summary>Скільки змін статусу вже було збережено в момент виклику обробника.</summary>
+        public int SavedChangesSeen { get; private set; } = -1;
+
+        public Task<IReadOnlyList<string>> OnStatusChangingAsync(OrderStatusChange change, CancellationToken ct)
+        {
+            if (Fail)
+                throw new InvalidOperationException("Збій обробника");
+            SavedChangesSeen = store.SavedChanges.Count;
+            return Task.FromResult(Warnings);
+        }
     }
 
     [Fact]

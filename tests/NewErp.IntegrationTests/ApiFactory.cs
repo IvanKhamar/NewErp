@@ -34,6 +34,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const int ProductId = 101; // товар у замовленні OrderId, 2 шт.
     public const int Pending = 1;
     public const int Completed = 5;
+    public const int InSewing = 17; // статус, у якому списуються розхідники
 
     public async Task InitializeAsync()
     {
@@ -57,6 +58,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:ErpDb", _connectionString ?? "server=unused");
         builder.UseSetting("Bonus:Percent", "10");
         builder.UseSetting("Bonus:CountedStatusIds:0", Completed.ToString());
+        builder.UseSetting("Production:WriteOffStatusId", InSewing.ToString());
     }
 
     private async Task SeedAsync()
@@ -66,7 +68,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         db.DdOrderStatuses.AddRange(
             new DdOrderStatus { OrderStatusId = Pending, LanguageId = 1, Name = "Очікує" },
-            new DdOrderStatus { OrderStatusId = Completed, LanguageId = 1, Name = "Виконано" });
+            new DdOrderStatus { OrderStatusId = Completed, LanguageId = 1, Name = "Виконано" },
+            new DdOrderStatus { OrderStatusId = InSewing, LanguageId = 1, Name = "В пошиві" });
         db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = 1, LanguageId = 1, Name = "Instagram" });
         db.DdUsers.AddRange(
             User(ActiveUserId, "Олена", active: true),

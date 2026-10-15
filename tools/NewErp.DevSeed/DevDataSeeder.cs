@@ -1,6 +1,9 @@
 using Bogus;
 
+using Microsoft.EntityFrameworkCore;
+
 using NewErp.Application.Auth;
+using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
@@ -20,8 +23,11 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     private static readonly (int Id, string Name)[] Statuses =
     [
         (1, "Очікує"), (2, "В обробці"), (3, "Відправлено"), (5, "Виконано"),
-        (7, "Скасовано"), (11, "Повернення"), (15, "Оплачено"),
+        (7, "Скасовано"), (11, "Повернення"), (15, "Оплачено"), (17, "В пошиві"),
     ];
+
+    // Id товару = FirstProductId + позиція в масиві, щоб специфікації (BOM) прив'язувались до тих самих товарів, що й у замовленнях.
+    private const int FirstProductId = 101;
 
     private static readonly string[] Sources = ["Сайт", "Instagram", "Телефон", "Партнер"];
 
@@ -110,11 +116,12 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             {
                 var price = _random.Next(8, 45) * 100m;
                 var qty = _random.Next(1, 3);
+                var product = _random.Next(Products.Length);
                 db.DdOrderProducts.Add(new DdOrderProduct
                 {
                     OrderId = order.OrderId,
-                    ProductId = _random.Next(50, 400),
-                    Name = Products[_random.Next(Products.Length)],
+                    ProductId = FirstProductId + product,
+                    Name = Products[product],
                     Model = $"VD-{_random.Next(1000, 9999)}",
                     Quantity = qty,
                     Price = price,
@@ -151,7 +158,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await db.SaveChangesAsync();
 
         var stockItems = await SeedStockAsync(storekeeper.UserId, now);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу.";
+        var boms = await SeedBomsAsync(storekeeper.UserId, now);
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, {boms} специфікацій.";
     }
 
     private async Task<int> SeedStockAsync(int userId, DateTime now)
@@ -184,6 +192,34 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
         return items.Length;
+    }
+
+    /// <summary>Специфікації для перших шести товарів. Останні два лишаються без специфікації, щоб було видно й такий випадок.</summary>
+    private async Task<int> SeedBomsAsync(int userId, DateTime now)
+    {
+        var id = await db.StockItems.ToDictionaryAsync(i => i.Name, i => i.Id);
+        int linen = id["Льон бежевий"], knit = id["Трикотаж чорний"], viscose = id["Віскоза принт"],
+            buttons = id["Ґудзики дерев'яні 15 мм"], zipper = id["Блискавка прихована 20 см"],
+            bag = id["Пакет кур'єрський 30x40"], tag = id["Бірка з логотипом"];
+
+        (int StockItemId, decimal Quantity)[][] specs =
+        [
+            [(linen, 2.8m), (zipper, 1), (bag, 1), (tag, 1)],      // Сукня лляна
+            [(viscose, 2.2m), (buttons, 8), (bag, 1), (tag, 1)],   // Сорочка оверсайз
+            [(linen, 2.4m), (zipper, 1), (bag, 1), (tag, 1)],      // Штани палаццо
+            [(knit, 3.1m), (bag, 1), (tag, 1)],                    // Костюм трикотажний
+            [(viscose, 1.6m), (zipper, 1), (bag, 1), (tag, 1)],    // Спідниця міді
+            [(linen, 2.6m), (buttons, 3), (bag, 1), (tag, 1)],     // Жакет класичний
+        ];
+
+        for (var i = 0; i < specs.Length; i++)
+        {
+            var bom = new Bom(FirstProductId + i);
+            bom.SetLines(specs[i], userId, now);
+            db.Boms.Add(bom);
+        }
+        await db.SaveChangesAsync();
+        return specs.Length;
     }
 
     /// <summary>OpenCart вимагає NOT NULL у багатьох колонках, які нам не потрібні. Заповнюємо порожніми значеннями.</summary>
