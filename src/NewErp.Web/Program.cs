@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 
 using NewErp.Web;
+using NewErp.Web.Api;
 using NewErp.Web.Auth;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -22,5 +23,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<ApiAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ApiAuthenticationStateProvider>());
 builder.Services.AddMudServices();
+builder.Services.AddScoped<StockApi>();
+builder.Services.AddScoped<Clipboard>();
 
 await builder.Build().RunAsync();

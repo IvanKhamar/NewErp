@@ -1,0 +1,116 @@
+@page "/stock/suppliers"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Постачальники й категорії — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Постачальники й категорії</MudText>
+
+<MudGrid>
+    <MudItem xs="12" lg="8">
+        <MudText Typo="Typo.h6" Class="mb-2">Постачальники</MudText>
+        <MudTable T="StockSupplierDto" Items="_suppliers" Dense="true" Hover="true" Outlined="true" Elevation="0" Class="mb-3">
+            <HeaderContent>
+                <MudTh>Назва</MudTh>
+                <MudTh>Телефон</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>Що постачає</MudTh>
+                <MudTh>Примітки</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Назва">@context.Name</MudTd>
+                <MudTd DataLabel="Телефон">@context.Phone</MudTd>
+                <MudTd DataLabel="Email">@context.Email</MudTd>
+                <MudTd DataLabel="Що постачає">@context.Categories</MudTd>
+                <MudTd DataLabel="Примітки">@context.Notes</MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Постачальників ще немає.</MudText></NoRecordsContent>
+        </MudTable>
+
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Новий постачальник</MudText>
+            <div class="d-flex flex-wrap gap-3">
+                <MudTextField @bind-Value="_supplier.Name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="150" />
+                <MudTextField @bind-Value="_supplier.Phone" Label="Телефон" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="32" />
+                <MudTextField @bind-Value="_supplier.Email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="96" />
+                <MudTextField @bind-Value="_supplier.Categories" Label="Що постачає" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" />
+                <MudTextField @bind-Value="_supplier.Notes" Label="Примітки" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="AddSupplierAsync">Додати постачальника</MudButton>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <MudText Typo="Typo.h6" Class="mb-2">Категорії розхідників</MudText>
+        <MudPaper Class="pa-3" Outlined="true">
+            <div class="d-flex flex-wrap gap-1 mb-3">
+                @foreach (var category in _categories)
+                {
+                    <MudChip T="string" Size="Size.Small">@category.Name</MudChip>
+                }
+                @if (_categories.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">Категорій ще немає.</MudText>
+                }
+            </div>
+            <div class="d-flex align-center gap-2">
+                <MudTextField @bind-Value="_categoryName" Label="Нова категорія" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" />
+                <MudButton Variant="Variant.Outlined" OnClick="AddCategoryAsync">Додати</MudButton>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<StockSupplierDto> _suppliers = [];
+    private List<LookupItem> _categories = [];
+    private SupplierForm _supplier = new();
+    private string _categoryName = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _suppliers = await Api.SuppliersAsync();
+        _categories = await Api.CategoriesAsync();
+    }
+
+    private async Task AddSupplierAsync()
+    {
+        try
+        {
+            await Api.CreateSupplierAsync(new CreateStockSupplierRequest(_supplier.Name, _supplier.Phone, _supplier.Email, _supplier.Categories, _supplier.Notes));
+            Snackbar.Add($"Постачальника «{_supplier.Name}» додано.", Severity.Success);
+            _supplier = new();
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task AddCategoryAsync()
+    {
+        try
+        {
+            await Api.CreateCategoryAsync(new CreateStockCategoryRequest(_categoryName));
+            _categoryName = "";
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private sealed class SupplierForm
+    {
+        public string Name { get; set; } = "";
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public string? Categories { get; set; }
+        public string? Notes { get; set; }
+    }
+}

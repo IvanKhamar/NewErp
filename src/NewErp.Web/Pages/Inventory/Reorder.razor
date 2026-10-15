@@ -1,0 +1,116 @@
+@page "/stock/reorder"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+@inject Clipboard Clipboard
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Що дозамовити — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-1">
+    <MudText Typo="Typo.h4">Що дозамовити</MudText>
+    <MudSpacer />
+    @if (_report is not null)
+    {
+        <MudText Typo="Typo.h6">Разом: @Fmt.Money(_report.Total)</MudText>
+    }
+</div>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Позиції нижче мінімуму. Пропонуємо довести залишок до двох мінімумів; те, що вже замовлено й ще не приїхало, віднімається.
+</MudText>
+
+@if (_report is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_report.Suppliers.Count == 0)
+{
+    <MudAlert Severity="Severity.Success">Усього вистачає — дозамовляти нічого.</MudAlert>
+}
+else
+{
+    @foreach (var group in _report.Suppliers)
+    {
+        <MudCard Outlined="true" Class="mb-4" data-test="supplier-group">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@group.SupplierName</MudText>
+                    <MudText Typo="Typo.body2">@string.Join(" · ", new[] { group.Phone, group.Email }.Where(s => !string.IsNullOrEmpty(s)))</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudText Typo="Typo.subtitle1" Class="mr-2 mt-2">@Fmt.Money(group.Total)</MudText>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent Class="pt-0">
+                <MudSimpleTable Dense="true" Elevation="0" Hover="true">
+                    <thead>
+                        <tr>
+                            <th>Позиція</th>
+                            <th style="text-align: right">Є</th>
+                            <th style="text-align: right">Мінімум</th>
+                            <th style="text-align: right">Вже замовлено</th>
+                            <th style="text-align: right">Замовити</th>
+                            <th style="text-align: right">Сума</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var line in group.Lines)
+                        {
+                            <tr>
+                                <td><MudLink Href="@StockRoutes.Item(line.ItemId)">@line.Name</MudLink></td>
+                                <td style="text-align: right">@Fmt.Qty(line.Quantity) @line.Unit</td>
+                                <td style="text-align: right">@Fmt.Qty(line.MinQuantity)</td>
+                                <td style="text-align: right">@(line.OnOrder > 0 ? Fmt.Qty(line.OnOrder) : "")</td>
+                                <td style="text-align: right"><b>@Fmt.Qty(line.Suggested) @line.Unit</b></td>
+                                <td style="text-align: right">@(line.Sum > 0 ? Fmt.Money(line.Sum) : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="() => CopyAsync(group)">Скопіювати текст</MudButton>
+                @if (group.SupplierId is { } supplierId)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.NoteAdd"
+                               OnClick="() => CreateOrderAsync(supplierId)" Disabled="_busy">Створити замовлення</MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="ml-2">У цих позицій немає постачальника, тож замовлення створюється вручну (скопіюйте текст).</MudText>
+                }
+            </MudCardActions>
+        </MudCard>
+    }
+}
+
+@code {
+    private ReorderReportDto? _report;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => _report = await Api.ReorderAsync();
+
+    private async Task CopyAsync(SupplierReorderDto group)
+    {
+        await Clipboard.CopyAsync(group.MessageText);
+        Snackbar.Add("Текст скопійовано — можна вставити в месенджер.", Severity.Info);
+    }
+
+    private async Task CreateOrderAsync(int supplierId)
+    {
+        _busy = true;
+        try
+        {
+            var id = await Api.CreatePurchaseOrderFromReorderAsync(supplierId);
+            Navigation.NavigateTo(StockRoutes.PurchaseOrder(id));
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

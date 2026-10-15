@@ -1,0 +1,63 @@
+@inject StockApi Api
+@inject ISnackbar Snackbar
+
+@* Прихід або витрата розхідника. Повертає Ok, якщо залишок змінено. *@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">Зараз на складі: <b>@Fmt.Qty(Item.Quantity) @Item.Unit</b></MudText>
+        <MudRadioGroup T="bool" @bind-Value="_income" Class="mb-2">
+            <MudRadio T="bool" Value="true" Color="Color.Success">Прихід</MudRadio>
+            <MudRadio T="bool" Value="false" Color="Color.Error">Витрата</MudRadio>
+        </MudRadioGroup>
+        <MudNumericField T="decimal" @bind-Value="_quantity" Format="0.###" Label="@($"Кількість, {Item.Unit}")" Min="0" Step="1" Variant="Variant.Outlined"
+                         Margin="Margin.Dense" Class="mb-3" AutoFocus="true" />
+        <MudTextField @bind-Value="_reason" Label="Причина" Placeholder="@(_income ? "Прихід від постачальника" : "Брак, інвентаризація...")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required StockItemDto Item { get; set; }
+
+    private bool _income = true;
+    private decimal _quantity;
+    private string _reason = "";
+    private string? _error;
+    private bool _busy;
+
+    private async Task SaveAsync()
+    {
+        if (_quantity <= 0)
+        {
+            _error = "Вкажіть кількість, більшу за нуль.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var reason = string.IsNullOrWhiteSpace(_reason) ? (_income ? "Прихід" : "Витрата") : _reason;
+            var movement = await Api.AdjustAsync(Item.Id, new AdjustStockRequest(_income ? _quantity : -_quantity, reason));
+            Snackbar.Add($"{Item.Name}: тепер {Fmt.Qty(movement.QuantityAfter)} {Item.Unit}.", Severity.Success);
+            Dialog.Close(DialogResult.Ok(movement));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message; // наприклад, «Недостатньо залишку...»
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

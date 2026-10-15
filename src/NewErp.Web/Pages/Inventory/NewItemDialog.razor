@@ -1,0 +1,76 @@
+@inject StockApi Api
+
+@* Новий розхідник. Повертає Ok(id) створеної позиції. *@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" AutoFocus="true" MaxLength="150" />
+        <div class="d-flex gap-3 mb-3">
+            <MudTextField @bind-Value="_unit" Label="Одиниця" Placeholder="м, шт, кг" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="16" />
+            <MudNumericField T="decimal" @bind-Value="_minQuantity" Format="0.###" Label="Мінімальний залишок" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+        <MudSelect T="int?" @bind-Value="_categoryId" Label="Категорія" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
+            @foreach (var category in _categories)
+            {
+                <MudSelectItem T="int?" Value="category.Id">@category.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="int?" @bind-Value="_supplierId" Label="Постачальник" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
+            @foreach (var supplier in _suppliers)
+            {
+                <MudSelectItem T="int?" Value="supplier.Id">@supplier.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <div class="d-flex gap-3">
+            <MudNumericField T="decimal" @bind-Value="_price" Format="0.##" Label="Ціна за одиницю, ₴" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_usedFor" Label="Для чого" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" />
+        </div>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Створити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    private List<LookupItem> _categories = [];
+    private List<StockSupplierDto> _suppliers = [];
+    private string _name = "";
+    private string _unit = "шт";
+    private decimal _minQuantity;
+    private int? _categoryId;
+    private int? _supplierId;
+    private decimal _price;
+    private string _usedFor = "";
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await Api.CategoriesAsync();
+        _suppliers = await Api.SuppliersAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var id = await Api.CreateItemAsync(new CreateStockItemRequest(_categoryId, _supplierId, _name, _unit, _minQuantity, _usedFor, _price));
+            Dialog.Close(DialogResult.Ok(id));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

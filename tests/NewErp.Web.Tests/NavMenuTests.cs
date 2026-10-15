@@ -6,8 +6,8 @@ namespace NewErp.Web.Tests;
 public class NavMenuTests : WebTestContext
 {
     [Theory]
-    [InlineData(Roles.Admin, new[] { "Головна", "Склад", "Виробництво", "Замовлення", "Бонуси", "Користувачі" })]
-    [InlineData(Roles.Storekeeper, new[] { "Головна", "Склад", "Виробництво" })]
+    [InlineData(Roles.Admin, new[] { "Головна", "Склад", "Розхідники", "Що дозамовити", "Замовлення постачальникам", "Постачальники й категорії", "Виробництво", "Замовлення", "Бонуси", "Користувачі" })]
+    [InlineData(Roles.Storekeeper, new[] { "Головна", "Склад", "Розхідники", "Що дозамовити", "Замовлення постачальникам", "Постачальники й категорії", "Виробництво" })]
     [InlineData(Roles.Manager, new[] { "Головна", "Замовлення" })]
     public void ShowsOnlySectionsOfTheRole(string role, string[] expected)
     {

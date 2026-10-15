@@ -2,7 +2,12 @@
 <MudNavMenu>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Головна</MudNavLink>
     <AuthorizeView Roles="@Access.Stock">
-        <MudNavLink Href="stock" Icon="@Icons.Material.Filled.Inventory2">Склад</MudNavLink>
+        <MudNavGroup Title="Склад" Icon="@Icons.Material.Filled.Inventory2" Expanded="true">
+            <MudNavLink Href="stock" Match="NavLinkMatch.All">Розхідники</MudNavLink>
+            <MudNavLink Href="stock/reorder">Що дозамовити</MudNavLink>
+            <MudNavLink Href="stock/purchase-orders">Замовлення постачальникам</MudNavLink>
+            <MudNavLink Href="stock/suppliers">Постачальники й категорії</MudNavLink>
+        </MudNavGroup>
     </AuthorizeView>
     <AuthorizeView Roles="@Access.Production">
         <MudNavLink Href="production" Icon="@Icons.Material.Filled.ContentCut">Виробництво</MudNavLink>

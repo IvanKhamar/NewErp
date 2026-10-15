@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using MudBlazor.Services;
 
+using NewErp.Web.Api;
 using NewErp.Web.Auth;
 
 namespace NewErp.Web.Tests;
@@ -12,14 +13,21 @@ namespace NewErp.Web.Tests;
 /// <summary>
 /// Спільне налаштування для тестів компонентів: MudBlazor, «API» з наперед заданими відповідями і стан входу.
 /// </summary>
-public abstract class WebTestContext : BunitContext
+public abstract class WebTestContext : BunitContext, IAsyncLifetime
 {
+    // Сервіси MudBlazor (KeyInterceptorService тощо) звільняються лише асинхронно, тож xUnit має викликати DisposeAsync.
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
+
     protected WebTestContext()
     {
         JSInterop.Mode = JSRuntimeMode.Loose; // MudBlazor викликає JavaScript; у тестах ці виклики просто ігноруються
         Services.AddMudServices();
         Services.AddSingleton(new HttpClient(Api) { BaseAddress = new Uri("http://localhost/app/") });
         Services.AddScoped<ApiAuthenticationStateProvider>();
+        Services.AddScoped<StockApi>();
+        Services.AddScoped<Clipboard>();
     }
 
     protected FakeApi Api { get; } = new();
@@ -31,14 +39,19 @@ public abstract class WebTestContext : BunitContext
 
         public List<string> Requests { get; } = [];
 
+        /// <summary>Тіла запитів, що змінюють дані (POST/PUT), за шляхом.</summary>
+        public Dictionary<string, string> Bodies { get; } = [];
+
         public void Respond(string path, HttpStatusCode status, object? body = null) =>
             _responses[path] = () => new HttpResponseMessage(status) { Content = body is null ? null : JsonContent.Create(body) };
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
             Requests.Add(path);
-            return Task.FromResult(_responses.TryGetValue(path, out var respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound));
+            if (request.Content is not null)
+                Bodies[path] = await request.Content.ReadAsStringAsync(cancellationToken);
+            return _responses.TryGetValue(path, out var respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
 }

@@ -1,0 +1,59 @@
+@page "/stock/purchase-orders"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Замовлення постачальникам — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Замовлення постачальникам</MudText>
+    <MudSpacer />
+    <MudButton Href="stock/reorder" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PlaylistAdd">Що дозамовити</MudButton>
+</div>
+
+<MudChipSet T="string" @bind-SelectedValue="_status" SelectionMode="SelectionMode.SingleSelection" CheckMark="true" Class="mb-3">
+    <MudChip T="string" Value="@OpenStatuses">Відкриті</MudChip>
+    @foreach (var status in PurchaseStatus.All)
+    {
+        <MudChip T="string" Value="status">@PurchaseStatus.Label(status)</MudChip>
+    }
+    <MudChip T="string" Value="@AllStatuses">Усі</MudChip>
+</MudChipSet>
+
+<MudTable T="PurchaseOrderSummaryDto" Items="Filtered" Hover="true" Dense="true" Loading="_orders is null" RowStyle="cursor: pointer"
+          OnRowClick="row => Navigation.NavigateTo(StockRoutes.PurchaseOrder(row.Item!.Id))">
+    <HeaderContent>
+        <MudTh>№</MudTh>
+        <MudTh>Постачальник</MudTh>
+        <MudTh>Статус</MudTh>
+        <MudTh>Створено</MudTh>
+        <MudTh Style="text-align: right">Позицій</MudTh>
+        <MudTh Style="text-align: right">Сума</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="№">@context.Id</MudTd>
+        <MudTd DataLabel="Постачальник">@context.SupplierName</MudTd>
+        <MudTd DataLabel="Статус"><MudChip T="string" Size="Size.Small" Color="@PurchaseStatus.Color(context.Status)">@PurchaseStatus.Label(context.Status)</MudChip></MudTd>
+        <MudTd DataLabel="Створено">@Fmt.Date(context.CreatedAt)</MudTd>
+        <MudTd DataLabel="Позицій" Style="text-align: right">@context.LineCount</MudTd>
+        <MudTd DataLabel="Сума" Style="text-align: right">@Fmt.Money(context.Total)</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Замовлень немає.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private const string OpenStatuses = "open";
+    private const string AllStatuses = "all";
+
+    private List<PurchaseOrderSummaryDto>? _orders;
+    private string _status = OpenStatuses; // за замовчуванням те, з чим треба щось робити: чернетки й надіслані
+
+    private IEnumerable<PurchaseOrderSummaryDto> Filtered => (_orders ?? []).Where(o => _status switch
+    {
+        AllStatuses => true,
+        OpenStatuses => o.Status is Domain.Stock.PurchaseOrder.Draft or Domain.Stock.PurchaseOrder.Ordered,
+        _ => o.Status == _status,
+    });
+
+    protected override async Task OnInitializedAsync() => _orders = await Api.PurchaseOrdersAsync();
+}

@@ -1,0 +1,109 @@
+@page "/stock"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Розхідники — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Розхідники</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NewItemAsync">Новий розхідник</MudButton>
+</div>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-4" Elevation="0" Outlined="true">
+    <MudTextField @bind-Value="_search" Placeholder="Пошук за назвою" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Clearable="true" Style="min-width: 240px" />
+    <MudSelect T="int?" @bind-Value="_categoryId" Label="Категорія" Clearable="true" Style="min-width: 200px">
+        @foreach (var category in _categories)
+        {
+            <MudSelectItem T="int?" Value="category.Id">@category.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSwitch @bind-Value="_belowMinimumOnly" Color="Color.Warning" Label="Лише нижче мінімуму" />
+</MudPaper>
+
+<MudTable T="StockItemDto" Items="Filtered" Hover="true" Dense="true" Loading="_loading" LoadingProgressColor="Color.Primary"
+          OnRowClick="row => Navigation.NavigateTo(StockRoutes.Item(row.Item!.Id))" RowStyle="cursor: pointer">
+    <HeaderContent>
+        <MudTh>Назва</MudTh>
+        <MudTh>Категорія</MudTh>
+        <MudTh>Постачальник</MudTh>
+        <MudTh Style="text-align: right">Залишок</MudTh>
+        <MudTh Style="text-align: right">Мінімум</MudTh>
+        <MudTh Style="text-align: right">Ціна</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Назва">@context.Name</MudTd>
+        <MudTd DataLabel="Категорія">@context.CategoryName</MudTd>
+        <MudTd DataLabel="Постачальник">@context.SupplierName</MudTd>
+        <MudTd DataLabel="Залишок" Style="text-align: right">
+            @Fmt.Qty(context.Quantity) @context.Unit
+            @if (context.Quantity == 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-2">немає</MudChip>
+            }
+            else if (context.IsBelowMinimum)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-2">мало</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Мінімум" Style="text-align: right">@Fmt.Qty(context.MinQuantity)</MudTd>
+        <MudTd DataLabel="Ціна" Style="text-align: right">@(context.Price > 0 ? Fmt.Money(context.Price) : "")</MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            <MudTooltip Text="Прихід або витрата">
+                <MudIconButton Icon="@Icons.Material.Filled.SwapVert" Size="Size.Small" aria-label="Прихід або витрата"
+                               OnClick="() => AdjustAsync(context)" />
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>@(_items.Count == 0 ? "На складі ще немає розхідників." : "Нічого не знайдено за цими умовами.")</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<StockItemDto> _items = [];
+    private List<LookupItem> _categories = [];
+    private bool _loading = true;
+    private string? _search;
+    private int? _categoryId;
+    private bool _belowMinimumOnly;
+
+    // Розхідників небагато, тож вантажимо всі й фільтруємо в браузері: фільтри спрацьовують миттєво.
+    private IEnumerable<StockItemDto> Filtered => _items
+        .Where(i => string.IsNullOrWhiteSpace(_search) || i.Name.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase))
+        .Where(i => _categoryId is null || i.CategoryId == _categoryId)
+        .Where(i => !_belowMinimumOnly || i.IsBelowMinimum);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await Api.CategoriesAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _items = await Api.ItemsAsync();
+        _loading = false;
+    }
+
+    private async Task AdjustAsync(StockItemDto item)
+    {
+        var dialog = await Dialogs.ShowAsync<AdjustStockDialog>(
+            $"Прихід або витрата: {item.Name}", new DialogParameters<AdjustStockDialog> { { d => d.Item, item } });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task NewItemAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<NewItemDialog>("Новий розхідник");
+        if (await dialog.Result is { Canceled: false, Data: int id })
+            Navigation.NavigateTo(StockRoutes.Item(id));
+    }
+}
