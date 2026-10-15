@@ -19,6 +19,8 @@ public partial class ErpDbContext
 
     public DbSet<SewnBomLine> SewnBomLines => Set<SewnBomLine>();
 
+    public DbSet<ProductionLogEntry> ProductionLog => Set<ProductionLogEntry>();
+
     private static void ConfigureProduction(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProductionModel>(e =>
@@ -103,6 +105,26 @@ public partial class ErpDbContext
             e.Property(x => x.SizeId).HasColumnName("size_id");
             e.Property(x => x.ItemId).HasColumnName("item_id");
             e.Property(x => x.QtyPerUnit).HasColumnName("qty_per_unit").HasPrecision(12, 4);
+        });
+
+        modelBuilder.Entity<ProductionLogEntry>(e =>
+        {
+            e.ToTable("dd_stock_production_log");
+            e.Property(x => x.Id).HasColumnName("log_id");
+            e.Property(x => x.ProductionId).HasColumnName("production_id");
+            e.Property(x => x.SizeId).HasColumnName("size_id");
+            e.Property(x => x.SizeName).HasColumnName("size_name").HasMaxLength(32);
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(20);
+            e.Property(x => x.Stage).HasColumnName("stage").HasMaxLength(8);
+            e.Property(x => x.Direction).HasColumnName("direction").HasMaxLength(8);
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3);
+            e.Property(x => x.StockBefore).HasColumnName("stock_before").HasPrecision(12, 3);
+            e.Property(x => x.StockAfter).HasColumnName("stock_after").HasPrecision(12, 3);
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(255);
+            e.Property(x => x.CreatedAt).HasColumnName("date_added").HasColumnType("datetime");
+            e.HasOne(x => x.Model).WithMany().HasForeignKey(x => x.ProductionId);
+            e.HasOne(x => x.Size).WithMany().HasForeignKey(x => x.SizeId);
         });
 
         modelBuilder.Entity<ComponentStock>(e =>

@@ -58,3 +58,37 @@ public sealed record ProductionModelDto(
     IReadOnlyList<CategoryLinkDto> Categories,
     IReadOnlyList<ComponentDto> Components,
     IReadOnlyList<SewnBomLineDto> SewnBom);
+
+// ── Операції крою й пошиву ──
+
+/// <summary>Операції з залишками моделі (у старому модулі — кнопки «+Покроєно», «В пошив», «+Пошито», «Відвантаж.»).</summary>
+public enum ProductionOperation
+{
+    /// <summary>+Покроєно: крій зростає, розхідники списуються за специфікацією крою, запас деталей зростає.</summary>
+    Cut,
+
+    /// <summary>В пошив: розкроєні комплекти передано швачкам, крій зменшується.</summary>
+    SendToSewing,
+
+    /// <summary>+Пошито: пошиті вироби зростають, деталі й розхідники списуються за специфікацією пошиву.</summary>
+    Sewn,
+
+    /// <summary>Відвантажено не через замовлення: пошиті вироби зменшуються.</summary>
+    Ship,
+}
+
+public sealed record SizeQuantity(int SizeId, decimal Quantity);
+
+public sealed record ProductionOperationRequest(IReadOnlyList<SizeQuantity> Quantities, string? Comment = null);
+
+public sealed record SizeChangeDto(int SizeId, string SizeName, decimal Before, decimal After);
+
+/// <summary>Warnings: чого не вистачило при списанні (списано те, що було).</summary>
+public sealed record ProductionOperationResult(IReadOnlyList<SizeChangeDto> Sizes, IReadOnlyList<string> Warnings);
+
+public sealed record ProductionLogDto(
+    int Id, int ProductionId, string? ProductionName, int SizeId, string SizeName, string Stage, string Direction,
+    decimal Quantity, decimal StockBefore, decimal StockAfter, string Comment, int UserId, string Username, DateTime CreatedAt);
+
+/// <summary>Stage: "cut" або "sewn".</summary>
+public sealed record ProductionLogFilter(int? ProductionId = null, string? Stage = null, int Limit = 100);

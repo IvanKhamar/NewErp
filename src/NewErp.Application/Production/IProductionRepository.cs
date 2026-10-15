@@ -1,4 +1,5 @@
 using NewErp.Domain.Production;
+using NewErp.Domain.Stock;
 
 namespace NewErp.Application.Production;
 
@@ -24,6 +25,23 @@ public interface IProductionRepository
     Task<bool> SizesInUseAsync(IReadOnlyCollection<int> sizeIds, CancellationToken ct);
 
     Task<IReadOnlyList<ComponentStock>> FindComponentStockAsync(int componentId, CancellationToken ct);
+
+    /// <summary>Деталі моделі зі специфікаціями крою, для операцій.</summary>
+    Task<IReadOnlyList<ProductionComponent>> FindComponentsAsync(int productionId, CancellationToken ct);
+
+    /// <summary>Наявні рядки запасу цих деталей (рядка може ще не бути, якщо деталь не кроїли).</summary>
+    Task<IReadOnlyList<ComponentStock>> FindComponentStocksAsync(IReadOnlyCollection<int> componentIds, CancellationToken ct);
+
+    /// <summary>Розхідники для зміни залишку.</summary>
+    Task<IReadOnlyList<StockItem>> FindStockItemsAsync(IReadOnlyCollection<int> itemIds, CancellationToken ct);
+
+    Task<IReadOnlyList<ProductionLogDto>> ListLogAsync(ProductionLogFilter filter, CancellationToken ct);
+
+    void Add(ProductionLogEntry entry);
+
+    void Add(StockMovement movement);
+
+    void Add(ComponentStock stock);
 
     void Add(ProductionModel model);
 

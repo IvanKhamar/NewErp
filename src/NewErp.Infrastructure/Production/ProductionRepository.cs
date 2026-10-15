@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using NewErp.Application.Production;
 using NewErp.Domain.Production;
+using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Production;
@@ -92,6 +93,43 @@ public sealed class ProductionRepository(ErpDbContext db) : IProductionRepositor
 
     public async Task<IReadOnlyList<ComponentStock>> FindComponentStockAsync(int componentId, CancellationToken ct) =>
         await db.ComponentStocks.Where(s => s.ComponentId == componentId).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ProductionComponent>> FindComponentsAsync(int productionId, CancellationToken ct) =>
+        await db.ProductionComponents.Include(c => c.Bom)
+            .Where(c => c.ProductionId == productionId)
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ComponentStock>> FindComponentStocksAsync(IReadOnlyCollection<int> componentIds, CancellationToken ct) =>
+        await db.ComponentStocks.Where(s => componentIds.Contains(s.ComponentId)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<StockItem>> FindStockItemsAsync(IReadOnlyCollection<int> itemIds, CancellationToken ct) =>
+        await db.StockItems.Where(i => i.IsActive && itemIds.Contains(i.Id)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ProductionLogDto>> ListLogAsync(ProductionLogFilter filter, CancellationToken ct)
+    {
+        var log = db.ProductionLog.AsNoTracking();
+        if (filter.ProductionId is { } productionId)
+            log = log.Where(l => l.ProductionId == productionId);
+        if (!string.IsNullOrEmpty(filter.Stage))
+            log = log.Where(l => l.Stage == filter.Stage);
+
+        return await (
+            from l in log
+            join m in db.ProductionModels on l.ProductionId equals m.Id into ms
+            from m in ms.DefaultIfEmpty()
+            orderby l.CreatedAt descending, l.Id descending
+            select new ProductionLogDto(
+                l.Id, l.ProductionId, m == null ? null : m.Name, l.SizeId, l.SizeName, l.Stage, l.Direction,
+                l.Quantity, l.StockBefore, l.StockAfter, l.Comment, l.UserId, l.Username, l.CreatedAt)
+        ).Take(Math.Clamp(filter.Limit, 1, 500)).ToListAsync(ct);
+    }
+
+    public void Add(ProductionLogEntry entry) => db.ProductionLog.Add(entry);
+
+    public void Add(StockMovement movement) => db.StockMovements.Add(movement);
+
+    public void Add(ComponentStock stock) => db.ComponentStocks.Add(stock);
 
     public void Add(ProductionModel model) => db.ProductionModels.Add(model);
 

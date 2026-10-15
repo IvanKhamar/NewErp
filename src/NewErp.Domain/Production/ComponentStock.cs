@@ -16,4 +16,16 @@ public class ComponentStock
     public int SizeId { get; private set; }
 
     public decimal Stock { get; internal set; }
+
+    /// <summary>Розкроєно ще <paramref name="quantity"/> деталей.</summary>
+    public void Add(decimal quantity) => Stock += quantity;
+
+    /// <summary>Деталі пішли в пошив. Як і з розхідниками: якщо бракує, береться те, що є.</summary>
+    /// <returns>Скільки справді взято.</returns>
+    public decimal TakeUpTo(decimal wanted)
+    {
+        var taken = Math.Min(wanted, Math.Max(0, Stock));
+        Stock -= taken;
+        return taken;
+    }
 }

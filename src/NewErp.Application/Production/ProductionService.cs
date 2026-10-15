@@ -1,12 +1,144 @@
 using NewErp.Application.Common;
 using NewErp.Domain.Common;
 using NewErp.Domain.Production;
+using NewErp.Domain.Stock;
 
 namespace NewErp.Application.Production;
 
-/// <summary>Сценарії виробництва (перенесено з модуля StockTrack старого сайту): моделі, розміри, деталі крою, специфікації.</summary>
-public sealed class ProductionService(IProductionRepository repository)
+/// <summary>
+/// Сценарії виробництва (на основі модуля StockTrack старого сайту): моделі, розміри, деталі крою, специфікації,
+/// операції крою й пошиву зі списанням розхідників.
+/// </summary>
+public sealed class ProductionService(IProductionRepository repository, TimeProvider clock)
 {
+    /// <summary>
+    /// Виконує операцію для кількох розмірів одразу. Крій і пошив списують розхідники та деталі за специфікаціями:
+    /// якщо чогось бракує, списується те, що є, а нестача повертається в Warnings. Усе зберігається одним записом.
+    /// </summary>
+    public async Task<ProductionOperationResult> RecordAsync(
+        int productionId, ProductionOperation operation, ProductionOperationRequest request, int userId, string username, CancellationToken ct)
+    {
+        var model = await RequireModelAsync(productionId, ct);
+        var rows = request.Quantities ?? [];
+        if (rows.Count == 0)
+            throw new DomainException("Вкажіть кількість хоча б для одного розміру.");
+        if (rows.GroupBy(r => r.SizeId).FirstOrDefault(g => g.Count() > 1) is { } dup)
+            throw new DomainException($"Розмір {dup.Key} указано двічі.");
+
+        var now = clock.GetLocalNow().DateTime;
+        var consumption = operation is ProductionOperation.Cut or ProductionOperation.Sewn
+            ? await LoadConsumptionAsync(model, ct)
+            : null;
+        var changes = new List<SizeChangeDto>();
+
+        foreach (var (sizeId, quantity) in rows)
+        {
+            var entry = operation switch
+            {
+                ProductionOperation.Cut => model.RecordCut(sizeId, quantity, request.Comment, userId, username, now),
+                ProductionOperation.SendToSewing => model.SendToSewing(sizeId, quantity, request.Comment, userId, username, now),
+                ProductionOperation.Sewn => model.RecordSewn(sizeId, quantity, request.Comment, userId, username, now),
+                ProductionOperation.Ship => model.Ship(sizeId, quantity, request.Comment, userId, username, now),
+                _ => throw new DomainException($"Невідома операція {operation}."),
+            };
+            repository.Add(entry);
+            changes.Add(new SizeChangeDto(sizeId, entry.SizeName, entry.StockBefore, entry.StockAfter));
+
+            if (operation == ProductionOperation.Cut)
+                consumption!.ForCut(entry.SizeName, sizeId, quantity, userId, username, now);
+            else if (operation == ProductionOperation.Sewn)
+                consumption!.ForSewing(entry.SizeName, sizeId, quantity, userId, username, now);
+        }
+
+        await repository.SaveChangesAsync(ct);
+        return new ProductionOperationResult(changes, consumption?.Warnings ?? []);
+    }
+
+    private async Task<Consumption> LoadConsumptionAsync(ProductionModel model, CancellationToken ct)
+    {
+        var components = await repository.FindComponentsAsync(model.Id, ct);
+        var itemIds = components.SelectMany(c => c.Bom.Select(b => b.ItemId))
+            .Concat(model.SewnBom.Where(b => b.ItemId is not null).Select(b => b.ItemId!.Value))
+            .Distinct().ToList();
+        var items = await repository.FindStockItemsAsync(itemIds, ct);
+        var stocks = await repository.FindComponentStocksAsync(components.Select(c => c.Id).ToList(), ct);
+        return new Consumption(repository, model, components, items, stocks);
+    }
+
+    /// <summary>Списання розхідників і деталей для однієї операції (стан, спільний для всіх розмірів запиту).</summary>
+    private sealed class Consumption(
+        IProductionRepository repository,
+        ProductionModel model,
+        IReadOnlyList<ProductionComponent> components,
+        IReadOnlyList<StockItem> items,
+        IReadOnlyList<ComponentStock> stocks)
+    {
+        private readonly Dictionary<int, StockItem> _items = items.ToDictionary(i => i.Id);
+        private readonly Dictionary<(int, int), ComponentStock> _stocks = stocks.ToDictionary(s => (s.ComponentId, s.SizeId));
+
+        public List<string> Warnings { get; } = [];
+
+        /// <summary>+Покроєно: кожна деталь отримує +quantity у запас, а її розхідники списуються за специфікацією крою.</summary>
+        public void ForCut(string sizeName, int sizeId, decimal quantity, int userId, string username, DateTime now)
+        {
+            foreach (var component in components)
+            {
+                foreach (var line in BomResolver.Resolve(component.Bom, sizeId, b => b.SizeId, b => b.ItemId))
+                    TakeItem(line.ItemId, line.QtyPerUnit * quantity, Invariant($"Крій: {model.Name}, {component.Name}, {sizeName} x{quantity:0.###}"), userId, username, now);
+                StockOf(component.Id, sizeId).Add(quantity);
+            }
+        }
+
+        /// <summary>+Пошито: деталі крою береться із запасу, прямі розхідники (нитки, бірки) списуються зі складу.</summary>
+        public void ForSewing(string sizeName, int sizeId, decimal quantity, int userId, string username, DateTime now)
+        {
+            var componentLines = BomResolver.Resolve(model.SewnBom, sizeId, b => b.SizeId, b => b.ComponentId);
+            foreach (var line in componentLines)
+            {
+                var need = line.QtyPerUnit * quantity;
+                var taken = StockOf(line.ComponentId!.Value, sizeId).TakeUpTo(need);
+                if (taken < need)
+                {
+                    var name = components.FirstOrDefault(c => c.Id == line.ComponentId)?.Name ?? $"деталь {line.ComponentId}";
+                    Warnings.Add(Invariant($"Бракує розкроєних деталей «{name}» розміру {sizeName}: {need - taken:0.###} шт. Взято {taken:0.###} з {need:0.###}."));
+                }
+            }
+
+            foreach (var line in BomResolver.Resolve(model.SewnBom, sizeId, b => b.SizeId, b => b.ItemId))
+                TakeItem(line.ItemId!.Value, line.QtyPerUnit * quantity, Invariant($"Пошив: {model.Name}, {sizeName} x{quantity:0.###}"), userId, username, now);
+        }
+
+        private void TakeItem(int itemId, decimal need, string comment, int userId, string username, DateTime now)
+        {
+            if (!_items.TryGetValue(itemId, out var item))
+            {
+                Warnings.Add($"Розхідника {itemId} зі специфікації немає на складі, його не списано.");
+                return;
+            }
+
+            // Довгі назви моделі й деталі можуть не вміститися в коментар журналу (255 символів).
+            var movement = item.TakeUpTo(need, comment.Length > 255 ? comment[..255] : comment, userId, username, now);
+            if (movement is not null)
+                repository.Add(movement);
+            var taken = movement?.Quantity ?? 0;
+            if (taken < need)
+                Warnings.Add(Invariant($"Бракує {need - taken:0.###} {item.Unit}: {item.Name}. Списано {taken:0.###} з {need:0.###}."));
+        }
+
+        private ComponentStock StockOf(int componentId, int sizeId)
+        {
+            if (!_stocks.TryGetValue((componentId, sizeId), out var stock))
+            {
+                stock = new ComponentStock(componentId, sizeId);
+                _stocks[(componentId, sizeId)] = stock;
+                repository.Add(stock);
+            }
+            return stock;
+        }
+
+        private static string Invariant(FormattableString text) => FormattableString.Invariant(text);
+    }
+
     public async Task<int> CreateModelAsync(SaveProductionModelRequest request, CancellationToken ct)
     {
         var model = new ProductionModel(request.Name, request.Type, request.MinTotal, request.SortOrder);

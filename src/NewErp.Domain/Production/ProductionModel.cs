@@ -161,6 +161,56 @@ public class ProductionModel
     /// <summary>Прибирає деталь зі специфікації пошиву, коли її видаляють.</summary>
     public void RemoveComponentFromSewnBom(int componentId) => _sewnBom.RemoveAll(l => l.ComponentId == componentId);
 
+    /// <summary>«+Покроєно»: розкроєно <paramref name="quantity"/> комплектів розміру.</summary>
+    public ProductionLogEntry RecordCut(int sizeId, decimal quantity, string? comment, int userId, string username, DateTime now) =>
+        Change(RequireSize(sizeId), ProductionLogEntry.Cut, RequirePositive(quantity), comment, userId, username, now);
+
+    /// <summary>«В пошив»: розкроєні комплекти передано швачкам. Більше, ніж розкроєно, передати не можна.</summary>
+    public ProductionLogEntry SendToSewing(int sizeId, decimal quantity, string? comment, int userId, string username, DateTime now)
+    {
+        var size = RequireSize(sizeId);
+        RequireAvailable(size, size.CutStock, quantity, "розкроєно");
+        return Change(size, ProductionLogEntry.Cut, -quantity, comment, userId, username, now);
+    }
+
+    /// <summary>«+Пошито»: готові вироби розміру надійшли на склад (для ready_made — прихід від постачальника).</summary>
+    public ProductionLogEntry RecordSewn(int sizeId, decimal quantity, string? comment, int userId, string username, DateTime now) =>
+        Change(RequireSize(sizeId), ProductionLogEntry.Sewn, RequirePositive(quantity), comment, userId, username, now);
+
+    /// <summary>«Відвантажено»: пошиті вироби пішли зі складу не через замовлення. Більше, ніж є, відвантажити не можна.</summary>
+    public ProductionLogEntry Ship(int sizeId, decimal quantity, string? comment, int userId, string username, DateTime now)
+    {
+        var size = RequireSize(sizeId);
+        RequireAvailable(size, size.SewnStock, quantity, "пошито");
+        return Change(size, ProductionLogEntry.Sewn, -quantity, comment, userId, username, now);
+    }
+
+    private ProductionLogEntry Change(
+        ProductionSize size, string stage, decimal delta, string? comment, int userId, string username, DateTime now)
+    {
+        var before = stage == ProductionLogEntry.Cut ? size.CutStock : size.SewnStock;
+        var after = before + delta;
+        if (stage == ProductionLogEntry.Cut)
+            size.CutStock = after;
+        else
+            size.SewnStock = after;
+
+        var text = comment?.Trim() ?? "";
+        if (text.Length > 255)
+            throw new DomainException("Коментар: не довше 255 символів.");
+        return new ProductionLogEntry(this, size, stage, delta, before, after, text, userId, username, now);
+    }
+
+    private static decimal RequirePositive(decimal quantity) =>
+        quantity > 0 ? quantity : throw new DomainException("Кількість має бути більшою за нуль.");
+
+    private static void RequireAvailable(ProductionSize size, decimal available, decimal quantity, string what)
+    {
+        RequirePositive(quantity);
+        if (quantity > available)
+            throw new DomainException($"Розмір {size.Name}: {what} лише {available}, а вказано {quantity}.");
+    }
+
     public ProductionSize RequireSize(int sizeId) =>
         _sizes.Find(s => s.Id == sizeId) ?? throw new DomainException($"Розмір {sizeId} не належить моделі \"{Name}\".");
 }

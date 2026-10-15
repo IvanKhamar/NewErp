@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using NewErp.Api.Auth;
 using NewErp.Application.Production;
 
@@ -51,6 +53,20 @@ public static class ProductionEndpoints
         })
             .WithSummary("Специфікація пошиву: деталі крою й розхідники на один виріб");
 
+        // Чотири операції з залишками. Кожна приймає кількості для кількох розмірів одразу.
+        MapOperation(production, "cut", ProductionOperation.Cut,
+            "+Покроєно: крій зростає, розхідники списуються за специфікацією крою (бракує — списується те, що є, у warnings)");
+        MapOperation(production, "to-sewing", ProductionOperation.SendToSewing,
+            "В пошив: розкроєні комплекти передано швачкам (більше, ніж розкроєно, не можна)");
+        MapOperation(production, "sewn", ProductionOperation.Sewn,
+            "+Пошито: пошиті вироби зростають, деталі й розхідники списуються за специфікацією пошиву");
+        MapOperation(production, "ship", ProductionOperation.Ship,
+            "Відвантажено не через замовлення (більше, ніж пошито, не можна)");
+
+        production.MapGet("/log", (IProductionRepository repo, [AsParameters] ProductionLogFilter filter, CancellationToken ct) =>
+            repo.ListLogAsync(filter, ct))
+            .WithSummary("Журнал крою й пошиву (stage = cut або sewn), нові записи першими");
+
         production.MapPost("/models/{id:int}/components", async (int id, SaveComponentRequest request, ProductionService service, CancellationToken ct) =>
         {
             var componentId = await service.AddComponentAsync(id, request, ct);
@@ -77,4 +93,10 @@ public static class ProductionEndpoints
         })
             .WithSummary("Специфікація крою: розхідники на одну деталь");
     }
+
+    private static void MapOperation(RouteGroupBuilder group, string route, ProductionOperation operation, string summary) =>
+        group.MapPost($"/models/{{id:int}}/{route}",
+            (int id, ProductionOperationRequest request, ClaimsPrincipal user, ProductionService service, CancellationToken ct) =>
+                service.RecordAsync(id, operation, request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary(summary);
 }

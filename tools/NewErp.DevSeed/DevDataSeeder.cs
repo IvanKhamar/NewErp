@@ -1,11 +1,15 @@
 using Bogus;
 
+using Microsoft.EntityFrameworkCore;
+
 using NewErp.Application.Auth;
+using NewErp.Application.Production;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
+using NewErp.Infrastructure.Production;
 
 namespace NewErp.DevSeed;
 
@@ -161,7 +165,36 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
 
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
         var models = await SeedProductionAsync();
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, {models} моделей виробництва.";
+        var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, " +
+               $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
+    }
+
+    /// <summary>
+    /// Крій і пошив через справжній ProductionService, щоб залишки, журнали й списання були такими, як у роботі.
+    /// Трикотажу навмисно замало, тож для костюма буде нестача.
+    /// </summary>
+    private async Task<int> SeedProductionOperationsAsync(int userId, string username)
+    {
+        var service = new ProductionService(new ProductionRepository(db), TimeProvider.System);
+        var warnings = 0;
+        foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
+        {
+            if (model.Type == ProductionModel.Clothing)
+            {
+                warnings += (await Run(ProductionOperation.Cut, 4)).Warnings.Count;
+                await Run(ProductionOperation.SendToSewing, 3);
+                warnings += (await Run(ProductionOperation.Sewn, 3)).Warnings.Count;
+            }
+            else
+                await Run(ProductionOperation.Sewn, 15); // готовий товар: прихід від постачальника
+
+            Task<ProductionOperationResult> Run(ProductionOperation operation, decimal perSize) =>
+                service.RecordAsync(model.Id, operation,
+                    new ProductionOperationRequest(model.Sizes.Select(s => new SizeQuantity(s.Id, perSize)).ToList(), "Початкові дані"),
+                    userId, username, CancellationToken.None);
+        }
+        return warnings;
     }
 
     /// <summary>

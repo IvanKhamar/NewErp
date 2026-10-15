@@ -176,3 +176,24 @@ CREATE TABLE `dd_stock_production_sewn_bom` (
   PRIMARY KEY (`bom_id`),
   KEY `production_id` (`production_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Журнал виробництва: кожна зміна залишку крою (stage = 'cut') чи пошиву ('sewn') за розміром.
+-- direction: 'in' (+Покроєно, +Пошито) або 'out' (В пошив, Відвантаження, замовлення).
+-- Замовлення старий сайт пише з user_id = 0 і username = 'system'.
+CREATE TABLE `dd_stock_production_log` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `production_id` int(11) NOT NULL,
+  `size_id` int(11) NOT NULL,
+  `size_name` varchar(32) NOT NULL,
+  `user_id` int(11) NOT NULL DEFAULT '0',
+  `username` varchar(20) NOT NULL DEFAULT '',
+  `stage` varchar(8) NOT NULL,
+  `direction` varchar(8) NOT NULL,
+  `quantity` decimal(12,3) NOT NULL,
+  `stock_before` decimal(12,3) NOT NULL,
+  `stock_after` decimal(12,3) NOT NULL,
+  `comment` varchar(255) NOT NULL DEFAULT '',
+  `date_added` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `production_id` (`production_id`, `date_added`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
