@@ -39,6 +39,7 @@ app.UseAuthorization();  // перевіряє, чи має він доступ 
 
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapAuthEndpoints();
+app.MapUserEndpoints();
 app.MapOrderEndpoints();
 app.MapStaffEndpoints();
 app.MapStockEndpoints();

@@ -17,6 +17,8 @@ public partial class ErpDbContext
             e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(255);
             e.Property(x => x.Role).HasColumnName("role").HasMaxLength(32);
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at").HasColumnType("datetime");
+            e.Property(x => x.SecurityStamp).HasColumnName("security_stamp").HasMaxLength(36);
+            e.Property(x => x.MustChangePassword).HasColumnName("must_change_password");
         });
     }
 }

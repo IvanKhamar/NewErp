@@ -23,6 +23,10 @@ CREATE TABLE `erp_user_login` (
   `password_hash` varchar(255) NOT NULL,
   `role` varchar(32) NOT NULL,
   `last_login_at` datetime NULL,
+  -- Змінюється при зміні ролі чи пароля; cookie зі старим значенням одразу перестає діяти.
+  `security_stamp` varchar(36) NOT NULL,
+  -- Пароль видав адмін (тимчасовий), користувач має змінити його сам.
+  `must_change_password` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

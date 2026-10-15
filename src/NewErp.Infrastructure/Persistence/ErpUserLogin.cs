@@ -10,4 +10,11 @@ public sealed class ErpUserLogin
     public string Role { get; set; } = "";
 
     public DateTime? LastLoginAt { get; set; }
+
+    /// <summary>Версія облікового запису. Нове значення робить недійсними всі видані раніше cookie.</summary>
+    public string SecurityStamp { get; set; } = NewStamp();
+
+    public bool MustChangePassword { get; set; }
+
+    public static string NewStamp() => Guid.NewGuid().ToString("N");
 }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 
@@ -11,6 +12,7 @@ public static class Policies
     public const string Orders = nameof(Orders);
     public const string Stock = nameof(Stock);
     public const string Bonuses = nameof(Bonuses);
+    public const string Users = nameof(Users);
 }
 
 public static class AuthSetup
@@ -30,6 +32,20 @@ public static class AuthSetup
                 // Типово cookie-схема переадресовує на сторінку входу. В API замість цього повертаємо коди 401 і 403.
                 options.Events.OnRedirectToLogin = context => SetStatus(context.Response, StatusCodes.Status401Unauthorized);
                 options.Events.OnRedirectToAccessDenied = context => SetStatus(context.Response, StatusCodes.Status403Forbidden);
+
+                // На кожному запиті: чи не змінилася версія облікового запису (роль, пароль, відкликаний доступ)
+                // і чи не вимкнули користувача на старому сайті. Якщо так — cookie недійсна, відповідь 401.
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    var principal = context.Principal!;
+                    var store = context.HttpContext.RequestServices.GetRequiredService<IUserLoginStore>();
+                    var current = await store.GetActiveSecurityStampAsync(principal.GetUserId(), context.HttpContext.RequestAborted);
+                    if (current is null || current != principal.GetSecurityStamp())
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    }
+                };
             });
 
         services.AddAuthorizationBuilder()
@@ -37,7 +53,8 @@ public static class AuthSetup
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
             .AddPolicy(Policies.Orders, p => p.RequireRole(Roles.Admin, Roles.Manager))
             .AddPolicy(Policies.Stock, p => p.RequireRole(Roles.Admin, Roles.Storekeeper))
-            .AddPolicy(Policies.Bonuses, p => p.RequireRole(Roles.Admin));
+            .AddPolicy(Policies.Bonuses, p => p.RequireRole(Roles.Admin))
+            .AddPolicy(Policies.Users, p => p.RequireRole(Roles.Admin));
 
         return services;
     }

@@ -24,6 +24,7 @@ public static class DependencyInjection
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.
         services.AddScoped<IOrderStatusHandler, OrderSewnStockHandler>();
         services.AddScoped<AuthService>();
+        services.AddScoped<UserAdminService>();
         return services;
     }
 }

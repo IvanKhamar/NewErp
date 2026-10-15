@@ -15,12 +15,12 @@ public static class AuthEndpoints
 
         auth.MapPost("/login", async (LoginRequest request, AuthService service, HttpContext http, CancellationToken ct) =>
         {
-            var user = await service.LoginAsync(request, ct);
-            if (user is null)
+            var authenticated = await service.LoginAsync(request, ct);
+            if (authenticated is null)
                 return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Невірний логін або пароль");
 
-            await http.SignInAsync(user.ToPrincipal());
-            return Results.Ok(user);
+            await http.SignInAsync(authenticated.ToPrincipal());
+            return Results.Ok(authenticated.User);
         })
         .AllowAnonymous()
         .WithSummary("Вхід: видає cookie сесії");
@@ -33,6 +33,15 @@ public static class AuthEndpoints
         .WithSummary("Вихід: видаляє cookie сесії");
 
         auth.MapGet("/me", (ClaimsPrincipal user) => user.ToCurrentUser())
-            .WithSummary("Хто зараз увійшов");
+            .WithSummary("Хто зараз увійшов; mustChangePassword = true — пароль тимчасовий, його треба змінити");
+
+        auth.MapPost("/change-password", async (ChangePasswordRequest request, ClaimsPrincipal user, AuthService service, HttpContext http, CancellationToken ct) =>
+        {
+            var authenticated = await service.ChangePasswordAsync(user.GetUserId(), request, ct);
+            // Нова версія облікового запису робить недійсними всі сесії, тож поточну видаємо заново.
+            await http.SignInAsync(authenticated.ToPrincipal());
+            return Results.NoContent();
+        })
+        .WithSummary("Змінити власний пароль (потрібен поточний). Інші сесії цього користувача закриваються");
     }
 }
