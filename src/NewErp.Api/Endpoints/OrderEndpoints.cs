@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using NewErp.Api.Auth;
 using NewErp.Application.Orders;
+using NewErp.Application.Sms;
 
 namespace NewErp.Api.Endpoints;
 
@@ -36,5 +37,12 @@ public static class OrderEndpoints
             return Results.NoContent();
         })
         .WithSummary("Призначити відповідального менеджера");
+
+        orders.MapPost("/{id:int}/sms", (int id, SendSmsRequest request, SmsService service, CancellationToken ct) =>
+            service.SendToOrderAsync(id, request, ct))
+        .WithSummary("Надіслати SMS клієнту замовлення (зараз заглушка: нічого не надсилає, sent = false, але пише в журнал)");
+
+        orders.MapGet("/{id:int}/sms", (int id, ISmsLog log, CancellationToken ct) => log.ListForOrderAsync(id, ct))
+        .WithSummary("SMS, надіслані клієнту цього замовлення");
     }
 }

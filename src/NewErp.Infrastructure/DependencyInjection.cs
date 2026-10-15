@@ -5,12 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 using NewErp.Application.Auth;
 using NewErp.Application.Orders;
 using NewErp.Application.Production;
+using NewErp.Application.Sms;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Orders;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Production;
+using NewErp.Infrastructure.Sms;
 using NewErp.Infrastructure.Staff;
 using NewErp.Infrastructure.Stock;
 
@@ -35,6 +37,9 @@ public static class DependencyInjection
         services.AddScoped<IBonusDataSource, BonusDataSource>();
         services.AddScoped<IStockRepository, StockRepository>();
         services.AddScoped<IProductionRepository, ProductionRepository>();
+        services.AddScoped<ISmsLog, SmsLog>();
+        // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).
+        services.AddSingleton<ISmsSender, StubSmsSender>();
         services.AddScoped<IUserLoginStore, UserLoginStore>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         return services;

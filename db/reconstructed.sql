@@ -197,3 +197,18 @@ CREATE TABLE `dd_stock_production_log` (
   PRIMARY KEY (`log_id`),
   KEY `production_id` (`production_id`, `date_added`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ═══ Журнал SMS ═══
+-- Відновлено з admin/model/tool/log.php (addSMSLog). pre_order_id — для передзамовлень, 0 якщо немає.
+-- response — сирий текст відповіді SMS-сервісу. Типи вгадані, звірити.
+CREATE TABLE `dd_sms_log` (
+  `message_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL DEFAULT '0',
+  `pre_order_id` int(11) NOT NULL DEFAULT '0',
+  `phone` varchar(32) NOT NULL,
+  `text` text NOT NULL,
+  `response` text NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`message_id`),
+  KEY `order_id` (`order_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
