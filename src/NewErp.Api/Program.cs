@@ -4,6 +4,7 @@ using NewErp.Api.Endpoints;
 using NewErp.Application;
 using NewErp.Application.Production;
 using NewErp.Application.Staff;
+using NewErp.Application.Stock;
 using NewErp.Infrastructure;
 
 using Scalar.AspNetCore;
@@ -17,6 +18,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddErpAuth();
 
 builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusOptions.SectionName));
+builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockOptions.SectionName));
 builder.Services.Configure<ProductionOptions>(builder.Configuration.GetSection(ProductionOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

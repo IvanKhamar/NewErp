@@ -31,7 +31,10 @@ public static class StockEndpoints
             repo.ListItemsAsync(filter, ct))
             .WithSummary("Позиції складу; belowMinimumOnly=true показує те, що треба дозамовити");
 
-        stock.MapGet("/items/{id:int}", async (int id, IStockRepository repo, CancellationToken ct) =>
+        stock.MapGet("/reorder", (ReorderService service, CancellationToken ct) => service.GetReportAsync(ct))
+            .WithSummary("Що дозамовити: позиції нижче мінімуму за постачальниками, до 2× мінімуму, з готовим текстом замовлення");
+
+        stock.MapGet("/items/{id:int}",async (int id, IStockRepository repo, CancellationToken ct) =>
             await repo.GetItemDtoAsync(id, ct) is { } item ? Results.Ok(item) : Results.NotFound());
 
         stock.MapPost("/items", async (CreateStockItemRequest request, StockService service, CancellationToken ct) =>
