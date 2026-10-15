@@ -10,7 +10,10 @@
         </MudNavGroup>
     </AuthorizeView>
     <AuthorizeView Roles="@Access.Production">
-        <MudNavLink Href="production" Icon="@Icons.Material.Filled.ContentCut">Виробництво</MudNavLink>
+        <MudNavGroup Title="Виробництво" Icon="@Icons.Material.Filled.ContentCut" Expanded="true">
+            <MudNavLink Href="production" Match="NavLinkMatch.All">Моделі</MudNavLink>
+            <MudNavLink Href="production/log">Журнал крою й пошиву</MudNavLink>
+        </MudNavGroup>
     </AuthorizeView>
     <AuthorizeView Roles="@Access.Orders">
         <MudNavLink Href="orders" Icon="@Icons.Material.Filled.ShoppingCart">Замовлення</MudNavLink>

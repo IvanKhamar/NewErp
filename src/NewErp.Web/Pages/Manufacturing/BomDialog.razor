@@ -1,0 +1,122 @@
+@inject ProductionApi Api
+@inject StockApi Stock
+
+@*
+    Редагування специфікації. Component задано — специфікація крою цієї деталі (рядки: розхідник на одну деталь).
+    Component не задано — специфікація пошиву моделі (рядки: деталь крою або розхідник на один виріб). Повертає Ok після збереження.
+*@
+<MudDialog>
+    <DialogContent>
+        @if (_items is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @foreach (var row in _rows)
+            {
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudSelect T="int?" @bind-Value="row.SizeId" Label="Розмір" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 160px">
+                        <MudSelectItem T="int?" Value="null">Усі розміри</MudSelectItem>
+                        @foreach (var size in Model.Sizes)
+                        {
+                            <MudSelectItem T="int?" Value="size.Id">@size.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" @bind-Value="row.What" Label="@(Component is null ? "Деталь або розхідник" : "Розхідник")"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @if (Component is null)
+                        {
+                            @foreach (var component in Model.Components)
+                            {
+                                <MudSelectItem T="string" Value="@($"c:{component.Id}")">Деталь: @component.Name</MudSelectItem>
+                            }
+                        }
+                        @foreach (var item in _items)
+                        {
+                            <MudSelectItem T="string" Value="@($"i:{item.Id}")">@item.Name (@item.Unit)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudNumericField T="decimal" @bind-Value="row.Qty" Label="Кількість" Format="0.####" Min="0" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" Style="max-width: 140px" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Прибрати рядок" OnClick="() => _rows.Remove(row)" />
+                </div>
+            }
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => _rows.Add(new Row())">Додати рядок</MudButton>
+            <MudText Typo="Typo.caption" Class="d-block mt-2">
+                Кількість — @(Component is null ? "на один пошитий виріб" : "на одну деталь"). Рядок для конкретного розміру перекриває рядок «Усі розміри» з тим самим розхідником чи деталлю.
+            </MudText>
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    /// <summary>Деталь, чию специфікацію крою редагуємо; null — специфікація пошиву.</summary>
+    [Parameter] public ComponentDto? Component { get; set; }
+
+    private List<StockItemDto>? _items;
+    private List<Row> _rows = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _rows = Component is not null
+            ? Component.Bom.Select(b => new Row { SizeId = b.SizeId, What = $"i:{b.ItemId}", Qty = b.QtyPerUnit }).ToList()
+            : Model.SewnBom.Select(b => new Row
+            {
+                SizeId = b.SizeId,
+                What = b.ComponentId is { } c ? $"c:{c}" : $"i:{b.ItemId}",
+                Qty = b.QtyPerUnit,
+            }).ToList();
+        _items = await Stock.ItemsAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        var rows = _rows.Where(r => r.What is not null).ToList();
+        _busy = true;
+        try
+        {
+            if (Component is not null)
+                await Api.SetComponentBomAsync(Component.Id, new SetComponentBomRequest(
+                    rows.Select(r => new ComponentBomRowRequest(r.SizeId, r.Id, r.Qty)).ToList()));
+            else
+                await Api.SetSewnBomAsync(Model.Id, new SetSewnBomRequest(rows.Select(r => new SewnBomRowRequest(
+                    r.SizeId, r.IsComponent ? r.Id : null, r.IsComponent ? null : r.Id, r.Qty)).ToList()));
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Рядок форми. What — "c:{id}" (деталь) або "i:{id}" (розхідник), щоб обидва були в одному списку.</summary>
+    private sealed class Row
+    {
+        public int? SizeId { get; set; }
+        public string? What { get; set; }
+        public decimal Qty { get; set; } = 1;
+
+        public bool IsComponent => What?.StartsWith("c:", StringComparison.Ordinal) == true;
+
+        public int Id => int.Parse(What![2..], System.Globalization.CultureInfo.InvariantCulture);
+    }
+}

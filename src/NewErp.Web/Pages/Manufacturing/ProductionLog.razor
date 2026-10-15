@@ -1,0 +1,9 @@
+@page "/production/log"
+@attribute [Authorize(Roles = Access.Production)]
+
+<PageTitle>Журнал крою й пошиву — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Журнал крою й пошиву</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">Останні 200 записів. Записи «Замовлення #…» і «Скасування #…» робить система, коли змінюється статус замовлення.</MudText>
+
+<ProductionLogTable />

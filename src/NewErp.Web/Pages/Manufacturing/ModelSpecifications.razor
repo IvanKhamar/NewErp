@@ -1,0 +1,151 @@
+@using NewErp.Domain.Production
+@inject ProductionApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+@* Деталі крою й обидві специфікації моделі. *@
+@if (Model.Type == ProductionModel.ReadyMade)
+{
+    <MudAlert Severity="Severity.Info">Готовий товар не кроять і не шиють, тож специфікації для нього не потрібні.</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h6">Деталі крою</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">
+        «Покроєно» додає кожну деталь у запас і списує тканину за її специфікацією крою. Рядок без розміру діє для всіх розмірів, рядок із розміром його перекриває.
+    </MudText>
+
+    <MudGrid Class="mb-2">
+        @foreach (var component in Model.Components)
+        {
+            <MudItem xs="12" md="6">
+                <MudCard Outlined="true" data-test="component">
+                    <MudCardHeader Class="pb-0">
+                        <CardHeaderContent><MudText Typo="Typo.subtitle1"><b>@component.Name</b></MudText></CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Перейменувати" OnClick="() => RenameAsync(component)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Видалити" OnClick="() => DeleteAsync(component)" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.caption">Розкроєно в запасі:</MudText>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            @foreach (var size in Model.Sizes)
+                            {
+                                <MudChip T="string" Size="Size.Small">@size.Name: @Fmt.Qty(component.Stock.GetValueOrDefault(size.Id))</MudChip>
+                            }
+                        </div>
+                        @if (component.Bom.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Warning">Специфікацію крою не задано — тканина не списуватиметься.</MudText>
+                        }
+                        else
+                        {
+                            @foreach (var line in component.Bom)
+                            {
+                                <MudText Typo="Typo.body2">@SizeName(line.SizeId): @line.ItemName — @Fmt.Qty(line.QtyPerUnit) @line.Unit</MudText>
+                            }
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.ListAlt" OnClick="() => EditComponentBomAsync(component)">Специфікація крою</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+    <div class="d-flex align-center gap-2 mb-6" style="max-width: 420px">
+        <MudTextField @bind-Value="_newComponent" Label="Нова деталь (перед, спинка, рукав...)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" />
+        <MudButton Variant="Variant.Outlined" OnClick="AddComponentAsync" Disabled="string.IsNullOrWhiteSpace(_newComponent)">Додати</MudButton>
+    </div>
+
+    <div class="d-flex align-center mb-1">
+        <MudText Typo="Typo.h6">Специфікація пошиву</MudText>
+        <MudSpacer />
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditSewnBomAsync">Змінити</MudButton>
+    </div>
+    <MudText Typo="Typo.body2" Class="mb-2">На один пошитий виріб: деталі крою із запасу й розхідники напряму (нитки, бірки, пакет).</MudText>
+    <MudSimpleTable Dense="true" Outlined="true" Elevation="0" Style="max-width: 720px">
+        <thead><tr><th>Розмір</th><th>Що</th><th style="text-align: right">На виріб</th></tr></thead>
+        <tbody>
+            @foreach (var line in Model.SewnBom)
+            {
+                <tr>
+                    <td>@SizeName(line.SizeId)</td>
+                    <td>@(line.ComponentName is not null ? $"Деталь: {line.ComponentName}" : line.ItemName)</td>
+                    <td style="text-align: right">@Fmt.Qty(line.QtyPerUnit) @(line.ComponentId is not null ? "шт" : line.Unit)</td>
+                </tr>
+            }
+            @if (Model.SewnBom.Count == 0)
+            {
+                <tr><td colspan="3"><MudText Typo="Typo.body2" Color="Color.Warning">Не задано — при пошиві нічого не списуватиметься.</MudText></td></tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string _newComponent = "";
+
+    private string SizeName(int? sizeId) => sizeId is { } id ? Model.Sizes.FirstOrDefault(s => s.Id == id)?.Name ?? $"розмір {id}" : "Усі розміри";
+
+    private Task AddComponentAsync() => RunAsync(async () =>
+    {
+        await Api.AddComponentAsync(Model.Id, new SaveComponentRequest(_newComponent, Model.Components.Count + 1));
+        _newComponent = "";
+    });
+
+    private async Task RenameAsync(ComponentDto component)
+    {
+        var dialog = await Dialogs.ShowAsync<TextPromptDialog>("Перейменувати деталь", new DialogParameters<TextPromptDialog>
+        {
+            { d => d.Label, "Назва" }, { d => d.Value, component.Name }, { d => d.MaxLength, 100 },
+        });
+        if (await dialog.Result is { Canceled: false, Data: string name })
+            await RunAsync(() => Api.UpdateComponentAsync(component.Id, new SaveComponentRequest(name, component.SortOrder)));
+    }
+
+    private async Task DeleteAsync(ComponentDto component)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            $"Видалити деталь «{component.Name}»?", "Разом з нею зникне її специфікація крою й рядки в специфікації пошиву.",
+            yesText: "Видалити", cancelText: "Ні");
+        if (confirmed == true)
+            await RunAsync(() => Api.DeleteComponentAsync(component.Id));
+    }
+
+    private async Task EditComponentBomAsync(ComponentDto component)
+    {
+        var dialog = await Dialogs.ShowAsync<BomDialog>($"Специфікація крою: {component.Name}", new DialogParameters<BomDialog>
+        {
+            { d => d.Model, Model }, { d => d.Component, component },
+        }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await OnChanged.InvokeAsync();
+    }
+
+    private async Task EditSewnBomAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<BomDialog>("Специфікація пошиву", new DialogParameters<BomDialog> { { d => d.Model, Model } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await OnChanged.InvokeAsync();
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            await OnChanged.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,73 @@
+@page "/production"
+@attribute [Authorize(Roles = Access.Production)]
+@using NewErp.Domain.Production
+@inject ProductionApi Api
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<PageTitle>Моделі — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Моделі</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NewModelAsync">Нова модель</MudButton>
+</div>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-4" Elevation="0" Outlined="true">
+    <MudTextField @bind-Value="_search" Placeholder="Пошук за назвою" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" Clearable="true" Style="min-width: 240px" />
+    <MudSelect T="string" @bind-Value="_type" Label="Тип" Clearable="true" Style="min-width: 200px">
+        <MudSelectItem T="string" Value="ProductionModel.Clothing">@ProductionUi.TypeLabel(ProductionModel.Clothing)</MudSelectItem>
+        <MudSelectItem T="string" Value="ProductionModel.ReadyMade">@ProductionUi.TypeLabel(ProductionModel.ReadyMade)</MudSelectItem>
+    </MudSelect>
+    <MudSwitch @bind-Value="_belowMinimumOnly" Color="Color.Warning" Label="Лише ті, що треба шити" />
+</MudPaper>
+
+<MudTable T="ProductionModelSummaryDto" Items="Filtered" Hover="true" Dense="true" Loading="_models is null" RowStyle="cursor: pointer"
+          OnRowClick="row => Navigation.NavigateTo(ProductionUi.Model(row.Item!.Id))">
+    <HeaderContent>
+        <MudTh>Модель</MudTh>
+        <MudTh>Тип</MudTh>
+        <MudTh Style="text-align: right">Розкроєно</MudTh>
+        <MudTh Style="text-align: right">Пошито</MudTh>
+        <MudTh Style="text-align: right">Мінімум</MudTh>
+        <MudTh Style="text-align: right">Бракує</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Модель">@context.Name</MudTd>
+        <MudTd DataLabel="Тип">@ProductionUi.TypeLabel(context.Type)</MudTd>
+        <MudTd DataLabel="Розкроєно" Style="text-align: right">@Fmt.Qty(context.TotalCut)</MudTd>
+        <MudTd DataLabel="Пошито" Style="text-align: right">@Fmt.Qty(context.TotalSewn)</MudTd>
+        <MudTd DataLabel="Мінімум" Style="text-align: right">@context.MinTotal</MudTd>
+        <MudTd DataLabel="Бракує" Style="text-align: right">
+            @if (context.Deficit > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning">@Fmt.Qty(context.Deficit)</MudChip>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>@((_models?.Count ?? 0) == 0 ? "Моделей ще немає." : "Нічого не знайдено за цими умовами.")</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<ProductionModelSummaryDto>? _models;
+    private string? _search;
+    private string? _type;
+    private bool _belowMinimumOnly;
+
+    private IEnumerable<ProductionModelSummaryDto> Filtered => (_models ?? [])
+        .Where(m => string.IsNullOrWhiteSpace(_search) || m.Name.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase))
+        .Where(m => _type is null || m.Type == _type)
+        .Where(m => !_belowMinimumOnly || m.Deficit > 0);
+
+    protected override async Task OnInitializedAsync() => _models = await Api.ModelsAsync();
+
+    private async Task NewModelAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<ModelDialog>("Нова модель");
+        if (await dialog.Result is { Canceled: false, Data: int id })
+            Navigation.NavigateTo(ProductionUi.Model(id));
+    }
+}

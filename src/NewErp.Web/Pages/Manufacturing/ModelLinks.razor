@@ -1,0 +1,102 @@
+@inject ProductionApi Api
+@inject ISnackbar Snackbar
+
+@*
+    Прив'язка моделі до товарів магазину: напряму (id товару) або через категорію з фільтром за назвою,
+    і розміри моделі — до значень опції «Розмір» у товарах. Від цього залежить списання пошитих виробів за замовленнями.
+*@
+<MudText Typo="Typo.body2" Class="mb-3">
+    Коли замовлення переходить у статуси списання, система шукає модель для кожного товару (спершу пряма прив'язка, потім категорія)
+    і розмір — за опцією «Розмір» у замовленні. Назв товарів і опцій NewErp поки не знає, тож тут вказуються їхні id зі старого сайту.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.subtitle1" Class="mb-1">Товари напряму</MudText>
+        <MudTextField @bind-Value="_productIds" Label="Id товарів через кому" Placeholder="101, 102" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+        <MudText Typo="Typo.subtitle1" Class="mt-4 mb-1">Через категорії</MudText>
+        @foreach (var category in _categories)
+        {
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudNumericField T="int" @bind-Value="category.CategoryId" Label="Id категорії" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 130px" />
+                <MudTextField @bind-Value="category.NameFilter" Label="Назва містить" Placeholder="порожньо — уся категорія" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudCheckBox @bind-Value="category.MatchExact" Label="точно" Dense="true" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Прибрати категорію" OnClick="() => _categories.Remove(category)" />
+            </div>
+        }
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => _categories.Add(new CategoryRow())">Додати категорію</MudButton>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.subtitle1" Class="mb-1">Розміри → опція «Розмір» (option_value_id)</MudText>
+        @foreach (var size in Model.Sizes)
+        {
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudText Style="min-width: 60px">@size.Name</MudText>
+                <MudNumericField T="int?" Value="_options.GetValueOrDefault(size.Id)" ValueChanged="v => _options[size.Id] = v" Label="option_value_id"
+                                 Min="1" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 200px" />
+            </div>
+        }
+    </MudItem>
+</MudGrid>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="SaveAsync" Disabled="_busy">Зберегти прив'язку</MudButton>
+
+@code {
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string _productIds = "";
+    private List<CategoryRow> _categories = [];
+    private Dictionary<int, int?> _options = [];
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        _productIds = string.Join(", ", Model.ProductIds);
+        _categories = Model.Categories.Select(c => new CategoryRow { CategoryId = c.CategoryId, NameFilter = c.NameFilter, MatchExact = c.MatchExact }).ToList();
+        _options = Model.Sizes.ToDictionary(s => s.Id, s => s.OptionValueId);
+    }
+
+    private async Task SaveAsync()
+    {
+        var ids = new List<int>();
+        foreach (var part in _productIds.Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!int.TryParse(part, out var id))
+            {
+                Snackbar.Add($"«{part}» не схоже на id товару.", Severity.Error);
+                return;
+            }
+            ids.Add(id);
+        }
+
+        _busy = true;
+        try
+        {
+            await Api.SetLinksAsync(Model.Id, new SetProductionLinksRequest(
+                ids.Distinct().ToList(),
+                _categories.Select(c => new CategoryLinkRequest(c.CategoryId, c.NameFilter, c.MatchExact)).ToList(),
+                _options.Select(o => new SizeOptionRequest(o.Key, o.Value)).ToList()));
+            Snackbar.Add("Прив'язку збережено.", Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed class CategoryRow
+    {
+        public int CategoryId { get; set; }
+        public string? NameFilter { get; set; }
+        public bool MatchExact { get; set; }
+    }
+}

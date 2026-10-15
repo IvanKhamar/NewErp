@@ -1,0 +1,45 @@
+@inject ProductionApi Api
+
+@* Журнал крою й пошиву: усіх моделей або однієї (ModelId). *@
+<MudTable T="ProductionLogDto" Items="_entries" Dense="true" Hover="true" Loading="_entries is null" Outlined="true" Elevation="0">
+    <HeaderContent>
+        <MudTh>Коли</MudTh>
+        @if (ModelId is null)
+        {
+            <MudTh>Модель</MudTh>
+        }
+        <MudTh>Розмір</MudTh>
+        <MudTh>Що</MudTh>
+        <MudTh Style="text-align: right">Кількість</MudTh>
+        <MudTh Style="text-align: right">Стало</MudTh>
+        <MudTh>Коментар</MudTh>
+        <MudTh>Хто</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Коли">@Fmt.Date(context.CreatedAt)</MudTd>
+        @if (ModelId is null)
+        {
+            <MudTd DataLabel="Модель"><MudLink Href="@ProductionUi.Model(context.ProductionId)">@context.ProductionName</MudLink></MudTd>
+        }
+        <MudTd DataLabel="Розмір">@context.SizeName</MudTd>
+        <MudTd DataLabel="Що">@ProductionUi.LogLabel(context)</MudTd>
+        <MudTd DataLabel="Кількість" Style="text-align: right">
+            <MudText Typo="Typo.body2" Color="@(context.Direction == Domain.Production.ProductionLogEntry.In ? Color.Success : Color.Error)">
+                @(context.Direction == Domain.Production.ProductionLogEntry.In ? "+" : "−")@Fmt.Qty(context.Quantity)
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Стало" Style="text-align: right">@Fmt.Qty(context.StockAfter)</MudTd>
+        <MudTd DataLabel="Коментар">@context.Comment</MudTd>
+        <MudTd DataLabel="Хто">@context.Username</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Записів ще немає.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    /// <summary>null — журнал усіх моделей.</summary>
+    [Parameter] public int? ModelId { get; set; }
+
+    private List<ProductionLogDto>? _entries;
+
+    protected override async Task OnParametersSetAsync() => _entries = await Api.LogAsync(ModelId);
+}

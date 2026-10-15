@@ -1,0 +1,97 @@
+@using NewErp.Domain.Production
+@inject ProductionApi Api
+
+@* Нова модель або зміна наявної (якщо передано Model). Повертає Ok(id). *@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" AutoFocus="true" MaxLength="150" />
+        <div class="d-flex gap-3 mb-3">
+            <MudSelect T="string" @bind-Value="_type" Label="Тип" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="ProductionModel.Clothing">@ProductionUi.TypeLabel(ProductionModel.Clothing)</MudSelectItem>
+                <MudSelectItem T="string" Value="ProductionModel.ReadyMade">@ProductionUi.TypeLabel(ProductionModel.ReadyMade)</MudSelectItem>
+            </MudSelect>
+            <MudNumericField T="int" @bind-Value="_minTotal" Label="Мінімум пошитих" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense"
+                             HelperText="Менше — модель потрапить у «треба шити»" />
+        </div>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-1">Розміри</MudText>
+        @if (Model is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mb-2 d-block">Розміри зіставляються за назвою: перейменування — це новий розмір. Розмір із залишком прибрати не можна.</MudText>
+        }
+        @foreach (var size in _sizes)
+        {
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudTextField @bind-Value="size.Name" Label="Розмір" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="32" />
+                <MudNumericField T="decimal" @bind-Value="size.Percent" Label="Частка, %" Format="0.##" Min="0" Max="100" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Прибрати розмір" OnClick="() => _sizes.Remove(size)" />
+            </div>
+        }
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => _sizes.Add(new SizeRow())">Додати розмір</MudButton>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">@(Model is null ? "Створити" : "Зберегти")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    /// <summary>Наявна модель для зміни; null — нова.</summary>
+    [Parameter] public ProductionModelDto? Model { get; set; }
+
+    private string _name = "";
+    private string _type = ProductionModel.Clothing;
+    private int _minTotal = 30;
+    private List<SizeRow> _sizes = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (Model is null)
+        {
+            _sizes = new[] { "S", "M", "L", "XL" }.Select(n => new SizeRow { Name = n }).ToList();
+            return;
+        }
+        (_name, _type, _minTotal) = (Model.Name, Model.Type, Model.MinTotal);
+        _sizes = Model.Sizes.Select(s => new SizeRow { Name = s.Name, Percent = s.Percent }).ToList();
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var request = new SaveProductionModelRequest(
+                _name, _sizes.Where(s => !string.IsNullOrWhiteSpace(s.Name)).Select(s => new SizeRequest(s.Name, s.Percent)).ToList(),
+                _type, _minTotal, Model?.SortOrder ?? 0);
+            var id = Model?.Id ?? 0;
+            if (Model is null)
+                id = await Api.CreateModelAsync(request);
+            else
+                await Api.UpdateModelAsync(Model.Id, request);
+            Dialog.Close(DialogResult.Ok(id));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed class SizeRow
+    {
+        public string Name { get; set; } = "";
+        public decimal Percent { get; set; }
+    }
+}

@@ -1,0 +1,105 @@
+@page "/production/models/{Id:int}"
+@attribute [Authorize(Roles = Access.Production)]
+@using NewErp.Domain.Production
+@inject ProductionApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(_model?.Name ?? "Модель") — NewErp</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_model is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <div class="d-flex align-center flex-wrap gap-2 mb-1">
+        <MudText Typo="Typo.h4">@_model.Name</MudText>
+        <MudChip T="string" Size="Size.Small">@ProductionUi.TypeLabel(_model.Type)</MudChip>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditAsync">Змінити</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="DeactivateAsync">Прибрати модель</MudButton>
+    </div>
+    <MudText Typo="Typo.body1" Class="mb-3">
+        Пошито разом: <b>@Fmt.Qty(TotalSewn)</b> з мінімуму @_model.MinTotal
+        @if (TotalSewn < _model.MinTotal)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-2">треба шити ще @Fmt.Qty(_model.MinTotal - TotalSewn)</MudChip>
+        }
+    </MudText>
+
+    <MudTabs Elevation="0" Outlined="true" Rounded="true" TabPanelsClass="pa-3" @bind-ActivePanelIndex="_tab">
+        <MudTabPanel Text="Залишки й операції">
+            <OperationPanel Model="_model" OnDone="LoadAsync" />
+        </MudTabPanel>
+        <MudTabPanel Text="Специфікації">
+            <ModelSpecifications Model="_model" OnChanged="LoadAsync" />
+        </MudTabPanel>
+        <MudTabPanel Text="Прив'язка до магазину">
+            <ModelLinks Model="_model" OnChanged="LoadAsync" />
+        </MudTabPanel>
+        <MudTabPanel Text="Журнал">
+            <ProductionLogTable ModelId="_model.Id" @key="_logVersion" />
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProductionModelDto? _model;
+    private string? _error;
+    private int _tab;
+    private int _logVersion; // змінюється після операцій, щоб журнал перечитався
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    private decimal TotalSewn => _model?.Sizes.Sum(s => s.SewnStock) ?? 0;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _model = await Api.ModelAsync(Id);
+            _logVersion++;
+            _breadcrumbs = [new("Моделі", href: "production"), new(_model.Name, href: null, disabled: true)];
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task EditAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<ModelDialog>(
+            "Змінити модель", new DialogParameters<ModelDialog> { { d => d.Model, _model } });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task DeactivateAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Прибрати модель?", "Модель зникне зі списків (як і на старому сайті, дані не видаляються).", yesText: "Прибрати", cancelText: "Ні");
+        if (confirmed != true)
+            return;
+        try
+        {
+            await Api.DeactivateModelAsync(Id);
+            Navigation.NavigateTo("production");
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,121 @@
+@inject ProductionApi Api
+@inject ISnackbar Snackbar
+
+@* Операція з залишками моделі для кількох розмірів одразу: покроєно, в пошив, пошито (прихід), відвантажено. *@
+<MudPaper Class="pa-3" Outlined="true">
+    <MudChipSet T="ProductionOperation" @bind-SelectedValue="_operation" SelectionMode="SelectionMode.SingleSelection" CheckMark="true" Class="mb-2">
+        @foreach (var operation in ProductionUi.OperationsFor(Model.Type))
+        {
+            <MudChip T="ProductionOperation" Value="operation">@ProductionUi.OperationLabel(operation, Model.Type)</MudChip>
+        }
+    </MudChipSet>
+    <MudText Typo="Typo.body2" Class="mb-2">@Hint</MudText>
+
+    <MudSimpleTable Dense="true" Elevation="0">
+        <thead>
+            <tr>
+                <th>Розмір</th>
+                @if (Model.Type == Domain.Production.ProductionModel.Clothing)
+                {
+                    <th style="text-align: right">Розкроєно</th>
+                }
+                <th style="text-align: right">Пошито</th>
+                <th style="width: 160px">Кількість</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var size in Model.Sizes)
+            {
+                <tr>
+                    <td>@size.Name</td>
+                    @if (Model.Type == Domain.Production.ProductionModel.Clothing)
+                    {
+                        <td style="text-align: right">@Fmt.Qty(size.CutStock)</td>
+                    }
+                    <td style="text-align: right">@Fmt.Qty(size.SewnStock)</td>
+                    <td>
+                        <MudNumericField T="decimal" Value="_quantities.GetValueOrDefault(size.Id)" ValueChanged="v => _quantities[size.Id] = v"
+                                         Format="0.###" Min="0" Margin="Margin.Dense" data-test="@($"qty-{size.Name}")" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+
+    <div class="d-flex align-center flex-wrap gap-3 mt-2">
+        <MudTextField @bind-Value="_comment" Label="Коментар (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" Style="min-width: 260px" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy" data-test="submit">
+            @ProductionUi.OperationLabel(_operation, Model.Type)
+        </MudButton>
+    </div>
+
+    @if (_warnings.Count > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mt-3" data-test="warnings">
+            Зроблено, але дечого бракувало (списано те, що було):
+            <ul class="mt-1">
+                @foreach (var warning in _warnings)
+                {
+                    <li>@warning</li>
+                }
+            </ul>
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    /// <summary>Викликається після успішної операції, щоб сторінка перечитала залишки.</summary>
+    [Parameter] public EventCallback OnDone { get; set; }
+
+    private ProductionOperation _operation;
+    private readonly Dictionary<int, decimal> _quantities = [];
+    private string? _comment;
+    private List<string> _warnings = [];
+    private bool _busy;
+
+    private string Hint => _operation switch
+    {
+        ProductionOperation.Cut => "Розкроєні комплекти: залишок крою зростає, тканина списується за специфікацією крою, деталі йдуть у запас.",
+        ProductionOperation.SendToSewing => "Розкроєне передано швачкам: залишок крою зменшується.",
+        ProductionOperation.Sewn when Model.Type == Domain.Production.ProductionModel.ReadyMade => "Товар надійшов від постачальника: залишок зростає.",
+        ProductionOperation.Sewn => "Пошиті вироби: залишок зростає, деталі крою й фурнітура списуються за специфікацією пошиву.",
+        ProductionOperation.Ship => "Вироби пішли зі складу не через замовлення (замовлення списують самі).",
+        _ => "",
+    };
+
+    protected override void OnInitialized() => _operation = ProductionUi.OperationsFor(Model.Type)[0];
+
+    private async Task SubmitAsync()
+    {
+        var quantities = Model.Sizes
+            .Where(s => _quantities.GetValueOrDefault(s.Id) > 0)
+            .Select(s => new SizeQuantity(s.Id, _quantities[s.Id]))
+            .ToList();
+        if (quantities.Count == 0)
+        {
+            Snackbar.Add("Вкажіть кількість хоча б для одного розміру.", Severity.Warning);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await Api.RecordAsync(Model.Id, _operation, new ProductionOperationRequest(quantities, _comment));
+            _warnings = result.Warnings.ToList();
+            _quantities.Clear();
+            _comment = null;
+            Snackbar.Add($"{ProductionUi.OperationLabel(_operation, Model.Type)}: збережено.", Severity.Success);
+            await OnDone.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
