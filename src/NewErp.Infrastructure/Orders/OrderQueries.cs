@@ -136,6 +136,15 @@ public sealed class OrderQueries(ErpDbContext db, IOptions<ErpOptions> options) 
             .Select(s => new LookupItem(s.OrderStatusId, s.Name))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<LookupItem>> ListManagersAsync(CancellationToken ct) =>
+        (await db.DdUsers.AsNoTracking()
+            .Where(u => u.Status)
+            .Select(u => new { u.UserId, u.Firstname, u.Lastname })
+            .ToListAsync(ct))
+        .Select(u => new LookupItem(u.UserId, $"{u.Firstname} {u.Lastname}".Trim()))
+        .OrderBy(u => u.Name, StringComparer.CurrentCulture)
+        .ToList();
+
     public async Task<IReadOnlyList<LookupItem>> ListSourcesAsync(CancellationToken ct) =>
         await db.DdOrderSources.AsNoTracking()
             .Where(s => s.LanguageId == _languageId)

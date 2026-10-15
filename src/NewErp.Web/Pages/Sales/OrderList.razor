@@ -1,0 +1,100 @@
+@page "/orders"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Замовлення — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Замовлення</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudTextField T="string" Value="_search" ValueChanged="v => SetAsync(() => _search = v)" Placeholder="Телефон, ім'я, email або №"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Immediate="true"
+                  Style="min-width: 240px" />
+    <MudSelect T="int?" Value="_statusId" ValueChanged="v => SetAsync(() => _statusId = v)" Label="Статус" Clearable="true" Style="min-width: 200px">
+        @foreach (var status in _statuses)
+        {
+            <MudSelectItem T="int?" Value="status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="int?" Value="_sourceId" ValueChanged="v => SetAsync(() => _sourceId = v)" Label="Джерело" Clearable="true" Style="min-width: 160px">
+        @foreach (var source in _sources)
+        {
+            <MudSelectItem T="int?" Value="source.Id">@source.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="int?" Value="_managerId" ValueChanged="v => SetAsync(() => _managerId = v)" Label="Менеджер" Clearable="true" Style="min-width: 200px">
+        @foreach (var manager in _managers)
+        {
+            <MudSelectItem T="int?" Value="manager.Id">@manager.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudDatePicker Date="_from" DateChanged="v => SetAsync(() => _from = v)" Label="З" Clearable="true" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+    <MudDatePicker Date="_to" DateChanged="v => SetAsync(() => _to = v)" Label="По" Clearable="true" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+</MudPaper>
+
+<MudTable @ref="_table" T="OrderListItem" ServerData="LoadAsync" Hover="true" Dense="true" RowStyle="cursor: pointer" RowsPerPage="20"
+          OnRowClick="row => Navigation.NavigateTo(OrderRoutes.Order(row.Item!.Id))">
+    <HeaderContent>
+        <MudTh>№</MudTh>
+        <MudTh>Дата</MudTh>
+        <MudTh>Клієнт</MudTh>
+        <MudTh>Телефон</MudTh>
+        <MudTh Style="text-align: right">Сума</MudTh>
+        <MudTh>Статус</MudTh>
+        <MudTh>Джерело</MudTh>
+        <MudTh>Менеджер</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="№">@context.Id</MudTd>
+        <MudTd DataLabel="Дата">@Fmt.Date(context.DateAdded)</MudTd>
+        <MudTd DataLabel="Клієнт">@context.Customer</MudTd>
+        <MudTd DataLabel="Телефон">@context.Telephone</MudTd>
+        <MudTd DataLabel="Сума" Style="text-align: right">@Fmt.Money(context.Total)</MudTd>
+        <MudTd DataLabel="Статус"><MudChip T="string" Size="Size.Small">@(context.StatusName ?? $"статус {context.StatusId}")</MudChip></MudTd>
+        <MudTd DataLabel="Джерело">@context.SourceName</MudTd>
+        <MudTd DataLabel="Менеджер">@context.ManagerName</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Замовлень не знайдено.</MudText></NoRecordsContent>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="На сторінці:" InfoFormat="{first_item}–{last_item} з {all_items}" PageSizeOptions="new[] { 20, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<OrderListItem>? _table;
+    private List<LookupItem> _statuses = [];
+    private List<LookupItem> _sources = [];
+    private List<LookupItem> _managers = [];
+    private string? _search;
+    private int? _statusId;
+    private int? _sourceId;
+    private int? _managerId;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _statuses = await Api.StatusesAsync();
+        _sources = await Api.SourcesAsync();
+        _managers = await Api.ManagersAsync();
+    }
+
+    // Замовлень сотні й тисячі, тож фільтри й сторінки обробляє сервер, а таблиця просить лише поточну сторінку.
+    private async Task<TableData<OrderListItem>> LoadAsync(TableState state, CancellationToken ct)
+    {
+        var page = await Api.ListAsync(new OrderFilter(
+            _statusId, _sourceId, _managerId,
+            _from is { } from ? DateOnly.FromDateTime(from) : null,
+            _to is { } to ? DateOnly.FromDateTime(to) : null,
+            _search, state.Page + 1, state.PageSize));
+        return new TableData<OrderListItem> { Items = page.Items, TotalItems = page.TotalCount };
+    }
+
+    private async Task SetAsync(Action change)
+    {
+        change();
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+}

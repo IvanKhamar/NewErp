@@ -12,4 +12,7 @@ public interface IOrderQueries
     Task<IReadOnlyList<LookupItem>> ListStatusesAsync(CancellationToken ct);
 
     Task<IReadOnlyList<LookupItem>> ListSourcesAsync(CancellationToken ct);
+
+    /// <summary>Кого можна призначити відповідальним: активні користувачі старого сайту (як і там, будь-хто з dd_user).</summary>
+    Task<IReadOnlyList<LookupItem>> ListManagersAsync(CancellationToken ct);
 }

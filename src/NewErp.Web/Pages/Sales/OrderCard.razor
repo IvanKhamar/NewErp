@@ -1,0 +1,214 @@
+@page "/orders/{Id:int}"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Замовлення №@Id — NewErp</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_order is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <div class="d-flex align-center flex-wrap gap-2 mb-3">
+        <MudText Typo="Typo.h4">Замовлення №@_order.Id</MudText>
+        <MudChip T="string" Color="Color.Primary" data-test="status">@(_order.StatusName ?? $"статус {_order.StatusId}")</MudChip>
+        <MudSpacer />
+        <MudText Typo="Typo.h5">@Fmt.Money(_order.Total)</MudText>
+    </div>
+
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">@_order.Customer</MudText>
+                <MudSimpleTable Dense="true" Elevation="0">
+                    <tbody>
+                        <tr><td>Телефон</td><td>@_order.Telephone</td></tr>
+                        <tr><td>Email</td><td>@(string.IsNullOrEmpty(_order.Email) ? "—" : _order.Email)</td></tr>
+                        <tr><td>Доставка</td><td>@_order.ShippingMethod @_order.ShippingCity @_order.ShippingAddress</td></tr>
+                        <tr><td>Оплата</td><td>@_order.PaymentMethod</td></tr>
+                        <tr><td>Джерело</td><td>@(_order.SourceName ?? "—")</td></tr>
+                        <tr><td>Створено</td><td>@Fmt.Date(_order.DateAdded)</td></tr>
+                        @if (!string.IsNullOrWhiteSpace(_order.Comment))
+                        {
+                            <tr><td>Коментар</td><td style="white-space: pre-line">@_order.Comment</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Товари</MudText>
+            <MudSimpleTable Dense="true" Outlined="true" Elevation="0" Class="mb-4">
+                <thead>
+                    <tr><th>Товар</th><th>Артикул</th><th style="text-align: right">К-сть</th><th style="text-align: right">Ціна</th><th style="text-align: right">Сума</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in _order.Products)
+                    {
+                        <tr>
+                            <td>@product.Name</td>
+                            <td>@product.Model</td>
+                            <td style="text-align: right">@product.Quantity</td>
+                            <td style="text-align: right">@Fmt.Money(product.Price)</td>
+                            <td style="text-align: right">@Fmt.Money(product.Total)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Історія статусів</MudText>
+            <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mb-4">
+                @foreach (var entry in _order.StatusHistory)
+                {
+                    <MudTimelineItem Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>@(entry.NewStatusName ?? $"статус {entry.NewStatusId}")</b></MudText>
+                        <MudText Typo="Typo.caption">@Fmt.Date(entry.ChangedAt) · @(entry.UserName ?? $"користувач {entry.UserId}")</MudText>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+            @if (_order.StatusHistory.Count == 0)
+            {
+                <MudText Typo="Typo.body2">Статус ще не змінювали.</MudText>
+            }
+        </MudItem>
+
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Статус</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudSelect T="int" @bind-Value="_newStatusId" Label="Новий статус" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var status in _statuses)
+                        {
+                            <MudSelectItem T="int" Value="status.Id">@status.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ChangeStatusAsync"
+                               Disabled="_busy || _newStatusId == _order.StatusId" data-test="change-status">Змінити</MudButton>
+                </div>
+                @if (_warnings.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3" data-test="warnings">
+                        Статус змінено, але склад попереджає:
+                        <ul class="mt-1">
+                            @foreach (var warning in _warnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </MudAlert>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Відповідальний менеджер</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudSelect T="int?" @bind-Value="_managerId" Label="Менеджер" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var manager in _managers)
+                        {
+                            <MudSelectItem T="int?" Value="manager.Id">@manager.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Outlined" OnClick="AssignManagerAsync" Disabled="_busy || _managerId is null || _managerId == _order.ManagerId">
+                        Призначити
+                    </MudButton>
+                </div>
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">SMS клієнту</MudText>
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">Поки SMS не надсилаються по-справжньому: спроба лише записується в журнал.</MudAlert>
+                <MudTextField @bind-Value="_smsText" Label="Текст" Lines="3" Variant="Variant.Outlined" MaxLength="670" Counter="670" Immediate="true" />
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Sms" Class="mt-2" OnClick="SendSmsAsync"
+                           Disabled="_busy || string.IsNullOrWhiteSpace(_smsText)">Надіслати на @_order.Telephone</MudButton>
+                @foreach (var sms in _sms)
+                {
+                    <MudPaper Class="pa-2 mt-2" Elevation="0" Style="background: var(--mud-palette-background-gray)">
+                        <MudText Typo="Typo.caption">@Fmt.Date(sms.SentAt) · @sms.Phone</MudText>
+                        <MudText Typo="Typo.body2" Style="white-space: pre-line">@sms.Text</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@sms.Response</MudText>
+                    </MudPaper>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private OrderDetails? _order;
+    private List<LookupItem> _statuses = [];
+    private List<LookupItem> _managers = [];
+    private List<SmsDto> _sms = [];
+    private int _newStatusId;
+    private int? _managerId;
+    private string _smsText = "";
+    private List<string> _warnings = [];
+    private string? _error;
+    private bool _busy;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _statuses = await Api.StatusesAsync();
+            _managers = await Api.ManagersAsync();
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _order = await Api.GetAsync(Id);
+        _sms = await Api.SmsAsync(Id);
+        _newStatusId = _order.StatusId;
+        _managerId = _order.ManagerId;
+        _breadcrumbs = [new("Замовлення", href: "orders"), new($"№{Id}", href: null, disabled: true)];
+    }
+
+    // Зміна статусу може списати чи повернути пошиті вироби; про нестачу склад повідомляє в warnings.
+    private Task ChangeStatusAsync() => RunAsync("Статус змінено.", async () =>
+        _warnings = (await Api.ChangeStatusAsync(Id, _newStatusId)).Warnings.ToList());
+
+    private Task AssignManagerAsync() => RunAsync("Менеджера призначено.", () => Api.AssignManagerAsync(Id, _managerId!.Value));
+
+    private Task SendSmsAsync() => RunAsync(null, async () =>
+    {
+        var result = await Api.SendSmsAsync(Id, _smsText);
+        Snackbar.Add(result.Sent ? "SMS надіслано." : "SMS записано в журнал, але не надіслано: сервіс SMS ще не підключено.",
+            result.Sent ? Severity.Success : Severity.Warning);
+        _smsText = "";
+    });
+
+    private async Task RunAsync(string? success, Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            if (success is not null)
+                Snackbar.Add(success, Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

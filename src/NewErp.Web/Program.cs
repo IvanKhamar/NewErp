@@ -25,6 +25,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddMudServices();
 builder.Services.AddScoped<StockApi>();
 builder.Services.AddScoped<ProductionApi>();
+builder.Services.AddScoped<OrdersApi>();
 builder.Services.AddScoped<Clipboard>();
 
 await builder.Build().RunAsync();

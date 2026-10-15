@@ -24,6 +24,9 @@ public static class OrderEndpoints
         orders.MapGet("/statuses", (IOrderQueries queries, CancellationToken ct) => queries.ListStatusesAsync(ct))
             .WithSummary("Довідник статусів");
 
+        orders.MapGet("/managers", (IOrderQueries queries, CancellationToken ct) => queries.ListManagersAsync(ct))
+            .WithSummary("Кого можна призначити відповідальним (активні користувачі)");
+
         orders.MapGet("/sources", (IOrderQueries queries, CancellationToken ct) => queries.ListSourcesAsync(ct))
             .WithSummary("Довідник джерел замовлення");
 

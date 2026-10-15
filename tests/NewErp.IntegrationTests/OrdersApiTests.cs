@@ -59,4 +59,15 @@ public class OrdersApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [MySqlFact]
+    public async Task Managers_ListsOnlyActiveUsers_AndIsOpenToManagers()
+    {
+        var client = await factory.LoginAsync(ApiFactory.Manager);
+
+        var managers = await client.GetFromJsonAsync<List<LookupItem>>("/orders/managers");
+
+        Assert.Contains(managers!, m => m.Id == ApiFactory.ManagerUserId && m.Name == "Марта Тест");
+        Assert.DoesNotContain(managers!, m => m.Id == ApiFactory.InactiveUserId);
+    }
 }
