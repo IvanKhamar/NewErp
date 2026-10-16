@@ -1,0 +1,37 @@
+@* Вибір ролі. Повертає Ok(роль). *@
+<MudDialog>
+    <DialogContent>
+        <MudRadioGroup T="string" @bind-Value="_role">
+            @foreach (var role in Roles.All)
+            {
+                <MudRadio T="string" Value="role" Disabled="IsSelf && role != Roles.Admin">@AdminUi.RoleLabel(role)</MudRadio>
+            }
+        </MudRadioGroup>
+        @if (IsSelf)
+        {
+            <MudText Typo="Typo.caption" Class="d-block mt-2">Зняти роль адміністратора із себе не можна, щоб система не лишилася без адміністратора.</MudText>
+        }
+        else if (Current is null)
+        {
+            <MudText Typo="Typo.caption" Class="d-block mt-2">Система згенерує тимчасовий пароль і покаже його один раз.</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => Dialog.Close(DialogResult.Ok(_role))"
+                   Disabled="_role == Current">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    /// <summary>Поточна роль; null — доступу ще немає.</summary>
+    [Parameter] public string? Current { get; set; }
+
+    [Parameter] public bool IsSelf { get; set; }
+
+    private string _role = Roles.Manager;
+
+    protected override void OnInitialized() => _role = Current ?? Roles.Manager;
+}

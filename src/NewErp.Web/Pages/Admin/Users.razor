@@ -1,0 +1,147 @@
+@page "/users"
+@attribute [Authorize(Roles = Access.Users)]
+@inject AdminApi Api
+@inject ApiAuthenticationStateProvider Auth
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Користувачі — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-1">
+    <MudText Typo="Typo.h4">Користувачі</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="NewUserAsync">Новий працівник</MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Усі користувачі старого сайту. Доступ до NewErp видається окремо; зміна ролі чи відкликання доступу діють одразу, навіть якщо людина зараз у системі.
+</MudText>
+
+<MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+    <MudSwitch @bind-Value="_withAccessOnly" Color="Color.Primary" Label="Лише ті, хто має доступ до NewErp" />
+</MudPaper>
+
+<MudTable T="UserDto" Items="Filtered" Dense="true" Hover="true" Loading="_users is null">
+    <HeaderContent>
+        <MudTh>Ім'я</MudTh>
+        <MudTh>Логін</MudTh>
+        <MudTh>Email</MudTh>
+        <MudTh>Роль у NewErp</MudTh>
+        <MudTh>Останній вхід</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Ім'я">
+            @context.FullName
+            @if (!context.ActiveOnOldSite)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="ml-1">вимкнено на старому сайті</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Логін">@context.Username</MudTd>
+        <MudTd DataLabel="Email">@context.Email</MudTd>
+        <MudTd DataLabel="Роль">
+            @if (context.HasAccess)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@AdminUi.RoleLabel(context.Role)</MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">немає доступу</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Останній вхід">@Fmt.Date(context.LastLoginAt)</MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" AriaLabel="Дії" Dense="true">
+                <MudMenuItem OnClick="() => SetRoleAsync(context)">@(context.HasAccess ? "Змінити роль" : "Видати доступ")</MudMenuItem>
+                @if (context.HasAccess)
+                {
+                    <MudMenuItem OnClick="() => ResetPasswordAsync(context)">Скинути пароль</MudMenuItem>
+                    @if (context.UserId != Auth.User?.UserId)
+                    {
+                        <MudMenuItem OnClick="() => RevokeAsync(context)">Забрати доступ</MudMenuItem>
+                    }
+                }
+            </MudMenu>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<UserDto>? _users;
+    private bool _withAccessOnly = true;
+
+    private IEnumerable<UserDto> Filtered => (_users ?? []).Where(u => !_withAccessOnly || u.HasAccess);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _users = await Api.UsersAsync();
+
+    private async Task NewUserAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<NewUserDialog>("Новий працівник");
+        if (await dialog.Result is not { Canceled: false, Data: UserAccessResult result })
+            return;
+        await LoadAsync();
+        var user = _users!.FirstOrDefault(u => u.UserId == result.UserId);
+        await ShowPasswordAsync(user?.Username ?? "", result.TemporaryPassword);
+    }
+
+    private async Task SetRoleAsync(UserDto user)
+    {
+        var dialog = await Dialogs.ShowAsync<RoleDialog>(
+            user.HasAccess ? $"Роль: {user.FullName}" : $"Видати доступ: {user.FullName}",
+            new DialogParameters<RoleDialog> { { d => d.Current, user.Role }, { d => d.IsSelf, user.UserId == Auth.User?.UserId } });
+        if (await dialog.Result is not { Canceled: false, Data: string role })
+            return;
+
+        await RunAsync(async () =>
+        {
+            var result = await Api.SetAccessAsync(user.UserId, new SetAccessRequest(role));
+            Snackbar.Add(user.HasAccess ? "Роль змінено." : "Доступ видано.", Severity.Success);
+            await ShowPasswordAsync(user.Username, result.TemporaryPassword);
+        });
+    }
+
+    private async Task ResetPasswordAsync(UserDto user)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Скинути пароль?", $"{user.FullName} отримає тимчасовий пароль, а поточні сесії закриються.", yesText: "Скинути", cancelText: "Ні");
+        if (confirmed == true)
+            await RunAsync(async () => await ShowPasswordAsync(user.Username, (await Api.ResetPasswordAsync(user.UserId)).TemporaryPassword));
+    }
+
+    private async Task RevokeAsync(UserDto user)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Забрати доступ?", $"{user.FullName} більше не зможе входити в NewErp. На старому сайті нічого не зміниться.",
+            yesText: "Забрати", cancelText: "Ні");
+        if (confirmed == true)
+            await RunAsync(async () =>
+            {
+                await Api.RevokeAsync(user.UserId);
+                Snackbar.Add("Доступ забрано.", Severity.Success);
+            });
+    }
+
+    private async Task ShowPasswordAsync(string username, string? password)
+    {
+        if (password is not null)
+            await Dialogs.ShowAsync<TemporaryPasswordDialog>("Тимчасовий пароль", new DialogParameters<TemporaryPasswordDialog>
+            {
+                { d => d.Username, username }, { d => d.Password, password },
+            });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,60 @@
+@inject AdminApi Api
+
+@* Новий працівник: рядок у dd_user старого сайту (без входу в стару адмінку) і доступ до NewErp. Повертає Ok(UserAccessResult). *@
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex gap-3 mb-3">
+            <MudTextField @bind-Value="_firstName" Label="Ім'я" Variant="Variant.Outlined" Margin="Margin.Dense" AutoFocus="true" MaxLength="32" />
+            <MudTextField @bind-Value="_lastName" Label="Прізвище" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="32" />
+        </div>
+        <div class="d-flex gap-3 mb-3">
+            <MudTextField @bind-Value="_username" Label="Логін" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="20" HelperText="3–20 символів" />
+            <MudSelect T="string" @bind-Value="_role" Label="Роль" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var role in Roles.All)
+                {
+                    <MudSelectItem T="string" Value="role">@AdminUi.RoleLabel(role)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <MudTextField @bind-Value="_email" Label="Email (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="96" />
+        <MudText Typo="Typo.caption" Class="d-block mt-2">Тимчасовий пароль система згенерує сама й покаже один раз.</MudText>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Створити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    private string _firstName = "";
+    private string _lastName = "";
+    private string _username = "";
+    private string _email = "";
+    private string _role = Roles.Manager;
+    private string? _error;
+    private bool _busy;
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await Api.CreateUserAsync(new CreateUserRequest(_username, _firstName, _lastName, _email, _role));
+            Dialog.Close(DialogResult.Ok(result));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

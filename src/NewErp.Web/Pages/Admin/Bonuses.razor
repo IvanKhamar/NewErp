@@ -1,0 +1,65 @@
+@page "/bonuses"
+@attribute [Authorize(Roles = Access.Bonuses)]
+@inject AdminApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Бонуси менеджерів — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Бонуси менеджерів</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Рахуються замовлення відповідального менеджера, створені за період, у статусах, що зараховуються (налаштування Bonus в appsettings.json).
+</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudDateRangePicker @bind-DateRange="_range" Label="Період" DateFormat="dd.MM.yyyy" Style="max-width: 280px" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync" Disabled="_loading">Порахувати</MudButton>
+    @if (_report is not null)
+    {
+        <MudSpacer />
+        <MudText>Ставка: <b>@Fmt.Qty(_report.Percent) %</b></MudText>
+        <MudText Typo="Typo.h6">Разом: @Fmt.Money(_report.TotalBonus)</MudText>
+    }
+</MudPaper>
+
+<MudTable T="ManagerBonusRow" Items="_report?.Managers" Dense="true" Hover="true" Loading="_loading">
+    <HeaderContent>
+        <MudTh>Менеджер</MudTh>
+        <MudTh Style="text-align: right">Замовлень</MudTh>
+        <MudTh Style="text-align: right">Виручка</MudTh>
+        <MudTh Style="text-align: right">Бонус</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Менеджер">@(context.ManagerName ?? $"користувач {context.ManagerId}")</MudTd>
+        <MudTd DataLabel="Замовлень" Style="text-align: right">@context.OrdersCount</MudTd>
+        <MudTd DataLabel="Виручка" Style="text-align: right">@Fmt.Money(context.Revenue)</MudTd>
+        <MudTd DataLabel="Бонус" Style="text-align: right"><b>@Fmt.Money(context.Bonus)</b></MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>За цей період зарахованих замовлень немає.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private DateRange _range = new(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1), DateTime.Today);
+    private BonusReport? _report;
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (_range.Start is not { } start || _range.End is not { } end)
+            return;
+        _loading = true;
+        try
+        {
+            _report = await Api.BonusesAsync(DateOnly.FromDateTime(start), DateOnly.FromDateTime(end));
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
