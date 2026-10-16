@@ -127,7 +127,9 @@ else
                 <MudText Typo="Typo.h6" Class="mb-2">Доставка</MudText>
                 @if (_shipment is null)
                 {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">ТТН ще не створено.</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">ТТН ще не створено.</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LocalShipping"
+                               OnClick="CreateShipmentAsync" Disabled="_busy" data-test="create-shipment">Створити ТТН</MudButton>
                 }
                 else
                 {
@@ -158,6 +160,15 @@ else
                             }
                         </tbody>
                     </MudSimpleTable>
+                    @* PDF відкривається в новій вкладці напряму з нашого API: ключ Нової Пошти браузер не бачить. *@
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Print" Target="_blank"
+                                   Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Document)">Друк ТТН</MudButton>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.QrCode" Target="_blank"
+                                   Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Markings)">Маркування</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="DeleteShipmentAsync" Disabled="@(_busy || _shipment.IsFinal)" data-test="delete-shipment">Видалити ТТН</MudButton>
+                    </div>
                 }
             </MudPaper>
 
@@ -247,6 +258,26 @@ else
             result.Sent ? Severity.Success : Severity.Warning);
         _smsText = "";
     });
+
+    private async Task CreateShipmentAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<CreateShipmentDialog>("Нова ТТН",
+            new DialogParameters<CreateShipmentDialog> { { d => d.OrderId, Id } },
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        if (await dialog.Result is not { Canceled: false, Data: ShipmentDto shipment })
+            return;
+        _shipment = shipment;
+        Snackbar.Add($"ТТН {shipment.Number} створено.", Severity.Success);
+    }
+
+    private async Task DeleteShipmentAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Видалити ТТН?", $"ТТН {_shipment!.Number} буде видалено в Новій Пошті й у замовленні.",
+            yesText: "Видалити", cancelText: "Залишити");
+        if (confirmed == true)
+            await RunAsync("ТТН видалено.", () => Api.DeleteShipmentAsync(Id));
+    }
 
     private async Task CopyAsync(string text)
     {

@@ -1,0 +1,202 @@
+@inject OrdersApi Api
+
+@* Нова ТТН Нової Пошти: відділення чи поштомат. Поля заповнено із замовлення; повертає Ok(ShipmentDto). *@
+<MudDialog>
+    <DialogContent>
+        @if (_form is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @if (!_form.CanCreate)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Ключ API Нової Пошти не задано, тож ТТН створити не можна.</MudAlert>
+            }
+            else if (_form.TestMode)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" data-test="fake-warning">
+                    Ключа API немає: створиться лише тестова ТТН (номер на 00), у Новій Пошті її не буде.
+                </MudAlert>
+            }
+
+            @if (_form.Senders.Count > 1 || _form.DropoffPoints.Count > 1)
+            {
+                <div class="d-flex gap-3 mb-3">
+                    <MudSelect T="string" @bind-Value="_senderId" Label="Відправник" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var sender in _form.Senders)
+                        {
+                            <MudSelectItem T="string" Value="sender.Id">@sender.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" @bind-Value="_dropoffPointId" Label="Місце відправки" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var point in _form.DropoffPoints)
+                        {
+                            <MudSelectItem T="string" Value="point.Id">@point.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Отримувач</MudText>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <MudTextField @bind-Value="_lastName" Label="Прізвище" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="lastname" />
+                <MudTextField @bind-Value="_firstName" Label="Ім'я" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_middleName" Label="По батькові" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_phone" Label="Телефон" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <MudAutocomplete T="CityDto" Value="_city" ValueChanged="CityChanged" SearchFunc="SearchCitiesAsync" ToStringFunc="@(c => c?.Name)"
+                                 Label="Місто" Variant="Variant.Outlined" Margin="Margin.Dense" MinCharacters="2" DebounceInterval="300"
+                                 HelperText="@CityHelper" ResetValueOnEmptyText="true" data-test="city" />
+                <MudAutocomplete T="WarehouseDto" @bind-Value="_warehouse" SearchFunc="SearchWarehousesAsync" ToStringFunc="@(w => w?.Name)"
+                                 Label="Відділення чи поштомат" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_city is null"
+                                 DebounceInterval="300" HelperText="@WarehouseHelper" ResetValueOnEmptyText="true" MaxItems="null"
+                                 Style="min-width: 22rem" data-test="warehouse" />
+            </div>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Оплата</MudText>
+            <div class="d-flex flex-wrap align-center gap-3 mb-3">
+                <MudNumericField @bind-Value="_declaredCost" Label="Оголошена вартість, грн" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Format="0.##" />
+                <MudNumericField @bind-Value="_cashOnDelivery" Label="Накладений платіж, грн" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Format="0.##"
+                                 HelperText="0 — без накладеного платежу" />
+                <MudSwitch T="bool" @bind-Value="_senderPays" Color="Color.Primary" Label="Доставку оплачуємо ми" />
+            </div>
+
+            <div class="d-flex align-center flex-wrap gap-2 mb-1">
+                <MudText Typo="Typo.subtitle2">Місця</MudText>
+                <MudSpacer />
+                @foreach (var preset in _form.SeatPresets)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => AddSeat(preset.Seat)">+ @preset.Name</MudButton>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => AddSeat(new ShipmentSeat(1, 0, 0, 0))">+ Інша</MudButton>
+            </div>
+            <MudSimpleTable Dense="true" Elevation="0" data-test="seats">
+                <thead><tr><th>Вага, кг</th><th>Ширина, см</th><th>Довжина, см</th><th>Висота, см</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var seat in _seats)
+                    {
+                        <tr>
+                            <td><MudNumericField @bind-Value="seat.Weight" Margin="Margin.Dense" Min="0" Format="0.###" /></td>
+                            <td><MudNumericField @bind-Value="seat.Width" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudNumericField @bind-Value="seat.Length" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudNumericField @bind-Value="seat.Height" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Прибрати місце" OnClick="() => _seats.Remove(seat)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_seats.Count == 0)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Додайте коробку кнопками вище.</MudText>
+            }
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3" data-test="error">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateAsync" Disabled="@(_busy || _form is not { CanCreate: true })"
+                   data-test="create">Створити ТТН</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    private ShipmentFormDto? _form;
+    private string? _senderId;
+    private string? _dropoffPointId;
+    private string _firstName = "";
+    private string _lastName = "";
+    private string _middleName = "";
+    private string _phone = "";
+    private CityDto? _city;
+    private WarehouseDto? _warehouse;
+    private decimal _declaredCost;
+    private decimal _cashOnDelivery;
+    private bool _senderPays;
+    private List<SeatRow> _seats = [];
+    private string? _error;
+    private bool _busy;
+
+    // Якщо місто чи відділення із замовлення не знайшлося в довіднику, підказуємо, що там було написано.
+    private string? CityHelper => _city is null && _form is { CityName: not "" } f ? $"У замовленні: {f.CityName}" : null;
+
+    private string? WarehouseHelper => _warehouse is null && _form is { WarehouseName: not "" } f ? $"У замовленні: {f.WarehouseName}" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var form = await Api.ShipmentFormAsync(OrderId);
+            _senderId = (form.Senders.FirstOrDefault(s => s.IsDefault) ?? form.Senders.FirstOrDefault())?.Id;
+            _dropoffPointId = (form.DropoffPoints.FirstOrDefault(p => p.IsDefault) ?? form.DropoffPoints.FirstOrDefault())?.Id;
+            (_firstName, _lastName, _phone) = (form.FirstName, form.LastName, form.Phone);
+            (_city, _warehouse) = (form.City, form.Warehouse);
+            (_declaredCost, _cashOnDelivery) = (form.DeclaredCost, form.CashOnDelivery);
+            _seats = [new SeatRow(form.SeatPresets[0].Seat)];
+            _form = form;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private void CityChanged(CityDto? city)
+    {
+        if (city?.Ref != _city?.Ref)
+            _warehouse = null; // відділення іншого міста вже не підходить
+        _city = city;
+    }
+
+    private async Task<IEnumerable<CityDto>> SearchCitiesAsync(string search, CancellationToken ct) =>
+        string.IsNullOrWhiteSpace(search) ? [] : await Api.CitiesAsync(search);
+
+    private async Task<IEnumerable<WarehouseDto>> SearchWarehousesAsync(string search, CancellationToken ct) =>
+        _city is null ? [] : await Api.WarehousesAsync(_city.Ref, search ?? "");
+
+    private void AddSeat(ShipmentSeat seat) => _seats.Add(new SeatRow(seat));
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var shipment = await Api.CreateShipmentAsync(OrderId, new CreateShipmentRequest(
+                _firstName, _lastName, _middleName, _phone, _city?.Ref ?? "", _warehouse?.Ref ?? "",
+                _declaredCost, _cashOnDelivery, _senderPays, _seats.Select(s => s.ToSeat()).ToList(), _senderId, _dropoffPointId));
+            Dialog.Close(DialogResult.Ok(shipment));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Рядок місця, який можна редагувати (ShipmentSeat — незмінний record).</summary>
+    private sealed class SeatRow(ShipmentSeat seat)
+    {
+        public decimal Weight { get; set; } = seat.Weight;
+
+        public decimal Width { get; set; } = seat.Width;
+
+        public decimal Length { get; set; } = seat.Length;
+
+        public decimal Height { get; set; } = seat.Height;
+
+        public ShipmentSeat ToSeat() => new(Weight, Width, Length, Height);
+    }
+}

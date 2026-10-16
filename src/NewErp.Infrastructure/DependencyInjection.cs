@@ -42,12 +42,13 @@ public static class DependencyInjection
         services.AddScoped<IProductionRepository, ProductionRepository>();
         services.AddScoped<ISmsLog, SmsLog>();
         services.AddScoped<IShipmentRepository, ShipmentRepository>();
+        services.AddScoped<IWarehouseDirectory, WarehouseDirectory>();
 
-        // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets, NovaPoshta:ApiKey).
+        // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets: NovaPoshta:ApiKey чи ключі відправників).
         // Без ключа заглушка: локальна розробка ніколи не звертається до справжнього сервісу.
         var novaPoshta = configuration.GetSection(NovaPoshtaOptions.SectionName).Get<NovaPoshtaOptions>() ?? new NovaPoshtaOptions();
-        if (string.IsNullOrWhiteSpace(novaPoshta.ApiKey))
-            services.AddSingleton<INovaPoshtaClient, StubNovaPoshtaClient>();
+        if (string.IsNullOrWhiteSpace(novaPoshta.TrackingKey))
+            services.AddSingleton<INovaPoshtaClient>(new StubNovaPoshtaClient(novaPoshta.FakeDocuments));
         else
             services.AddSingleton<INovaPoshtaClient>(_ => new NovaPoshtaClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, novaPoshta));
         // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).

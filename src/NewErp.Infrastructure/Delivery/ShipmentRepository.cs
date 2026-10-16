@@ -62,6 +62,46 @@ public sealed class ShipmentRepository(ErpDbContext db) : IShipmentRepository
         await db.DdOrders.Where(o => o.OrderId == orderId)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.DateRemind, remindedAt), ct) > 0;
 
+    public async Task<StoredShipment?> GetStoredAsync(int orderId, CancellationToken ct)
+    {
+        var row = await (
+            from d in db.ShipmentDocuments
+            where d.OrderId == orderId
+            join s in db.ShipmentSenderLinks on d.Id equals s.ShipmentId into ss
+            from s in ss.DefaultIfEmpty()
+            orderby d.Id descending
+            select new { Document = d, SenderId = s == null ? null : s.SenderId }
+        ).FirstOrDefaultAsync(ct);
+        return row is null ? null : new StoredShipment(row.Document, row.SenderId);
+    }
+
+    public Task<OrderShippingInfo?> GetOrderShippingInfoAsync(int orderId, CancellationToken ct) =>
+        db.DdOrders.AsNoTracking()
+            .Where(o => o.OrderId == orderId)
+            // Отримувач — з адреси доставки, а якщо її не заповнено, то покупець. Відділення старий сайт пише в address_2.
+            .Select(o => new OrderShippingInfo(
+                o.ShippingFirstname != "" ? o.ShippingFirstname : o.Firstname,
+                o.ShippingLastname != "" ? o.ShippingLastname : o.Lastname,
+                o.Telephone,
+                o.ShippingCity,
+                o.ShippingAddress2 != "" ? o.ShippingAddress2 : o.ShippingAddress1,
+                o.Total,
+                o.PaymentCode))
+            .FirstOrDefaultAsync(ct);
+
+    public void Add(ShipmentDocument document, string senderId, int userId, DateTime createdAt)
+    {
+        db.ShipmentDocuments.Add(document);
+        // ShipmentId EF підставить сам після вставки ТТН: запис посилається на документ через навігаційну властивість.
+        db.ShipmentSenderLinks.Add(new ShipmentSenderLink { Shipment = document, SenderId = senderId, CreatedByUserId = userId, CreatedAt = createdAt });
+    }
+
+    public async Task DeleteAsync(int documentId, CancellationToken ct)
+    {
+        await db.ShipmentSenderLinks.Where(s => s.ShipmentId == documentId).ExecuteDeleteAsync(ct);
+        await db.ShipmentDocuments.Where(d => d.Id == documentId).ExecuteDeleteAsync(ct);
+    }
+
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
     private static ShipmentDto ToDto(ShipmentDocument d) => new(

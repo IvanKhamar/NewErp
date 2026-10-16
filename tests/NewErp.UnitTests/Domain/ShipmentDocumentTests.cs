@@ -63,3 +63,23 @@ public class ShipmentDocumentTests
         Assert.Equal(new DateOnly(2026, 10, 25), document.DatePayedKeeping);
     }
 }
+
+public class NovaPoshtaWarehouseTests
+{
+    [Theory]
+    [InlineData("Відділення №12 (до 30 кг): вул. Шевченка, 1", "Branch", true, 12, true)]
+    [InlineData("Поштомат \"Нова Пошта\" №5107", "Postomat", true, 5107, true)]
+    [InlineData("Пункт приймання-видачі", "Branch", true, 1, true)]      // без номера — 1, як на старому сайті
+    [InlineData("Відділення №3", "Branch", false, 3, false)]               // не працює
+    [InlineData("Вантажне відділення №1", "CargoBranch", true, 1, false)]  // не для посилок клієнтам
+    public void SortOrderAndStatus_AsOldSite(string description, string category, bool working, int sortOrder, bool status)
+    {
+        var warehouse = new NovaPoshtaWarehouse("ref", description, category, "city", " Київ ", 30, working);
+
+        Assert.Equal((sortOrder, status, "Київ"), (warehouse.SortOrder, warehouse.Status, warehouse.CityDescription));
+    }
+
+    [Fact]
+    public void SeatVolume_InCubicMeters() =>
+        Assert.Equal(0.006696m, new ShipmentSeat(1, 31, 36, 6).Volume);
+}

@@ -40,11 +40,12 @@ public class ShipmentDocument
 
     private ShipmentDocument() { }
 
-    public ShipmentDocument(int orderId, string number, decimal cost, string carrier = NovaPoshta)
+    /// <param name="documentRef">Ref документа в API Нової Пошти (потрібен для друку й видалення); якщо невідомий — номер ТТН.</param>
+    public ShipmentDocument(int orderId, string number, decimal cost, string? documentRef = null, string carrier = NovaPoshta)
     {
         OrderId = orderId;
         Number = number;
-        Ref = number;
+        Ref = documentRef ?? number;
         Cost = cost;
         Carrier = carrier;
     }

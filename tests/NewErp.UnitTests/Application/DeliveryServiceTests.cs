@@ -8,8 +8,8 @@ namespace NewErp.UnitTests.Application;
 
 public class DeliveryServiceTests
 {
-    private readonly FakeRepository _repository = new();
-    private readonly FakeClient _client = new();
+    private readonly FakeShipmentRepository _repository = new();
+    private readonly FakeNovaPoshtaClient _client = new();
     private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero));
     private readonly DeliveryService _service;
 
@@ -61,47 +61,4 @@ public class DeliveryServiceTests
     [Fact]
     public async Task MarkReminded_UnknownOrder_NotFound() =>
         await Assert.ThrowsAsync<NotFoundException>(() => _service.MarkRemindedAsync(42, CancellationToken.None));
-
-    private sealed class FakeClient : INovaPoshtaClient
-    {
-        public bool IsConfigured { get; set; } = true;
-
-        public Func<string, TrackingInfo> Answer { get; set; } = number => Info(number, 0);
-
-        public List<IReadOnlyList<TrackingRequest>> Batches { get; } = [];
-
-        public Task<IReadOnlyList<TrackingInfo>> TrackAsync(IReadOnlyList<TrackingRequest> documents, CancellationToken ct)
-        {
-            Batches.Add(documents);
-            return Task.FromResult<IReadOnlyList<TrackingInfo>>(documents.Select(d => Answer(d.Number)).ToList());
-        }
-    }
-
-    private sealed class FakeRepository : IShipmentRepository
-    {
-        public List<OpenShipment> Open { get; } = [];
-
-        public bool Saved { get; private set; }
-
-        public (DateOnly From, DateOnly To)? ReminderRange { get; private set; }
-
-        public Task<ShipmentDto?> GetForOrderAsync(int orderId, CancellationToken ct) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<OpenShipment>> ListOpenForTrackingAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<OpenShipment>>(Open);
-
-        public Task<IReadOnlyList<ReminderDto>> ListRemindersAsync(DateOnly keepingFrom, DateOnly keepingTo, CancellationToken ct)
-        {
-            ReminderRange = (keepingFrom, keepingTo);
-            return Task.FromResult<IReadOnlyList<ReminderDto>>([]);
-        }
-
-        public Task<bool> MarkRemindedAsync(int orderId, DateTime remindedAt, CancellationToken ct) => Task.FromResult(false);
-
-        public Task SaveChangesAsync(CancellationToken ct)
-        {
-            Saved = true;
-            return Task.CompletedTask;
-        }
-    }
 }

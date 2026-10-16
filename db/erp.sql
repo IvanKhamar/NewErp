@@ -60,3 +60,14 @@ CREATE TABLE `erp_purchase_order_line` (
   KEY `ix_erp_purchase_order_line_item` (`item_id`),
   CONSTRAINT `fk_erp_purchase_order_line_order` FOREIGN KEY (`order_id`) REFERENCES `erp_purchase_order` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Хто й від якого відправника створив ТТН у NewErp. Старий сайт пише в dd_novaposhta_document сам ключ API відправника;
+-- NewErp ключів у базі не зберігає, а пише сюди id відправника з налаштувань (NovaPoshta:Senders), за яким потім бере ключ
+-- для друку й видалення. shipment_id посилається на dd_novaposhta_document.id (зовнішнього ключа немає: таблиця реконструйована).
+CREATE TABLE `erp_shipment_sender` (
+  `shipment_id` int NOT NULL,
+  `sender_id` varchar(32) NOT NULL,
+  `created_by_user_id` int NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`shipment_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

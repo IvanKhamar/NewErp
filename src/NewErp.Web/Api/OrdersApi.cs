@@ -57,6 +57,24 @@ public sealed class OrdersApi(HttpClient http)
 
     public async Task MarkRemindedAsync(int orderId) => await EnsureAsync(await http.PostAsync($"/delivery/reminders/{orderId}/done", null));
 
+    public Task<ShipmentFormDto> ShipmentFormAsync(int id) => GetAsync<ShipmentFormDto>($"/orders/{id}/shipment/form");
+
+    public async Task<ShipmentDto> CreateShipmentAsync(int id, CreateShipmentRequest request) =>
+        await ReadAsync<ShipmentDto>(await http.PostAsJsonAsync($"/orders/{id}/shipment", request));
+
+    public async Task DeleteShipmentAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/orders/{id}/shipment"));
+
+    /// <summary>Адреса PDF для друку: відкривається в новій вкладці, cookie входу браузер додасть сам.</summary>
+    public static string ShipmentPrintUrl(int id, ShipmentPrintKind kind) => $"/orders/{id}/shipment/print?kind={kind}";
+
+    public Task<List<CityDto>> CitiesAsync(string search) => GetAsync<List<CityDto>>($"/delivery/cities?search={Uri.EscapeDataString(search)}");
+
+    public Task<List<WarehouseDto>> WarehousesAsync(string cityRef, string search) =>
+        GetAsync<List<WarehouseDto>>($"/delivery/warehouses?cityRef={Uri.EscapeDataString(cityRef)}&search={Uri.EscapeDataString(search)}");
+
+    public async Task<WarehouseRefreshResult> RefreshWarehousesAsync() =>
+        await ReadAsync<WarehouseRefreshResult>(await http.PostAsync("/delivery/warehouses/refresh", null));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

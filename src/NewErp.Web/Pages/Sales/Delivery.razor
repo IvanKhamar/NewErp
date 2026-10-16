@@ -8,6 +8,8 @@
 <div class="d-flex align-center flex-wrap gap-2 mb-1">
     <MudText Typo="Typo.h4">Доставка</MudText>
     <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Storefront" OnClick="RefreshWarehousesAsync" Disabled="_busy"
+               data-test="refresh-warehouses">Оновити довідник відділень</MudButton>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Sync" OnClick="RefreshAsync" Disabled="_busy"
                data-test="refresh">Оновити статуси ТТН</MudButton>
 </div>
@@ -25,6 +27,15 @@
             Перевірено ТТН: @refresh.Checked, змінився статус: @refresh.Updated.
         </MudAlert>
     }
+}
+
+@if (_warehouses is { } warehouses)
+{
+    <MudAlert Severity="@(warehouses.ClientConfigured ? Severity.Success : Severity.Info)" Class="mb-3" data-test="warehouses-result">
+        @(warehouses.ClientConfigured
+            ? $"Довідник оновлено: {warehouses.Count} відділень і поштоматів."
+            : "Ключ API Нової Пошти не задано, тож довідник не оновлювався.")
+    </MudAlert>
 }
 
 <MudText Typo="Typo.h6" Class="mt-2">Нагадати забрати посилку</MudText>
@@ -59,6 +70,7 @@
 @code {
     private List<ReminderDto>? _reminders;
     private TrackingRefreshResult? _refresh;
+    private WarehouseRefreshResult? _warehouses;
     private bool _busy;
 
     protected override async Task OnInitializedAsync() => _reminders = await Api.RemindersAsync();
@@ -70,6 +82,24 @@
         {
             _refresh = await Api.RefreshTrackingAsync();
             _reminders = await Api.RemindersAsync(); // після оновлення статусів список нагадувань теж міг змінитися
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // Повне оновлення — десятки запитів до Нової Пошти, тож може тривати хвилину.
+    private async Task RefreshWarehousesAsync()
+    {
+        _busy = true;
+        try
+        {
+            _warehouses = await Api.RefreshWarehousesAsync();
         }
         catch (ApiException e)
         {

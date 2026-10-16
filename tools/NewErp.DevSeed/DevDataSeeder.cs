@@ -92,8 +92,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             .RuleFor(o => o.Lastname, f => f.Person.LastName)
             .RuleFor(o => o.Email, (f, o) => f.Internet.Email(o.Firstname, o.Lastname, "example.com"))
             .RuleFor(o => o.Telephone, f => f.Phone.PhoneNumber("+38067#######"))
-            .RuleFor(o => o.ShippingCity, f => f.Address.City())
-            .RuleFor(o => o.ShippingAddress1, f => $"Нова Пошта, відділення №{f.Random.Int(1, 250)}")
+            .RuleFor(o => o.ShippingCity, f => f.PickRandom(DevCities))
+            .RuleFor(o => o.ShippingAddress1, "")
             .RuleFor(o => o.ShippingMethod, f => f.PickRandom("Нова Пошта: відділення", "Нова Пошта: поштомат", "Укрпошта", "Самовивіз (Київ)"))
             .RuleFor(o => o.PaymentMethod, f => f.PickRandom("Накладений платіж", "LiqPay", "Monobank", "Переказ на рахунок"))
             .RuleFor(o => o.Comment, f => f.Random.Bool(0.2f) ? f.Lorem.Sentence() : "")
@@ -110,8 +110,18 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             .RuleFor(o => o.InvoicePrefix, "DEV-")
             .RuleFor(o => o.Ip, "127.0.0.1");
         var orders = orderFaker.Generate(orderCount);
+        var warehouses = DevWarehouses();
+        db.NovaPoshtaWarehouses.AddRange(warehouses);
         foreach (var o in orders)
+        {
             FillOpenCartRequiredFields(o);
+            // Як на старому сайті: відділення Нової Пошти — в address_2, оплата при отриманні — payment_code "cod".
+            var branches = warehouses.Where(w => w.CityDescription == o.ShippingCity).ToList();
+            o.ShippingAddress2 = o.ShippingMethod.StartsWith("Нова Пошта", StringComparison.Ordinal)
+                ? branches[_random.Next(branches.Count)].Description
+                : "";
+            o.PaymentCode = o.PaymentMethod == "Накладений платіж" ? "cod" : "";
+        }
         db.DdOrders.AddRange(orders);
         await db.SaveChangesAsync(); // після збереження EF заповнює OrderId з бази
 
@@ -173,9 +183,24 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await SeedSizeOptionsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {stockItems} позицій складу, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
+
+    private static readonly string[] DevCities = ["Київ", "Львів", "Харків", "Одеса", "Дніпро", "Конотоп", "Ковель", "Житомир"];
+
+    /// <summary>
+    /// Вигаданий довідник Нової Пошти: у кожному місті шість відділень, два поштомати й одне закрите відділення
+    /// (його в підказках не видно). Ref вигадані, справжньому API вони нічого не скажуть.
+    /// </summary>
+    private static List<NovaPoshtaWarehouse> DevWarehouses() =>
+    [
+        .. DevCities.SelectMany((city, i) => Enumerable.Range(1, 6)
+            .Select(n => new NovaPoshtaWarehouse($"dev-wh-{i}-{n}", $"Відділення №{n}: вул. Тестова, {n}", "Branch", $"dev-city-{i}", city, 30, working: true))
+            .Append(new NovaPoshtaWarehouse($"dev-wh-{i}-p1", $"Поштомат \"Нова Пошта\" №{100 + i}", "Postomat", $"dev-city-{i}", city, 20, working: true))
+            .Append(new NovaPoshtaWarehouse($"dev-wh-{i}-p2", $"Поштомат \"Нова Пошта\" №{200 + i}", "Postomat", $"dev-city-{i}", city, 20, working: true))
+            .Append(new NovaPoshtaWarehouse($"dev-wh-{i}-x", "Відділення №99: зачинено", "Branch", $"dev-city-{i}", city, 30, working: false))),
+    ];
 
     // Коди й тексти трекінгу Нової Пошти, які найчастіше трапляються.
     private static readonly (int Code, string Status)[] TrackingStatuses =
@@ -205,7 +230,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                 ? DateOnly.FromDateTime(now).AddDays(waiting++ % 5)
                 : null;
             document.ApplyTracking(new TrackingInfo(
-                document.Number, status, code, $"{order.ShippingCity}, {order.ShippingAddress1}",
+                document.Number, status, code, $"{order.ShippingCity}, {order.ShippingAddress2}",
                 order.PaymentMethod == "Накладений платіж", order.DateAdded.AddDays(1),
                 DateOnly.FromDateTime(order.DateAdded).AddDays(3), keeping));
             db.ShipmentDocuments.Add(document);

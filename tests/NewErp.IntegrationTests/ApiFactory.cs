@@ -47,6 +47,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const int CategoryId = 5;
     // ТТН замовлення 2: чекає на відділенні, платне зберігання завтра — має бути в нагадуваннях.
     public const string WaitingTtn = "20450000000002";
+    // Замовлення без ТТН, з містом і відділенням із тестового довідника й оплатою при отриманні — для створення ТТН.
+    public const int ShippingOrderId = 5;
+    public const string KyivRef = "city-kyiv";
+    public const string Branch1Ref = "wh-kyiv-1";
+    public const string Branch1 = "Відділення №1: вул. Хрещатик, 1";
 
     public async Task InitializeAsync()
     {
@@ -70,6 +75,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:ErpDb", _connectionString ?? "server=unused");
         builder.UseSetting("Bonus:Percent", "10");
         builder.UseSetting("Bonus:CountedStatusIds:0", Completed.ToString());
+        builder.UseSetting("NovaPoshta:FakeDocuments", "true"); // без ключа API: тестові ТТН заглушки
     }
 
     private async Task SeedAsync()
@@ -133,6 +139,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var tomorrow = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
         shipment.ApplyTracking(new TrackingInfo(WaitingTtn, "Прибув у відділення", 7, "Київ, відділення 1", false, DateTime.Now, null, tomorrow));
         db.ShipmentDocuments.Add(shipment);
+
+        var shippingOrder = Order(ShippingOrderId, Pending, 1200m, new DateTime(2026, 8, 1, 12, 0, 0));
+        (shippingOrder.ShippingCity, shippingOrder.ShippingAddress2, shippingOrder.PaymentCode) = ("Київ", Branch1, "cod");
+        db.DdOrders.Add(shippingOrder);
+        db.NovaPoshtaWarehouses.AddRange(
+            new NovaPoshtaWarehouse(Branch1Ref, Branch1, "Branch", KyivRef, "Київ", 30, working: true),
+            new NovaPoshtaWarehouse("wh-kyiv-2", "Поштомат №2", "Postomat", KyivRef, "Київ", 20, working: true),
+            new NovaPoshtaWarehouse("wh-kyiv-3", "Відділення №3", "Branch", KyivRef, "Київ", 30, working: false),
+            new NovaPoshtaWarehouse("wh-kovel-1", "Відділення №1", "Branch", "city-kovel", "Ковель", 30, working: true));
 
         var category = new StockCategory("Тканини");
         db.StockCategories.Add(category);

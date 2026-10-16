@@ -1,3 +1,5 @@
+using NewErp.Domain.Delivery;
+
 namespace NewErp.Application.Delivery;
 
 public interface IShipmentRepository
@@ -12,6 +14,18 @@ public interface IShipmentRepository
 
     /// <returns>false, якщо замовлення немає.</returns>
     Task<bool> MarkRemindedAsync(int orderId, DateTime remindedAt, CancellationToken ct);
+
+    /// <summary>Остання ТТН замовлення для зміни (друк, видалення) разом з відправником.</summary>
+    Task<StoredShipment?> GetStoredAsync(int orderId, CancellationToken ct);
+
+    /// <returns>null, якщо замовлення немає.</returns>
+    Task<OrderShippingInfo?> GetOrderShippingInfoAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Нова ТТН і відправник, від якого її створено (збережеться разом із SaveChangesAsync).</summary>
+    void Add(ShipmentDocument document, string senderId, int userId, DateTime createdAt);
+
+    /// <summary>Видаляє ТТН і запис про відправника одразу, без SaveChangesAsync.</summary>
+    Task DeleteAsync(int documentId, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

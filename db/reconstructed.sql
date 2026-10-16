@@ -224,7 +224,7 @@ ALTER TABLE `dd_order_status`
 -- Одна ТТН на замовлення. carrier: порожньо або 'novaposhta' — Нова Пошта, 'international' — Nova Post International.
 -- status_code — код статусу з API Нової Пошти (9 — отримано, 7/8 — на відділенні, 102–108 — відмова чи повернення...).
 -- date_payed_keeping — з якої дати зберігання на відділенні стає платним.
--- api_key старий модуль International зберігає тут для кожної ТТН; NewErp цю колонку не читає.
+-- api_key: старий сайт зберігає тут ключ API відправника для кожної ТТН (для друку й видалення); NewErp цю колонку не читає й не пише.
 CREATE TABLE `dd_novaposhta_document` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `order_id` int(11) NOT NULL,
@@ -248,3 +248,22 @@ CREATE TABLE `dd_novaposhta_document` (
 -- Власна колонка замовлення: коли клієнту нагадали забрати посилку, доки зберігання не стало платним.
 ALTER TABLE `dd_order`
   ADD COLUMN `date_remind` datetime NULL;
+
+-- ═══ Доставка: довідник відділень Нової Пошти ═══
+-- Відновлено з admin/model/novaposhta/warehouse.php і catalog/model/address/novaposhta.php. Типи, ключі й рушій вгадані, звірити.
+-- Таблицею користується й вітрина старого сайту (вибір міста й відділення при оформленні), тому NewErp оновлює саме її.
+-- Окремої таблиці міст немає: старий сайт бере міста з цієї ж таблиці (GROUP BY city_ref), а dd_novaposhta_city не використовується.
+-- sort_order — номер відділення з назви («№12» → 12); status — 1, якщо відділення працює і це відділення, поштомат чи пункт.
+CREATE TABLE `dd_novaposhta_warehouse` (
+  `ref` varchar(36) NOT NULL,
+  `description` varchar(255) NOT NULL DEFAULT '',
+  `category_of_warehouse` varchar(32) NOT NULL DEFAULT '',
+  `city_ref` varchar(36) NOT NULL DEFAULT '',
+  `city_description` varchar(255) NOT NULL DEFAULT '',
+  `weight` int(11) NOT NULL DEFAULT 0,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `status` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`ref`),
+  KEY `city_ref` (`city_ref`),
+  KEY `city_description` (`city_description`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
