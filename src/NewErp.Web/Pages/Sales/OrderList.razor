@@ -51,7 +51,7 @@
         <MudTd DataLabel="Клієнт">@context.Customer</MudTd>
         <MudTd DataLabel="Телефон">@context.Telephone</MudTd>
         <MudTd DataLabel="Сума" Style="text-align: right">@Fmt.Money(context.Total)</MudTd>
-        <MudTd DataLabel="Статус"><MudChip T="string" Size="Size.Small">@(context.StatusName ?? $"статус {context.StatusId}")</MudChip></MudTd>
+        <MudTd DataLabel="Статус"><StatusChip Name="@(context.StatusName ?? $"статус {context.StatusId}")" Color="@ColorOf(context.StatusId)" /></MudTd>
         <MudTd DataLabel="Джерело">@context.SourceName</MudTd>
         <MudTd DataLabel="Менеджер">@context.ManagerName</MudTd>
     </RowTemplate>
@@ -63,7 +63,7 @@
 
 @code {
     private MudTable<OrderListItem>? _table;
-    private List<LookupItem> _statuses = [];
+    private List<OrderStatusDto> _statuses = [];
     private List<LookupItem> _sources = [];
     private List<LookupItem> _managers = [];
     private string? _search;
@@ -90,6 +90,8 @@
             _search, state.Page + 1, state.PageSize));
         return new TableData<OrderListItem> { Items = page.Items, TotalItems = page.TotalCount };
     }
+
+    private string? ColorOf(int statusId) => _statuses.FirstOrDefault(s => s.Id == statusId)?.Color;
 
     private async Task SetAsync(Action change)
     {

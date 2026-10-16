@@ -10,4 +10,6 @@ public partial class DdOrderStatus
     public int LanguageId { get; set; }
 
     public string Name { get; set; } = null!;
+
+    public string Color { get; set; } = null!;
 }

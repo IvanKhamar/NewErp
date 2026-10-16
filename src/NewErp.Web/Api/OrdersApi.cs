@@ -24,7 +24,7 @@ public sealed class OrdersApi(HttpClient http)
 
     public Task<OrderDetails> GetAsync(int id) => GetAsync<OrderDetails>($"/orders/{id}");
 
-    public Task<List<LookupItem>> StatusesAsync() => GetAsync<List<LookupItem>>("/orders/statuses");
+    public Task<List<OrderStatusDto>> StatusesAsync() => GetAsync<List<OrderStatusDto>>("/orders/statuses");
 
     public Task<List<LookupItem>> SourcesAsync() => GetAsync<List<LookupItem>>("/orders/sources");
 

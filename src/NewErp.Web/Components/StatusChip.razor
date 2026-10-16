@@ -1,0 +1,33 @@
+@using System.Globalization
+
+@* Статус замовлення кольором зі старого сайту. Текст чорний або білий — залежно від яскравості фону, щоб читався на будь-якому кольорі. *@
+@if (TryParse(Color, out var r, out var g, out var b))
+{
+    <MudChip T="string" Size="@Size" Style="@($"background-color: {Color}; color: {(Luminance(r, g, b) > 0.5 ? "#000" : "#fff")}; border: 1px solid rgba(0,0,0,.15)")"
+             data-test="status">@Name</MudChip>
+}
+else
+{
+    <MudChip T="string" Size="@Size" data-test="status">@Name</MudChip>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+
+    /// <summary>#rrggbb або порожньо (тоді звичайний сірий чип).</summary>
+    [Parameter] public string? Color { get; set; }
+
+    [Parameter] public Size Size { get; set; } = Size.Small;
+
+    private static bool TryParse(string? color, out int r, out int g, out int b)
+    {
+        r = g = b = 0;
+        return color is { Length: 7 } && color[0] == '#'
+            && int.TryParse(color.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out r)
+            && int.TryParse(color.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out g)
+            && int.TryParse(color.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out b);
+    }
+
+    // Відносна яскравість кольору (0 — чорний, 1 — білий).
+    private static double Luminance(int r, int g, int b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}

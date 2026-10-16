@@ -56,3 +56,6 @@ public sealed record ChangeOrderStatusRequest(int StatusId);
 public sealed record ChangeOrderStatusResult(IReadOnlyList<string> Warnings);
 
 public sealed record AssignManagerRequest(int ManagerId);
+
+/// <summary>Статус замовлення з довідника. Color — колір зі старого сайту (#rrggbb) або порожньо.</summary>
+public sealed record OrderStatusDto(int Id, string Name, string Color);

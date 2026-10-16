@@ -24,14 +24,14 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// <summary>Пароль усіх тестових користувачів.</summary>
     public const string DevPassword = "dev";
 
-    // Статуси справжнього сайту (id і назви взято з dd_order_status). З "1) Уточнюємо" замовлення починається.
+    // Статуси справжнього сайту (id, назви й кольори взято з dd_order_status). З "1) Уточнюємо" замовлення починається.
     private const int FirstStatusId = 24;
 
-    private static readonly (int Id, string Name)[] Statuses =
+    private static readonly (int Id, string Name, string Color)[] Statuses =
     [
-        (24, "1) Уточнюємо"), (18, "2) Прийнято"), (25, "3) Виготовляється"), (21, "4) Чекає на відправку"),
-        (22, "5) Відправлено"), (20, "Виконано (B2B)"), (23, "Терміново"), (1, "Перевірити оплату"),
-        (17, "В обробці"), (19, "Відмінено"),
+        (24, "1) Уточнюємо", "#48f9f9"), (18, "2) Прийнято", "#ffff00"), (25, "3) Виготовляється", "#ff9900"),
+        (21, "4) Чекає на відправку", "#e8d030"), (22, "5) Відправлено", "#00ff00"), (20, "Виконано (B2B)", "#00ff00"),
+        (23, "Терміново", "#ff1a1a"), (1, "Перевірити оплату", "#ff00ff"), (17, "В обробці", "#ffffff"), (19, "Відмінено", "#156d2c"),
     ];
 
     // Id товару = FirstProductId + позиція в масиві, щоб специфікації (BOM) прив'язувались до тих самих товарів, що й у замовленнях.
@@ -52,8 +52,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         Randomizer.Seed = new Random(seed); // однаковий seed = однакові дані при кожному запуску
         var now = DateTime.Today;
 
-        foreach (var (id, name) in Statuses)
-            db.DdOrderStatuses.Add(new DdOrderStatus { OrderStatusId = id, LanguageId = LanguageId, Name = name });
+        foreach (var (id, name, color) in Statuses)
+            db.DdOrderStatuses.Add(new DdOrderStatus { OrderStatusId = id, LanguageId = LanguageId, Name = name, Color = color });
         for (var i = 0; i < Sources.Length; i++)
             db.DdOrderSources.Add(new DdOrderSource { OrderSourceId = i + 1, LanguageId = LanguageId, Name = Sources[i] });
 

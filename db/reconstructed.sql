@@ -212,3 +212,8 @@ CREATE TABLE `dd_sms_log` (
   PRIMARY KEY (`message_id`),
   KEY `order_id` (`order_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Власна колонка статусу замовлення: колір у списку замовлень (#rrggbb). Є в справжній базі (видно в phpMyAdmin),
+-- у стандартному OpenCart її немає. Тип вгаданий.
+ALTER TABLE `dd_order_status`
+  ADD COLUMN `color` varchar(7) NOT NULL DEFAULT '';

@@ -280,6 +280,10 @@ public partial class ErpDbContext : DbContext
                 .ValueGeneratedOnAdd()
                 .HasColumnName("order_status_id");
             entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Color)
+                .HasMaxLength(7)
+                .HasDefaultValueSql("''")
+                .HasColumnName("color");
             entity.Property(e => e.Name)
                 .HasMaxLength(32)
                 .HasColumnName("name");

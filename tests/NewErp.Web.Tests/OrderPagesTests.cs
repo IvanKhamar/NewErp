@@ -18,7 +18,7 @@ public class OrderPagesTests : WebTestContext
         var auth = AddAuthorization();
         auth.SetAuthorized("Менеджер");
         auth.SetRoles("Manager");
-        Api.Respond("/orders/statuses", HttpStatusCode.OK, new List<LookupItem> { new(24, "1) Уточнюємо"), new(18, "2) Прийнято") });
+        Api.Respond("/orders/statuses", HttpStatusCode.OK, new List<OrderStatusDto> { new(24, "1) Уточнюємо", "#48f9f9"), new(18, "2) Прийнято", "#ffff00") });
         Api.Respond("/orders/sources", HttpStatusCode.OK, new List<LookupItem>());
         Api.Respond("/orders/managers", HttpStatusCode.OK, new List<LookupItem> { new(1, "Марта") });
     }
@@ -55,6 +55,11 @@ public class OrderPagesTests : WebTestContext
 
         page.WaitForAssertion(() => Assert.Contains("Немира Скиба", page.Find("tbody").TextContent));
         Assert.Contains("1–20 з 400", page.Markup);
+
+        // Колір статусу зі старого сайту; на світлому фоні текст чорний, щоб читався.
+        var style = page.Find("tbody [data-test=status]").GetAttribute("style");
+        Assert.Contains("background-color: #48f9f9", style);
+        Assert.Contains("color: #000", style);
     }
 
     private static OrderDetails Order(int statusId) => new(

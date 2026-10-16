@@ -9,7 +9,7 @@ public interface IOrderQueries
 
     Task<OrderDetails?> GetAsync(int orderId, CancellationToken ct);
 
-    Task<IReadOnlyList<LookupItem>> ListStatusesAsync(CancellationToken ct);
+    Task<IReadOnlyList<OrderStatusDto>> ListStatusesAsync(CancellationToken ct);
 
     Task<IReadOnlyList<LookupItem>> ListSourcesAsync(CancellationToken ct);
 

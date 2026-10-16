@@ -129,11 +129,11 @@ public sealed class OrderQueries(ErpDbContext db, IOptions<ErpOptions> options) 
             history.Select(h => new OrderStatusHistoryEntry(h.DateAdded, h.OldStatusId, h.NewStatusId, statusNames.GetValueOrDefault(h.NewStatusId), h.UserId, h.UserName)).ToList());
     }
 
-    public async Task<IReadOnlyList<LookupItem>> ListStatusesAsync(CancellationToken ct) =>
+    public async Task<IReadOnlyList<OrderStatusDto>> ListStatusesAsync(CancellationToken ct) =>
         await db.DdOrderStatuses.AsNoTracking()
             .Where(s => s.LanguageId == _languageId)
             .OrderBy(s => s.OrderStatusId)
-            .Select(s => new LookupItem(s.OrderStatusId, s.Name))
+            .Select(s => new OrderStatusDto(s.OrderStatusId, s.Name, s.Color))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<LookupItem>> ListManagersAsync(CancellationToken ct) =>

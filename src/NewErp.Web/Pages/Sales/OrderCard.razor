@@ -19,7 +19,7 @@ else
 {
     <div class="d-flex align-center flex-wrap gap-2 mb-3">
         <MudText Typo="Typo.h4">Замовлення №@_order.Id</MudText>
-        <MudChip T="string" Color="Color.Primary" data-test="status">@(_order.StatusName ?? $"статус {_order.StatusId}")</MudChip>
+        <StatusChip Name="@(_order.StatusName ?? $"статус {_order.StatusId}")" Color="@ColorOf(_order.StatusId)" Size="Size.Medium" />
         <MudSpacer />
         <MudText Typo="Typo.h5">@Fmt.Money(_order.Total)</MudText>
     </div>
@@ -144,7 +144,9 @@ else
     [Parameter] public int Id { get; set; }
 
     private OrderDetails? _order;
-    private List<LookupItem> _statuses = [];
+    private List<OrderStatusDto> _statuses = [];
+
+    private string? ColorOf(int statusId) => _statuses.FirstOrDefault(s => s.Id == statusId)?.Color;
     private List<LookupItem> _managers = [];
     private List<SmsDto> _sms = [];
     private int _newStatusId;
