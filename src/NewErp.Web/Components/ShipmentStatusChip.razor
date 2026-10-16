@@ -1,0 +1,18 @@
+@using NewErp.Domain.Delivery
+
+@* Статус ТТН кольором, як на старому сайті: зелений — отримано, червоний — відмова, жовтий — повернення, синій — в дорозі. *@
+<MudChip T="string" Size="Size.Small" Color="@ColorOf(Tone)" data-test="shipment-status">@Text</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public ShipmentTone Tone { get; set; }
+
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    private static Color ColorOf(ShipmentTone tone) => tone switch
+    {
+        ShipmentTone.Success => Color.Success,
+        ShipmentTone.Error => Color.Error,
+        ShipmentTone.Warning => Color.Warning,
+        _ => Color.Info,
+    };
+}

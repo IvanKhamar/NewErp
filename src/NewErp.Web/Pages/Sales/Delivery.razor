@@ -1,0 +1,96 @@
+@page "/delivery"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Доставка — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-1">
+    <MudText Typo="Typo.h4">Доставка</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Sync" OnClick="RefreshAsync" Disabled="_busy"
+               data-test="refresh">Оновити статуси ТТН</MudButton>
+</div>
+@if (_refresh is { } refresh)
+{
+    @if (!refresh.ClientConfigured)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-3" data-test="refresh-result">
+            Ключ API Нової Пошти не задано, тож статуси не перевірялись. Так і має бути в локальній розробці.
+        </MudAlert>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-3" data-test="refresh-result">
+            Перевірено ТТН: @refresh.Checked, змінився статус: @refresh.Updated.
+        </MudAlert>
+    }
+}
+
+<MudText Typo="Typo.h6" Class="mt-2">Нагадати забрати посилку</MudText>
+<MudText Typo="Typo.body2" Class="mb-2">
+    Посилки на відділенні, у яких за 0–@DeliveryService.RemindDaysBefore дні почнеться платне зберігання. Після нагадування позначте рядок.
+</MudText>
+
+<MudTable T="ReminderDto" Items="_reminders" Dense="true" Hover="true" Loading="_reminders is null">
+    <HeaderContent>
+        <MudTh>Замовлення</MudTh>
+        <MudTh>Клієнт</MudTh>
+        <MudTh>Телефон</MudTh>
+        <MudTh>ТТН</MudTh>
+        <MudTh>Платне з</MudTh>
+        <MudTh>Менеджер</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Замовлення"><MudLink Href="@OrderRoutes.Order(context.OrderId)">№@context.OrderId</MudLink></MudTd>
+        <MudTd DataLabel="Клієнт">@context.Customer</MudTd>
+        <MudTd DataLabel="Телефон">@context.Telephone</MudTd>
+        <MudTd DataLabel="ТТН" Style="font-family: monospace">@context.Number</MudTd>
+        <MudTd DataLabel="Платне з">@context.DatePayedKeeping.ToString("dd.MM.yyyy")</MudTd>
+        <MudTd DataLabel="Менеджер">@context.ManagerName</MudTd>
+        <MudTd Style="text-align: right">
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => MarkAsync(context)">Нагадано</MudButton>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Нікому нагадувати не треба.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<ReminderDto>? _reminders;
+    private TrackingRefreshResult? _refresh;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => _reminders = await Api.RemindersAsync();
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        try
+        {
+            _refresh = await Api.RefreshTrackingAsync();
+            _reminders = await Api.RemindersAsync(); // після оновлення статусів список нагадувань теж міг змінитися
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task MarkAsync(ReminderDto reminder)
+    {
+        try
+        {
+            await Api.MarkRemindedAsync(reminder.OrderId);
+            _reminders!.Remove(reminder);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

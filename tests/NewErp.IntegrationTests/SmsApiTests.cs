@@ -18,7 +18,7 @@ public class SmsApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var result = await response.Content.ReadFromJsonAsync<SendSmsResultDto>();
 
         Assert.False(result!.Sent);
-        Assert.Equal("380670000001", result.Message.Phone); // +380670000001 з тестового замовлення
+        Assert.Equal("380670000001", result.Message!.Phone); // +380670000001 з тестового замовлення
         var history = await client.GetFromJsonAsync<List<SmsDto>>($"/orders/{ApiFactory.OrderId}/sms");
         Assert.Equal(StubSmsSender.Response, Assert.Single(history!).Response);
     }

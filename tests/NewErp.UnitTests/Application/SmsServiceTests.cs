@@ -31,6 +31,37 @@ public class SmsServiceTests
     }
 
     [Fact]
+    public async Task Send_TtnOfAnotherOrder_NotSentUntilForced()
+    {
+        _log.Ttns["20450000000001"] = 1;  // своя ТТН
+        _log.Ttns["20450000000002"] = 77; // чужа
+        var text = "Ваша ТТН 20450000000002";
+
+        var blocked = await _service.SendToOrderAsync(1, new SendSmsRequest(text), CancellationToken.None);
+
+        Assert.Equal(new TtnMismatchDto("20450000000002", 77), blocked.TtnMismatch);
+        Assert.Null(_sender.Last);
+        Assert.Empty(_log.Messages);
+
+        var forced = await _service.SendToOrderAsync(1, new SendSmsRequest(text, Force: true), CancellationToken.None);
+        Assert.NotNull(forced.Message);
+        Assert.Single(_log.Messages);
+    }
+
+    [Fact]
+    public async Task Send_OwnTtnOrLongNumber_IsNotBlocked()
+    {
+        _log.Ttns["20450000000001"] = 1;
+
+        var own = await _service.SendToOrderAsync(1, new SendSmsRequest("Ваша ТТН 20450000000001"), CancellationToken.None);
+        var longNumber = await _service.SendToOrderAsync(1, new SendSmsRequest("Рахунок 204500000000020"), CancellationToken.None); // 15 цифр — не ТТН
+
+        Assert.Null(own.TtnMismatch);
+        Assert.Null(longNumber.TtnMismatch);
+        Assert.Equal(2, _log.Messages.Count);
+    }
+
+    [Fact]
     public async Task Send_NotSent_StillLogged()
     {
         _sender.Result = new SmsSendResult(false, "insufficient funds");
@@ -75,6 +106,12 @@ public class SmsServiceTests
         public List<SmsMessage> Messages { get; } = [];
 
         public Task<string?> GetOrderPhoneAsync(int orderId, CancellationToken ct) => Task.FromResult(Phones.GetValueOrDefault(orderId));
+
+        /// <summary>Номер ТТН → замовлення, якому вона належить.</summary>
+        public Dictionary<string, int> Ttns { get; } = [];
+
+        public Task<IReadOnlyDictionary<string, int>> FindOrderIdsByTtnAsync(IReadOnlyCollection<string> numbers, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyDictionary<string, int>>(Ttns.Where(t => numbers.Contains(t.Key)).ToDictionary(t => t.Key, t => t.Value));
 
         public Task<IReadOnlyList<SmsDto>> ListForOrderAsync(int orderId, CancellationToken ct) => throw new NotSupportedException();
 

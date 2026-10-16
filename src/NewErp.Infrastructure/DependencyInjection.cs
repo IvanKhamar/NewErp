@@ -3,12 +3,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
+using NewErp.Application.Delivery;
 using NewErp.Application.Orders;
 using NewErp.Application.Production;
 using NewErp.Application.Sms;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
 using NewErp.Infrastructure.Auth;
+using NewErp.Infrastructure.Delivery;
 using NewErp.Infrastructure.Orders;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Production;
@@ -39,6 +41,15 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IProductionRepository, ProductionRepository>();
         services.AddScoped<ISmsLog, SmsLog>();
+        services.AddScoped<IShipmentRepository, ShipmentRepository>();
+
+        // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets, NovaPoshta:ApiKey).
+        // Без ключа заглушка: локальна розробка ніколи не звертається до справжнього сервісу.
+        var novaPoshta = configuration.GetSection(NovaPoshtaOptions.SectionName).Get<NovaPoshtaOptions>() ?? new NovaPoshtaOptions();
+        if (string.IsNullOrWhiteSpace(novaPoshta.ApiKey))
+            services.AddSingleton<INovaPoshtaClient, StubNovaPoshtaClient>();
+        else
+            services.AddSingleton<INovaPoshtaClient>(_ => new NovaPoshtaClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, novaPoshta));
         // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).
         services.AddSingleton<ISmsSender, StubSmsSender>();
         services.AddScoped<IUserLoginStore, UserLoginStore>();

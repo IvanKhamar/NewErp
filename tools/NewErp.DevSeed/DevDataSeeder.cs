@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 
 using NewErp.Application.Auth;
 using NewErp.Application.Production;
+using NewErp.Domain.Delivery;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure;
@@ -165,12 +166,52 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
 
+        var shipments = SeedShipments(orders, now);
+        await db.SaveChangesAsync();
+
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
         await SeedSizeOptionsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {stockItems} позицій складу, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {stockItems} позицій складу, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
+    }
+
+    // Коди й тексти трекінгу Нової Пошти, які найчастіше трапляються.
+    private static readonly (int Code, string Status)[] TrackingStatuses =
+    [
+        (1, "Відправник самостійно створив цю накладну, але ще не надав до відправки"),
+        (41, "Відправлення у дорозі"),
+        (7, "Прибув на відділення"),
+        (8, "Прибув у поштомат"),
+        (9, "Відправлення отримано"),
+        (11, "Відправлення отримано. Грошовий переказ видано одержувачу."),
+        (102, "Відмова від отримання"),
+    ];
+
+    /// <summary>
+    /// Вигадані ТТН для відправлених замовлень: номер 2045 + id замовлення, різні статуси трекінгу.
+    /// Посилки на відділенні отримують платне зберігання за 0–4 дні від сьогодні, щоб список нагадувань не був порожнім.
+    /// </summary>
+    private int SeedShipments(List<DdOrder> orders, DateTime now)
+    {
+        var shipped = orders.Where(o => o.OrderStatusId is 20 or 21 or 22).ToList();
+        var waiting = 0;
+        foreach (var order in shipped)
+        {
+            var document = new ShipmentDocument(order.OrderId, $"2045{order.OrderId:D10}", _random.Next(60, 151));
+            var (code, status) = TrackingStatuses[_random.Next(TrackingStatuses.Length)];
+            DateOnly? keeping = ShipmentDocument.WaitingAtBranchCodes.Contains(code)
+                ? DateOnly.FromDateTime(now).AddDays(waiting++ % 5)
+                : null;
+            document.ApplyTracking(new TrackingInfo(
+                document.Number, status, code, $"{order.ShippingCity}, {order.ShippingAddress1}",
+                order.PaymentMethod == "Накладений платіж", order.DateAdded.AddDays(1),
+                DateOnly.FromDateTime(order.DateAdded).AddDays(3), keeping));
+            db.ShipmentDocuments.Add(document);
+        }
+
+        return shipped.Count;
     }
 
     /// <summary>

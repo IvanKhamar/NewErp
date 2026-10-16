@@ -3,8 +3,10 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Common;
+using NewErp.Application.Delivery;
 using NewErp.Application.Orders;
 using NewErp.Application.Sms;
+using NewErp.Domain.Delivery;
 using NewErp.Web.Api;
 using NewErp.Web.Pages.Sales;
 
@@ -21,6 +23,8 @@ public class OrderPagesTests : WebTestContext
         Api.Respond("/orders/statuses", HttpStatusCode.OK, new List<OrderStatusDto> { new(24, "1) Уточнюємо", "#48f9f9"), new(18, "2) Прийнято", "#ffff00") });
         Api.Respond("/orders/sources", HttpStatusCode.OK, new List<LookupItem>());
         Api.Respond("/orders/managers", HttpStatusCode.OK, new List<LookupItem> { new(1, "Марта") });
+        Api.Respond("/orders/291/sms", HttpStatusCode.OK, new List<SmsDto>());
+        Api.Respond("/orders/291/shipment", HttpStatusCode.NoContent); // ТТН ще немає
     }
 
     [Fact]
@@ -60,6 +64,30 @@ public class OrderPagesTests : WebTestContext
         var style = page.Find("tbody [data-test=status]").GetAttribute("style");
         Assert.Contains("background-color: #48f9f9", style);
         Assert.Contains("color: #000", style);
+    }
+
+    [Fact]
+    public void Card_ShowsTtn_AndAsksBeforeSmsWithForeignTtn()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/291/shipment", HttpStatusCode.OK, new ShipmentDto(
+            1, 291, "novaposhta", "20450000000291", 70, "Відправлення отримано", 9, ShipmentTone.Success, true,
+            "Конотоп, №1", false, null, null, null));
+        Api.Respond("/orders/291/sms", HttpStatusCode.OK, new SendSmsResultDto(false, null, new TtnMismatchDto("20450000000007", 7)), HttpMethod.Post);
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => Assert.Equal("20450000000291", page.Find("[data-test=ttn]").TextContent.Trim()));
+        Assert.Contains("mud-chip-color-success", page.Find("[data-test=shipment-status]").ClassName);
+
+        var text = page.FindComponent<MudBlazor.MudTextField<string>>();
+        page.InvokeAsync(() => text.Instance.ValueChanged.InvokeAsync("Ваша ТТН 20450000000007"));
+        page.Find("[data-test=send-sms]").Click();
+
+        provider.WaitForAssertion(() => Assert.Contains("належить замовленню №7", provider.Markup));
+        Assert.DoesNotContain("\"force\":true", Api.Bodies["/orders/291/sms"]);
+        provider.FindAll("button").Single(b => b.TextContent.Contains("Надіслати")).Click();
+        page.WaitForAssertion(() => Assert.Contains("\"force\":true", Api.Bodies["/orders/291/sms"]));
     }
 
     private static OrderDetails Order(int statusId) => new(

@@ -61,6 +61,13 @@ public partial class SmsMessage
         return digits;
     }
 
+    /// <summary>Номери ТТН Нової Пошти в тексті: рівно 14 цифр поспіль (не частина довшого числа).</summary>
+    public static IReadOnlyList<string> FindTtnNumbers(string text) =>
+        TtnNumber().Matches(text).Select(m => m.Value).Distinct().ToList();
+
     [GeneratedRegex(@"\D")]
     private static partial Regex NonDigits();
+
+    [GeneratedRegex(@"(?<!\d)\d{14}(?!\d)")]
+    private static partial Regex TtnNumber();
 }

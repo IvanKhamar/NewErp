@@ -13,6 +13,14 @@ public sealed class SmsService(ISmsLog log, ISmsSender sender, TimeProvider cloc
         var text = SmsMessage.RequireText(request.Text);
         var phone = SmsMessage.NormalizePhone(rawPhone);
 
+        // Як на старому сайті: номер ТТН з іншого замовлення в тексті — майже напевно помилка копіювання.
+        if (!request.Force)
+        {
+            var owners = await log.FindOrderIdsByTtnAsync(SmsMessage.FindTtnNumbers(text), ct);
+            if (owners.FirstOrDefault(o => o.Value != orderId) is { Key: not null } foreign)
+                return new SendSmsResultDto(false, null, new TtnMismatchDto(foreign.Key, foreign.Value));
+        }
+
         var result = await sender.SendAsync(phone, text, ct);
 
         // Журнал пишемо завжди, навіть якщо сервіс відмовив: так видно, що менеджер намагався написати клієнту.

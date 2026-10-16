@@ -10,6 +10,9 @@ public interface ISmsLog
 
     Task<IReadOnlyList<SmsDto>> ListForOrderAsync(int orderId, CancellationToken ct);
 
+    /// <summary>Якому замовленню належить кожна з ТТН (номер → id замовлення); невідомих номерів у відповіді немає.</summary>
+    Task<IReadOnlyDictionary<string, int>> FindOrderIdsByTtnAsync(IReadOnlyCollection<string> numbers, CancellationToken ct);
+
     void Add(SmsMessage message);
 
     Task SaveChangesAsync(CancellationToken ct);

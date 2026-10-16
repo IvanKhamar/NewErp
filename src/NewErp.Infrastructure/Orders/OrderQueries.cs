@@ -31,9 +31,13 @@ public sealed class OrderQueries(ErpDbContext db, IOptions<ErpOptions> options) 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var s = filter.Search.Trim();
-            orders = int.TryParse(s, out var id)
-                ? orders.Where(o => o.OrderId == id || o.Telephone.Contains(s))
-                : orders.Where(o => o.Telephone.Contains(s) || o.Lastname.Contains(s) || o.Firstname.Contains(s) || o.Email.Contains(s));
+            if (s.Length == 14 && s.All(char.IsAsciiDigit))
+                // 14 цифр — номер ТТН Нової Пошти: шукаємо замовлення, до якого вона належить.
+                orders = orders.Where(o => db.ShipmentDocuments.Any(d => d.OrderId == o.OrderId && d.Number == s));
+            else
+                orders = int.TryParse(s, out var id)
+                    ? orders.Where(o => o.OrderId == id || o.Telephone.Contains(s))
+                    : orders.Where(o => o.Telephone.Contains(s) || o.Lastname.Contains(s) || o.Firstname.Contains(s) || o.Email.Contains(s));
         }
 
         var total = await orders.CountAsync(ct);

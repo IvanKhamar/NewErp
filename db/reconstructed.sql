@@ -217,3 +217,34 @@ CREATE TABLE `dd_sms_log` (
 -- у стандартному OpenCart її немає. Тип вгаданий.
 ALTER TABLE `dd_order_status`
   ADD COLUMN `color` varchar(7) NOT NULL DEFAULT '';
+
+-- ═══ Доставка: ТТН Нової Пошти ═══
+-- Відновлено з admin/model/novaposhta/document.php, admin/controller/novaposhta/document.php
+-- і admin/model/novaposhta_international/document.php. Типи й рушій вгадані, звірити.
+-- Одна ТТН на замовлення. carrier: порожньо або 'novaposhta' — Нова Пошта, 'international' — Nova Post International.
+-- status_code — код статусу з API Нової Пошти (9 — отримано, 7/8 — на відділенні, 102–108 — відмова чи повернення...).
+-- date_payed_keeping — з якої дати зберігання на відділенні стає платним.
+-- api_key старий модуль International зберігає тут для кожної ТТН; NewErp цю колонку не читає.
+CREATE TABLE `dd_novaposhta_document` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `carrier` varchar(32) NOT NULL DEFAULT '',
+  `ref` varchar(64) NOT NULL DEFAULT '',
+  `api_key` varchar(64) NOT NULL DEFAULT '',
+  `number` varchar(32) NOT NULL DEFAULT '',
+  `cost` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `status` varchar(255) NOT NULL DEFAULT '',
+  `status_code` int(11) NOT NULL DEFAULT '0',
+  `recipient_address` varchar(255) NOT NULL DEFAULT '',
+  `redelivery` tinyint(1) NOT NULL DEFAULT '0',
+  `date_created` datetime NULL,
+  `date_scheduled` date NULL,
+  `date_payed_keeping` date NULL,
+  PRIMARY KEY (`id`),
+  KEY `order_id` (`order_id`),
+  KEY `number` (`number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Власна колонка замовлення: коли клієнту нагадали забрати посилку, доки зберігання не стало платним.
+ALTER TABLE `dd_order`
+  ADD COLUMN `date_remind` datetime NULL;

@@ -2,6 +2,8 @@
 @attribute [Authorize(Roles = Access.Orders)]
 @inject OrdersApi Api
 @inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject Clipboard Clipboard
 
 <PageTitle>Замовлення №@Id — NewErp</PageTitle>
 
@@ -121,12 +123,50 @@ else
                 </div>
             </MudPaper>
 
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Доставка</MudText>
+                @if (_shipment is null)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">ТТН ще не створено.</MudText>
+                }
+                else
+                {
+                    <div class="d-flex align-center flex-wrap gap-2 mb-2">
+                        <MudText Typo="Typo.h6" Style="font-family: monospace" data-test="ttn">@_shipment.Number</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Скопіювати ТТН"
+                                       OnClick="() => CopyAsync(_shipment.Number)" />
+                        <ShipmentStatusChip Tone="_shipment.Tone" Text="@(string.IsNullOrEmpty(_shipment.Status) ? "статус ще не оновлювали" : _shipment.Status)" />
+                    </div>
+                    <MudSimpleTable Dense="true" Elevation="0">
+                        <tbody>
+                            @if (!string.IsNullOrEmpty(_shipment.RecipientAddress))
+                            {
+                                <tr><td>Куди</td><td>@_shipment.RecipientAddress</td></tr>
+                            }
+                            <tr><td>Вартість доставки</td><td>@Fmt.Money(_shipment.Cost)</td></tr>
+                            @if (_shipment.DateScheduled is { } scheduled)
+                            {
+                                <tr><td>Планова доставка</td><td>@scheduled.ToString("dd.MM.yyyy")</td></tr>
+                            }
+                            @if (_shipment.DatePayedKeeping is { } keeping)
+                            {
+                                <tr><td>Платне зберігання з</td><td>@keeping.ToString("dd.MM.yyyy")</td></tr>
+                            }
+                            @if (_shipment.Redelivery)
+                            {
+                                <tr><td>Зворотна доставка</td><td>так (грошовий переказ)</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">SMS клієнту</MudText>
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">Поки SMS не надсилаються по-справжньому: спроба лише записується в журнал.</MudAlert>
                 <MudTextField @bind-Value="_smsText" Label="Текст" Lines="3" Variant="Variant.Outlined" MaxLength="670" Counter="670" Immediate="true" />
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Sms" Class="mt-2" OnClick="SendSmsAsync"
-                           Disabled="_busy || string.IsNullOrWhiteSpace(_smsText)">Надіслати на @_order.Telephone</MudButton>
+                           Disabled="_busy || string.IsNullOrWhiteSpace(_smsText)" data-test="send-sms">Надіслати на @_order.Telephone</MudButton>
                 @foreach (var sms in _sms)
                 {
                     <MudPaper Class="pa-2 mt-2" Elevation="0" Style="background: var(--mud-palette-background-gray)">
@@ -149,6 +189,7 @@ else
     private string? ColorOf(int statusId) => _statuses.FirstOrDefault(s => s.Id == statusId)?.Color;
     private List<LookupItem> _managers = [];
     private List<SmsDto> _sms = [];
+    private ShipmentDto? _shipment;
     private int _newStatusId;
     private int? _managerId;
     private string _smsText = "";
@@ -175,6 +216,7 @@ else
     {
         _order = await Api.GetAsync(Id);
         _sms = await Api.SmsAsync(Id);
+        _shipment = await Api.ShipmentAsync(Id);
         _newStatusId = _order.StatusId;
         _managerId = _order.ManagerId;
         _breadcrumbs = [new("Замовлення", href: "orders"), new($"№{Id}", href: null, disabled: true)];
@@ -189,10 +231,28 @@ else
     private Task SendSmsAsync() => RunAsync(null, async () =>
     {
         var result = await Api.SendSmsAsync(Id, _smsText);
+        if (result.TtnMismatch is { } mismatch)
+        {
+            // Як на старому сайті: номер ТТН з іншого замовлення в тексті — майже напевно не той номер.
+            var confirmed = await Dialogs.ShowMessageBoxAsync(
+                "ТТН з іншого замовлення",
+                $"ТТН {mismatch.Ttn} належить замовленню №{mismatch.TtnOrderId}, а не цьому. Все одно надіслати?",
+                yesText: "Надіслати", cancelText: "Виправити текст");
+            if (confirmed != true)
+                return;
+            result = await Api.SendSmsAsync(Id, _smsText, force: true);
+        }
+
         Snackbar.Add(result.Sent ? "SMS надіслано." : "SMS записано в журнал, але не надіслано: сервіс SMS ще не підключено.",
             result.Sent ? Severity.Success : Severity.Warning);
         _smsText = "";
     });
+
+    private async Task CopyAsync(string text)
+    {
+        await Clipboard.CopyAsync(text);
+        Snackbar.Add("Скопійовано.", Severity.Info);
+    }
 
     private async Task RunAsync(string? success, Func<Task> action)
     {

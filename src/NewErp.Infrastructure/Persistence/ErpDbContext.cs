@@ -74,6 +74,9 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.DateModified)
                 .HasColumnType("datetime")
                 .HasColumnName("date_modified");
+            entity.Property(e => e.DateRemind)
+                .HasColumnType("datetime")
+                .HasColumnName("date_remind");
             entity.Property(e => e.Email)
                 .HasMaxLength(96)
                 .HasColumnName("email");

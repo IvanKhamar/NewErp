@@ -128,4 +128,6 @@ public partial class DdOrder
     public DateTime DateModified { get; set; }
 
     public int OrderSourceId { get; set; }
+
+    public DateTime? DateRemind { get; set; }
 }

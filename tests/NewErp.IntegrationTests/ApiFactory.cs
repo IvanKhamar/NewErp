@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
+using NewErp.Domain.Delivery;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
@@ -44,6 +45,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const int CategoryOrderId = 4;
     public const int CategoryProductId = 102; // «Сорочка лляна оверсайз», категорія CategoryId, розмір M, 1 шт.
     public const int CategoryId = 5;
+    // ТТН замовлення 2: чекає на відділенні, платне зберігання завтра — має бути в нагадуваннях.
+    public const string WaitingTtn = "20450000000002";
 
     public async Task InitializeAsync()
     {
@@ -125,6 +128,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             OrderId = CategoryOrderId, OrderProductId = 2, ProductOptionId = 51, ProductOptionValueId = 502, Name = "Розмір", Value = "M", Type = "radio",
         });
         db.ErpOrderManagers.Add(new ErpOrderManager { OrderId = 2, UserId = ActiveUserId, AssignedByUserId = ActiveUserId, AssignedAt = DateTime.Now });
+
+        var shipment = new ShipmentDocument(2, WaitingTtn, 70m);
+        var tomorrow = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
+        shipment.ApplyTracking(new TrackingInfo(WaitingTtn, "Прибув у відділення", 7, "Київ, відділення 1", false, DateTime.Now, null, tomorrow));
+        db.ShipmentDocuments.Add(shipment);
 
         var category = new StockCategory("Тканини");
         db.StockCategories.Add(category);

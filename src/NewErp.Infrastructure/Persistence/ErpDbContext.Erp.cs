@@ -11,6 +11,7 @@ public partial class ErpDbContext
         ConfigureStock(modelBuilder);
         ConfigureProduction(modelBuilder);
         ConfigureSms(modelBuilder);
+        ConfigureDelivery(modelBuilder);
         ConfigureAuth(modelBuilder);
     }
 }

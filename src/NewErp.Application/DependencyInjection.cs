@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
+using NewErp.Application.Delivery;
 using NewErp.Application.Orders;
 using NewErp.Application.Production;
 using NewErp.Application.Sms;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<PurchaseOrderService>();
         services.AddScoped<ProductionService>();
         services.AddScoped<SmsService>();
+        services.AddScoped<DeliveryService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.
         services.AddScoped<IOrderStatusHandler, OrderSewnStockHandler>();
         services.AddScoped<AuthService>();

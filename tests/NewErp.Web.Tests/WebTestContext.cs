@@ -42,8 +42,9 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
         /// <summary>Тіла запитів, що змінюють дані (POST/PUT), за шляхом.</summary>
         public Dictionary<string, string> Bodies { get; } = [];
 
-        public void Respond(string path, HttpStatusCode status, object? body = null) =>
-            _responses[path] = () => new HttpResponseMessage(status) { Content = body is null ? null : JsonContent.Create(body) };
+        /// <summary>Відповідь за шляхом; з method — лише для цього методу (коли GET і POST мають одну адресу).</summary>
+        public void Respond(string path, HttpStatusCode status, object? body = null, HttpMethod? method = null) =>
+            _responses[method is null ? path : $"{method} {path}"] = () => new HttpResponseMessage(status) { Content = body is null ? null : JsonContent.Create(body) };
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -51,7 +52,7 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
             Requests.Add(path);
             if (request.Content is not null)
                 Bodies[path] = await request.Content.ReadAsStringAsync(cancellationToken);
-            return _responses.TryGetValue(path, out var respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound);
+            return _responses.TryGetValue($"{request.Method} {path}", out var respond) || _responses.TryGetValue(path, out respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
 }
