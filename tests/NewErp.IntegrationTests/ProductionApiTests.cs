@@ -14,8 +14,8 @@ public class ProductionApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Model_SizesComponentsBomsAndLinks_RoundTrip()
     {
         var client = await factory.LoginAsync(ApiFactory.Storekeeper);
-        var linen = await CreateIdAsync(client, "/stock/items", new CreateStockItemRequest(null, null, "Льон", "м", 0));
-        var thread = await CreateIdAsync(client, "/stock/items", new CreateStockItemRequest(null, null, "Нитки", "шт", 0));
+        var linen = await CreateIdAsync(client, "/stock/items", new SaveStockItemRequest(null, null, "Льон", "м", 0));
+        var thread = await CreateIdAsync(client, "/stock/items", new SaveStockItemRequest(null, null, "Нитки", "шт", 0));
 
         var modelId = await CreateIdAsync(client, "/production/models",
             new SaveProductionModelRequest("Сукня лляна", [new("S", 30), new("M", 40), new("L", 30)], MinTotal: 20));
@@ -125,7 +125,7 @@ public class ProductionApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private static async Task<int> CreateItemWithStockAsync(HttpClient client, string name, string unit, decimal stock)
     {
-        var id = await CreateIdAsync(client, "/stock/items", new CreateStockItemRequest(null, null, name, unit, 0));
+        var id = await CreateIdAsync(client, "/stock/items", new SaveStockItemRequest(null, null, name, unit, 0));
         (await client.PostAsJsonAsync($"/stock/items/{id}/adjustments", new AdjustStockRequest(stock, "Прихід"))).EnsureSuccessStatusCode();
         return id;
     }

@@ -24,7 +24,7 @@ public sealed record CreateStockCategoryRequest(string Name, int SortOrder = 0);
 
 public sealed record CreateStockSupplierRequest(string Name, string? Phone, string? Email = null, string? Categories = null, string? Notes = null);
 
-public sealed record CreateStockItemRequest(
+public sealed record SaveStockItemRequest(
     int? CategoryId, int? SupplierId, string Name, string Unit, decimal MinQuantity, string? UsedFor = null, decimal Price = 0);
 
 /// <summary>Delta: плюс = прихід, мінус = витрата.</summary>

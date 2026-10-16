@@ -46,7 +46,7 @@ public class StockServiceTests
     [Fact]
     public async Task CreateItem_UnknownCategory_Rejected() =>
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateItemAsync(new CreateStockItemRequest(99, null, "Нитки", "шт", 0), CancellationToken.None));
+            _service.CreateItemAsync(new SaveStockItemRequest(99, null, "Нитки", "шт", 0), CancellationToken.None));
 
     [Fact]
     public async Task CreateCategory_DuplicateName_Rejected()

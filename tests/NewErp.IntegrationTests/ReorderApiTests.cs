@@ -14,9 +14,9 @@ public class ReorderApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var client = await factory.LoginAsync(ApiFactory.Storekeeper);
         var supplier = await CreateAsync(client, "/stock/suppliers", new CreateStockSupplierRequest("Текстиль-Опт", "+380441234567"));
-        var linen = await CreateAsync(client, "/stock/items", new CreateStockItemRequest(null, supplier, "Льон", "м", MinQuantity: 30, Price: 200));
+        var linen = await CreateAsync(client, "/stock/items", new SaveStockItemRequest(null, supplier, "Льон", "м", MinQuantity: 30, Price: 200));
         (await client.PostAsJsonAsync($"/stock/items/{linen}/adjustments", new AdjustStockRequest(12.5m, "Прихід"))).EnsureSuccessStatusCode();
-        await CreateAsync(client, "/stock/items", new CreateStockItemRequest(null, null, "Пакет", "шт", MinQuantity: 10));
+        await CreateAsync(client, "/stock/items", new SaveStockItemRequest(null, null, "Пакет", "шт", MinQuantity: 10));
 
         var report = await client.GetFromJsonAsync<ReorderReportDto>("/stock/reorder");
 
@@ -32,7 +32,7 @@ public class ReorderApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var client = await factory.LoginAsync(ApiFactory.Storekeeper);
         var supplier = await CreateAsync(client, "/stock/suppliers", new CreateStockSupplierRequest("Фурнітура-Опт", null));
-        var zipper = await CreateAsync(client, "/stock/items", new CreateStockItemRequest(null, supplier, "Блискавка", "шт", MinQuantity: 50, Price: 5));
+        var zipper = await CreateAsync(client, "/stock/items", new SaveStockItemRequest(null, supplier, "Блискавка", "шт", MinQuantity: 50, Price: 5));
 
         // Чернетка з пропозиції звіту: 2 × 50 − 0 = 100 шт по 5.
         var orderId = await CreateAsync(client, $"/stock/purchase-orders/from-reorder/{supplier}", new { });

@@ -81,6 +81,19 @@ public class StockItemTests
     }
 
     [Fact]
+    public void Update_ChangesDescriptionButNotQuantity()
+    {
+        var item = NewItem();
+        item.Adjust(12, "Прихід", 1, "sklad", Now);
+
+        item.Update(categoryId: 2, supplierId: 5, " Льон білий ", "м", 20, "сукні", 240);
+
+        Assert.Equal((2, 5, "Льон білий", 20m, 240m), (item.CategoryId, item.SupplierId, item.Name, item.MinQuantity, item.Price));
+        Assert.Equal(12, item.Quantity);
+        Assert.Throws<DomainException>(() => item.Update(null, null, "Льон", "м", 0, null, price: -1));
+    }
+
+    [Fact]
     public void Ctor_TrimsAndValidates()
     {
         Assert.Equal("Льон", new StockItem(null, null, "  Льон ", "м", 0).Name);

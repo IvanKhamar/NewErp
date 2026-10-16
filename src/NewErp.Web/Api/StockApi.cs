@@ -34,7 +34,10 @@ public sealed class StockApi(HttpClient http)
 
     public Task<StockItemDto> ItemAsync(int id) => GetAsync<StockItemDto>($"/stock/items/{id}");
 
-    public Task<int> CreateItemAsync(CreateStockItemRequest request) => CreateAsync("/stock/items", request);
+    public Task<int> CreateItemAsync(SaveStockItemRequest request) => CreateAsync("/stock/items", request);
+
+    public async Task UpdateItemAsync(int id, SaveStockItemRequest request) =>
+        await EnsureAsync(await http.PutAsJsonAsync($"/stock/items/{id}", request));
 
     public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request) =>
         await ReadAsync<StockMovementDto>(await http.PostAsJsonAsync($"/stock/items/{itemId}/adjustments", request));

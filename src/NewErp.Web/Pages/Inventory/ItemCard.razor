@@ -21,6 +21,7 @@ else
     <div class="d-flex align-center flex-wrap gap-2 mb-3">
         <MudText Typo="Typo.h4">@_item.Name</MudText>
         <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditAsync">Змінити</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert" OnClick="AdjustAsync">Прихід або витрата</MudButton>
     </div>
 
@@ -110,6 +111,16 @@ else
             $"Прихід або витрата: {_item!.Name}", new DialogParameters<AdjustStockDialog> { { d => d.Item, _item } });
         if (await dialog.Result is { Canceled: false })
             await LoadAsync();
+    }
+
+    private async Task EditAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<ItemDialog>("Змінити розхідник", new DialogParameters<ItemDialog> { { d => d.Item, _item } });
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Зміни збережено.", Severity.Success);
+            await LoadAsync();
+        }
     }
 
     private async Task SaveMinimumAsync()

@@ -14,6 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ErrorHandler>();
+// Зламаний JSON у тілі запиту завжди кидає виняток, а ErrorHandler відповідає 400 з поясненням.
+// Інакше поза Development була б порожня 400, а в Development — 500.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddHealthChecks();
 builder.Services.AddErpAuth();
 

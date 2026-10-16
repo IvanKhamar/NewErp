@@ -102,7 +102,7 @@
 
     private async Task NewItemAsync()
     {
-        var dialog = await Dialogs.ShowAsync<NewItemDialog>("Новий розхідник");
+        var dialog = await Dialogs.ShowAsync<ItemDialog>("Новий розхідник");
         if (await dialog.Result is { Canceled: false, Data: int id })
             Navigation.NavigateTo(StockRoutes.Item(id));
     }

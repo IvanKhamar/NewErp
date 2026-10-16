@@ -10,15 +10,19 @@ public class StockItem
 {
     private StockItem() { }
 
-    public StockItem(int? categoryId, int? supplierId, string name, string unit, decimal minQuantity, string? usedFor = null, decimal price = 0)
+    public StockItem(int? categoryId, int? supplierId, string name, string unit, decimal minQuantity, string? usedFor = null, decimal price = 0) =>
+        Update(categoryId, supplierId, name, unit, minQuantity, usedFor, price);
+
+    /// <summary>Змінює опис позиції. Залишок тут не змінюється: для цього лише Adjust і TakeUpTo з записом у журнал.</summary>
+    public void Update(int? categoryId, int? supplierId, string name, string unit, decimal minQuantity, string? usedFor, decimal price)
     {
+        if (price < 0)
+            throw new DomainException("Ціна не може бути від'ємною.");
         CategoryId = categoryId;
         SupplierId = supplierId;
         Name = RequireText(name, "Назва позиції", 150);
         Unit = RequireText(unit, "Одиниця виміру", 16);
         UsedFor = usedFor?.Trim() ?? "";
-        if (price < 0)
-            throw new DomainException("Ціна не може бути від'ємною.");
         Price = price;
         SetMinQuantity(minQuantity);
     }

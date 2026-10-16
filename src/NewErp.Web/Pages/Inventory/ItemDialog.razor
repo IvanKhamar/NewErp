@@ -1,6 +1,6 @@
 @inject StockApi Api
 
-@* Новий розхідник. Повертає Ok(id) створеної позиції. *@
+@* Новий розхідник або зміна наявного (якщо передано Item). Повертає Ok(id) позиції. Залишок тут не змінюється. *@
 <MudDialog>
     <DialogContent>
         <MudTextField @bind-Value="_name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" AutoFocus="true" MaxLength="150" />
@@ -31,7 +31,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Створити</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">@(Item is null ? "Створити" : "Зберегти")</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -50,8 +50,14 @@
     private string? _error;
     private bool _busy;
 
+    /// <summary>Позиція для зміни; null — новий розхідник.</summary>
+    [Parameter] public StockItemDto? Item { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
+        if (Item is not null)
+            (_name, _unit, _minQuantity, _categoryId, _supplierId, _price, _usedFor) =
+                (Item.Name, Item.Unit, Item.MinQuantity, Item.CategoryId, Item.SupplierId, Item.Price, Item.UsedFor);
         _categories = await Api.CategoriesAsync();
         _suppliers = await Api.SuppliersAsync();
     }
@@ -61,7 +67,12 @@
         _busy = true;
         try
         {
-            var id = await Api.CreateItemAsync(new CreateStockItemRequest(_categoryId, _supplierId, _name, _unit, _minQuantity, _usedFor, _price));
+            var request = new SaveStockItemRequest(_categoryId, _supplierId, _name, _unit, _minQuantity, _usedFor, _price);
+            var id = Item?.Id ?? 0;
+            if (Item is null)
+                id = await Api.CreateItemAsync(request);
+            else
+                await Api.UpdateItemAsync(Item.Id, request);
             Dialog.Close(DialogResult.Ok(id));
         }
         catch (ApiException e)

@@ -26,18 +26,33 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
         return supplier.Id;
     }
 
-    public async Task<int> CreateItemAsync(CreateStockItemRequest request, CancellationToken ct)
+    public async Task<int> CreateItemAsync(SaveStockItemRequest request, CancellationToken ct)
     {
-        if (request.CategoryId is { } categoryId && !await repository.CategoryExistsAsync(categoryId, ct))
-            throw new DomainException($"Категорії {categoryId} не існує.");
-        if (request.SupplierId is { } supplierId && !await repository.SupplierExistsAsync(supplierId, ct))
-            throw new DomainException($"Постачальника {supplierId} не існує.");
-
+        await RequireReferencesAsync(request, ct);
         var item = new StockItem(
             request.CategoryId, request.SupplierId, request.Name, request.Unit, request.MinQuantity, request.UsedFor, request.Price);
         repository.Add(item);
         await repository.SaveChangesAsync(ct);
         return item.Id;
+    }
+
+    /// <summary>Змінює опис позиції (назва, категорія, постачальник, ціна, мінімум). Залишок не чіпає.</summary>
+    public async Task UpdateItemAsync(int itemId, SaveStockItemRequest request, CancellationToken ct)
+    {
+        var item = await repository.FindItemAsync(itemId, ct)
+            ?? throw new NotFoundException($"Позицію складу {itemId} не знайдено.");
+        await RequireReferencesAsync(request, ct);
+
+        item.Update(request.CategoryId, request.SupplierId, request.Name, request.Unit, request.MinQuantity, request.UsedFor, request.Price);
+        await repository.SaveChangesAsync(ct);
+    }
+
+    private async Task RequireReferencesAsync(SaveStockItemRequest request, CancellationToken ct)
+    {
+        if (request.CategoryId is { } categoryId && !await repository.CategoryExistsAsync(categoryId, ct))
+            throw new DomainException($"Категорії {categoryId} не існує.");
+        if (request.SupplierId is { } supplierId && !await repository.SupplierExistsAsync(supplierId, ct))
+            throw new DomainException($"Постачальника {supplierId} не існує.");
     }
 
     public async Task<StockMovementDto> AdjustAsync(int itemId, AdjustStockRequest request, int userId, string username, CancellationToken ct)

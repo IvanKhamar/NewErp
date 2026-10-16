@@ -39,11 +39,18 @@ public static class StockEndpoints
         stock.MapGet("/items/{id:int}", async (int id, IStockRepository repo, CancellationToken ct) =>
             await repo.GetItemDtoAsync(id, ct) is { } item ? Results.Ok(item) : Results.NotFound());
 
-        stock.MapPost("/items", async (CreateStockItemRequest request, StockService service, CancellationToken ct) =>
+        stock.MapPost("/items", async (SaveStockItemRequest request, StockService service, CancellationToken ct) =>
         {
             var id = await service.CreateItemAsync(request, ct);
             return Results.Created($"/stock/items/{id}", new { id });
         });
+
+        stock.MapPut("/items/{id:int}", async (int id, SaveStockItemRequest request, StockService service, CancellationToken ct) =>
+        {
+            await service.UpdateItemAsync(id, request, ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Змінити позицію: назва, одиниця, категорія, постачальник, мінімум, ціна (залишок — лише через adjustments)");
 
         stock.MapPost("/items/{id:int}/adjustments", (int id, AdjustStockRequest request, ClaimsPrincipal user, StockService service, CancellationToken ct) =>
             service.AdjustAsync(id, request, user.GetUserId(), user.GetUsername(), ct))
