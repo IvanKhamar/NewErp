@@ -86,7 +86,8 @@ public sealed class ShipmentRepository(ErpDbContext db) : IShipmentRepository
                 o.ShippingCity,
                 o.ShippingAddress2 != "" ? o.ShippingAddress2 : o.ShippingAddress1,
                 o.Total,
-                o.PaymentCode))
+                o.PaymentCode,
+                o.Prepayment))
             .FirstOrDefaultAsync(ct);
 
     public void Add(ShipmentDocument document, string senderId, int userId, DateTime createdAt)

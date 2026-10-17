@@ -267,3 +267,118 @@ CREATE TABLE `dd_novaposhta_warehouse` (
   KEY `city_ref` (`city_ref`),
   KEY `city_description` (`city_description`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Власна колонка замовлення: завдаток (передоплата), уже отриманий до відправки. Старий сайт віднімає його
+-- від суми фіскального чека (admin/model/cashbox/cheque.php) і накладеного платежу. Тип вгаданий, звірити.
+ALTER TABLE `dd_order`
+  ADD COLUMN `prepayment` decimal(15,4) NOT NULL DEFAULT '0.0000';
+
+-- ═══ Каса: ПРРО Checkbox ═══
+-- Відновлено з admin/model/cashbox/*.php, admin/controller/cashbox/*.php і system/library/Checkbox.php.
+-- Типи, довжини, ключі й рушій вгадані, звірити (SHOW CREATE TABLE).
+
+-- Реквізити (ФОП), на які видається чек.
+CREATE TABLE `dd_cashbox_requisites` (
+  `requisites_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL DEFAULT '',
+  `description` text NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`requisites_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Склад або точка продажу каси.
+CREATE TABLE `dd_cashbox_warehouse` (
+  `warehouse_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL DEFAULT '',
+  `description` text NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Касир Checkbox. payment_code — для яких замовлень (код оплати OpenCart) його обирати.
+-- auto_close_time — о котрій закривати зміну автоматично (Z-звіт).
+-- login, password, checkbox_key (ключ ліцензії каси) й access_token старий сайт зберігає тут відкрито.
+-- NewErp ці чотири колонки не читає й не пише: ключі касирів лише в dotnet user-secrets (Checkbox:Cashiers).
+CREATE TABLE `dd_cashbox_user` (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL DEFAULT '',
+  `description` text NOT NULL,
+  `payment_code` varchar(128) NOT NULL DEFAULT '',
+  `login` varchar(255) NOT NULL DEFAULT '',
+  `password` varchar(255) NOT NULL DEFAULT '',
+  `checkbox_key` varchar(255) NOT NULL DEFAULT '',
+  `auto_close_time` time NULL,
+  `access_token` text NULL,
+  `date_access_token_update` datetime NULL,
+  `customer_id` int(11) NOT NULL DEFAULT '0',
+  `warehouse_id` int(11) NOT NULL DEFAULT '0',
+  `requisites_id` int(11) NOT NULL DEFAULT '0',
+  `status` tinyint(1) NOT NULL DEFAULT '0',
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Робоча зміна касира. user_id — хто відкрив (dd_user), date_end NULL — зміна відкрита.
+CREATE TABLE `dd_cashbox_work_shift` (
+  `work_shift_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL DEFAULT '0',
+  `cashbox_user_id` int(11) NOT NULL,
+  `checkbox_shift_id` varchar(64) NOT NULL DEFAULT '',
+  `date_added` datetime NOT NULL,
+  `date_start` datetime NOT NULL,
+  `date_end` datetime NULL,
+  PRIMARY KEY (`work_shift_id`),
+  KEY `cashbox_user_id` (`cashbox_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Фіскальний чек до замовлення. checkbox_id — id чека в Checkbox (порожньо, поки не фіскалізовано).
+-- sum старий сайт пише через (int), тобто без копійок; можливо, і колонка цілочисельна — звірити.
+CREATE TABLE `dd_cashbox_cheque` (
+  `cheque_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `cashbox_user_id` int(11) NOT NULL,
+  `cashbox_warehouse_id` int(11) NOT NULL DEFAULT '0',
+  `cashbox_requisites_id` int(11) NOT NULL DEFAULT '0',
+  `sum` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `checkbox_id` varchar(64) NOT NULL DEFAULT '',
+  `cashbox_work_shift_id` int(11) NOT NULL DEFAULT '0',
+  `cashbox_report_id` int(11) NOT NULL DEFAULT '0',
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`cheque_id`),
+  KEY `order_id` (`order_id`),
+  KEY `cashbox_user_id` (`cashbox_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Z-звіт (закриття зміни). z_report_id — id звіту в Checkbox.
+CREATE TABLE `dd_cashbox_report` (
+  `report_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL DEFAULT '0',
+  `cashbox_user_id` int(11) NOT NULL,
+  `z_report_id` varchar(64) NOT NULL DEFAULT '',
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`report_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ═══ Надходження на рахунки ПриватБанку ═══
+-- Відновлено з admin/model/sale/privatbank.php і admin/controller/sale/privatbank.php. Типи вгадані, звірити.
+-- Суми старий сайт зберігає текстом із валютою («1500.00 UAH»). appcode — id транзакції в банку (не повторюється).
+-- order_id — замовлення, до якого прив'язано платіж (0 — ще не прив'язано); show_status = 0 — платіж приховано.
+-- status пише лише метод updateStatus, якого в моделі старого сайту немає; NewErp колонку не використовує.
+CREATE TABLE `dd_privatbank` (
+  `payment_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL DEFAULT '0',
+  `appcode` varchar(64) NOT NULL DEFAULT '',
+  `card` varchar(64) NOT NULL DEFAULT '',
+  `amount` varchar(32) NOT NULL DEFAULT '',
+  `cardamount` varchar(32) NOT NULL DEFAULT '',
+  `rest` varchar(32) NOT NULL DEFAULT '',
+  `description` text NOT NULL,
+  `terminal` varchar(255) NOT NULL DEFAULT '',
+  `trandate` date NOT NULL,
+  `trantime` time NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT '',
+  `show_status` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`payment_id`),
+  KEY `appcode` (`appcode`),
+  KEY `order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

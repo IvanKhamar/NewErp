@@ -13,6 +13,8 @@ public static class Policies
     public const string Stock = nameof(Stock);
     public const string Bonuses = nameof(Bonuses);
     public const string Users = nameof(Users);
+    public const string Finance = nameof(Finance);
+    public const string FinanceSetup = nameof(FinanceSetup);
 }
 
 public static class AuthSetup
@@ -54,7 +56,10 @@ public static class AuthSetup
             .AddPolicy(Policies.Orders, p => p.RequireRole(Roles.Admin, Roles.Manager))
             .AddPolicy(Policies.Stock, p => p.RequireRole(Roles.Admin, Roles.Storekeeper))
             .AddPolicy(Policies.Bonuses, p => p.RequireRole(Roles.Admin))
-            .AddPolicy(Policies.Users, p => p.RequireRole(Roles.Admin));
+            .AddPolicy(Policies.Users, p => p.RequireRole(Roles.Admin))
+            // Каса й банк: чеки й зміни — менеджери, налаштування касирів — лише адмін.
+            .AddPolicy(Policies.Finance, p => p.RequireRole(Roles.Admin, Roles.Manager))
+            .AddPolicy(Policies.FinanceSetup, p => p.RequireRole(Roles.Admin));
 
         return services;
     }

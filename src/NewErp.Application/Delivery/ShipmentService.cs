@@ -32,7 +32,8 @@ public sealed class ShipmentService(
         return new ShipmentFormDto(
             order.FirstName, order.LastName, order.Telephone, order.City, city, order.Warehouse, warehouse,
             order.Total,
-            order.PaymentCode == CashOnDeliveryPaymentCode ? order.Total : 0,
+            // Накладений платіж, як на старому сайті, — сума мінус завдаток.
+            order.PaymentCode == CashOnDeliveryPaymentCode ? Math.Max(order.Total - order.Prepayment, 0) : 0,
             client.Senders, client.DropoffPoints, SeatPreset.All, client.CanCreateDocuments,
             client.CanCreateDocuments && !client.IsConfigured);
     }

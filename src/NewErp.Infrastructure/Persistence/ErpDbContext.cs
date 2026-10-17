@@ -144,6 +144,9 @@ public partial class ErpDbContext : DbContext
                 .HasMaxLength(128)
                 .HasColumnName("payment_zone");
             entity.Property(e => e.PaymentZoneId).HasColumnName("payment_zone_id");
+            entity.Property(e => e.Prepayment)
+                .HasPrecision(15, 4)
+                .HasColumnName("prepayment");
             entity.Property(e => e.ShippingAddress1)
                 .HasMaxLength(128)
                 .HasColumnName("shipping_address_1");

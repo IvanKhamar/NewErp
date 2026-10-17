@@ -13,4 +13,6 @@ public static class Access
     public const string Orders = $"{Roles.Admin},{Roles.Manager}";
     public const string Bonuses = Roles.Admin;
     public const string Users = Roles.Admin;
+    public const string Finance = $"{Roles.Admin},{Roles.Manager}";
+    public const string FinanceSetup = Roles.Admin;
 }

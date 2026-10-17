@@ -42,6 +42,16 @@ public class ShipmentServiceTests
     }
 
     [Fact]
+    public async Task Form_CashOnDelivery_MinusPrepayment()
+    {
+        _repository.Orders[1] = _repository.Orders[1] with { Prepayment = 300 };
+
+        var form = await _service.FormAsync(1, CancellationToken.None);
+
+        Assert.Equal((1500m, 1200m), (form.DeclaredCost, form.CashOnDelivery));
+    }
+
+    [Fact]
     public async Task Form_UnknownCity_LeavesTextOnly_AndNoCashOnDeliveryForPrepaid()
     {
         var form = await _service.FormAsync(2, CancellationToken.None);

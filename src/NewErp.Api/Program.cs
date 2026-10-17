@@ -25,6 +25,8 @@ builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockO
 builder.Services.Configure<ProductionOptions>(builder.Configuration.GetSection(ProductionOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
+builder.Services.AddHostedService<CashboxAutoCloseWorker>();
 
 var app = builder.Build();
 
@@ -48,6 +50,8 @@ app.MapStaffEndpoints();
 app.MapStockEndpoints();
 app.MapProductionEndpoints();
 app.MapDeliveryEndpoints();
+app.MapCashboxEndpoints();
+app.MapPaymentEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.

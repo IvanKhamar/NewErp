@@ -112,9 +112,10 @@ public enum ShipmentPrintKind
 /// <summary>Результат оновлення довідника. ClientConfigured = false — ключа немає, довідник не змінено.</summary>
 public sealed record WarehouseRefreshResult(bool ClientConfigured, int Count);
 
-/// <summary>Дані замовлення, з яких заповнюється форма ТТН.</summary>
+/// <summary>Дані замовлення, з яких заповнюється форма ТТН. Prepayment — завдаток, уже отриманий до відправки.</summary>
 public sealed record OrderShippingInfo(
-    string FirstName, string LastName, string Telephone, string City, string Warehouse, decimal Total, string PaymentCode);
+    string FirstName, string LastName, string Telephone, string City, string Warehouse, decimal Total, string PaymentCode,
+    decimal Prepayment = 0);
 
 /// <summary>ТТН разом з id відправника, від якого її створено (null — створено на старому сайті).</summary>
 public sealed record StoredShipment(ShipmentDocument Document, string? SenderId);

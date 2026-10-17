@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
+using NewErp.Domain.Cashbox;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Payments;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Persistence;
@@ -52,6 +54,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string KyivRef = "city-kyiv";
     public const string Branch1Ref = "wh-kyiv-1";
     public const string Branch1 = "Відділення №1: вул. Хрещатик, 1";
+    // Каса: касир за замовчуванням (тестова заглушка Checkbox «фіскалізує» чеки в пам'яті).
+    public const int CashierId = 1;
+    // Надходження на 2000 грн від клієнта замовлення 2 (сума й прізвище збігаються) — має бути першою підказкою.
+    public const string BankAppCode = "tx-2000";
 
     public async Task InitializeAsync()
     {
@@ -76,6 +82,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Bonus:Percent", "10");
         builder.UseSetting("Bonus:CountedStatusIds:0", Completed.ToString());
         builder.UseSetting("NovaPoshta:FakeDocuments", "true"); // без ключа API: тестові ТТН заглушки
+        builder.UseSetting("Checkbox:FakeReceipts", "true"); // без ключів касирів: тестові чеки заглушки
     }
 
     private async Task SeedAsync()
@@ -148,6 +155,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             new NovaPoshtaWarehouse("wh-kyiv-2", "Поштомат №2", "Postomat", KyivRef, "Київ", 20, working: true),
             new NovaPoshtaWarehouse("wh-kyiv-3", "Відділення №3", "Branch", KyivRef, "Київ", 30, working: false),
             new NovaPoshtaWarehouse("wh-kovel-1", "Відділення №1", "Branch", "city-kovel", "Ковель", 30, working: true));
+
+        db.Cashiers.Add(new Cashier("Олена Каса", "", "", null, 0, 0, isActive: true, DateTime.Now));
+        db.BankPayments.Add(new BankPayment(BankAppCode, "UA00", 2000m, 5000m, "Оплата за замовлення 2", "Тарас Клієнт2",
+            new DateOnly(2026, 10, 3), new TimeOnly(10, 0)));
 
         var category = new StockCategory("Тканини");
         db.StockCategories.Add(category);
