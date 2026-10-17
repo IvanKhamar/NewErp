@@ -27,6 +27,7 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
         Services.AddSingleton(new HttpClient(Api) { BaseAddress = new Uri("http://localhost/app/") });
         Services.AddScoped<ApiAuthenticationStateProvider>();
         Services.AddScoped<StockApi>();
+        Services.AddScoped<FinanceApi>();
         Services.AddScoped<Clipboard>();
     }
 

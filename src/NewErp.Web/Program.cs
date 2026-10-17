@@ -27,6 +27,7 @@ builder.Services.AddScoped<StockApi>();
 builder.Services.AddScoped<ProductionApi>();
 builder.Services.AddScoped<OrdersApi>();
 builder.Services.AddScoped<AdminApi>();
+builder.Services.AddScoped<FinanceApi>();
 builder.Services.AddScoped<Clipboard>();
 
 await builder.Build().RunAsync();

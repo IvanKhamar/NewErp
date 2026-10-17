@@ -117,6 +117,30 @@ public class OrderPagesTests : WebTestContext
         Assert.Contains("\"seats\":[{\"weight\":1,\"width\":31", body); // типова коробка «маленька»
     }
 
+    [Fact]
+    public void Card_IssuesCheque_AndShowsLinkedPayments()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/291/cheque", HttpStatusCode.NoContent, method: HttpMethod.Get);
+        Api.Respond("/orders/291/cheque", HttpStatusCode.OK, new NewErp.Application.Cashbox.ChequeDto(
+            3, 291, "Немира Скиба", 1, "Олена", null, null, 13200, "r-1", true, "https://checkbox.test/r-1", 1, 0, DateTime.Now), HttpMethod.Post);
+        Api.Respond("/orders/291/payments", HttpStatusCode.OK, new List<NewErp.Application.Payments.BankPaymentDto>
+        {
+            new(5, "tx", "UA00", 13200, 0, "Немира Скиба", "Оплата", new DateTime(2026, 10, 15, 10, 0, 0), 291, "Немира Скиба", true),
+        });
+
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => Assert.Contains("Немира Скиба", page.Find("[data-test=payment]").TextContent));
+
+        // Після видачі картка перечитує чек: тепер GET теж повертає фіскалізований.
+        Api.Respond("/orders/291/cheque", HttpStatusCode.OK, new NewErp.Application.Cashbox.ChequeDto(
+            3, 291, "Немира Скиба", 1, "Олена", null, null, 13200, "r-1", true, "https://checkbox.test/r-1", 1, 0, DateTime.Now), HttpMethod.Get);
+        page.Find("[data-test=issue-cheque]").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Чек №3", page.Find("[data-test=cheque]").TextContent));
+        Assert.Contains("Відкрити чек", page.Find("[data-test=cheque]").TextContent);
+    }
+
     private static OrderDetails Order(int statusId) => new(
         291, DateTime.Now, "Немира Скиба", "+380678708466", "", "Нова Пошта", "Конотоп", "", "Monobank", "",
         13200, "UAH", statusId, statusId == 24 ? "1) Уточнюємо" : "2) Прийнято", 1, "Сайт", null, null,

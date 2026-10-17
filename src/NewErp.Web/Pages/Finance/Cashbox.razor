@@ -1,0 +1,357 @@
+@page "/cashbox"
+@using NewErp.Web.Pages.Sales
+@attribute [Authorize(Roles = Access.Finance)]
+@inject FinanceApi Api
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Каса — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Каса</MudText>
+
+@if (_setup?.FakeMode == true)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" data-test="fake-mode">
+        Ключі Checkbox не задано: працює тестова заглушка, чеки не фіскальні. Так і має бути в локальній розробці.
+    </MudAlert>
+}
+
+<MudTabs Elevation="0" Outlined="true" Rounded="true" TabPanelsClass="pa-3">
+    <MudTabPanel Text="Касири">
+        <AuthorizeView Roles="@Access.FinanceSetup">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" Class="mb-2" OnClick="() => EditCashierAsync(null)"
+                       Disabled="_setup is null">Новий касир</MudButton>
+        </AuthorizeView>
+        <MudTable T="CashierDto" Items="_setup?.Cashiers" Dense="true" Hover="true" Loading="_setup is null">
+            <HeaderContent>
+                <MudTh>Касир</MudTh>
+                <MudTh>Для оплати</MudTh>
+                <MudTh>Склад / реквізити</MudTh>
+                <MudTh>Зміна</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Касир">
+                    @context.Name
+                    @if (!context.IsActive)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Dark" Class="ml-1">вимкнений</MudChip>
+                    }
+                    @if (!context.CanFiscalize)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1">немає ключів Checkbox</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Для оплати">@(context.PaymentCode == "" ? "за замовчуванням" : context.PaymentCode)</MudTd>
+                <MudTd DataLabel="Склад / реквізити">@(context.Warehouse ?? "—") / @(context.Requisites ?? "—")</MudTd>
+                <MudTd DataLabel="Зміна" data-test="shift-state">
+                    @if (context.OpenShiftStart is { } since)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">відкрита з @Fmt.Date(since)</MudChip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">закрита</MudText>
+                    }
+                    @if (context.AutoCloseTime is { } at)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">автозакриття о @at.ToString("HH:mm")</MudText>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: right; white-space: nowrap">
+                    @if (context.OpenShiftId is null)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenShiftAsync(context)"
+                                   Disabled="_busy || !context.CanFiscalize || !context.IsActive" data-test="open-shift">Відкрити зміну</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => XReportAsync(context)" Disabled="_busy">X-звіт</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="() => CloseShiftAsync(context)"
+                                   Disabled="_busy" data-test="close-shift">Закрити зміну (Z)</MudButton>
+                    }
+                    <AuthorizeView Roles="@Access.FinanceSetup" Context="auth">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Змінити касира"
+                                       OnClick="() => EditCashierAsync(context)" />
+                    </AuthorizeView>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Касирів ще немає.</MudText></NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Чеки">
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudSelect T="bool?" Value="_fiscalized" ValueChanged="FilterChequesAsync" Label="Які чеки" Dense="true" Style="max-width: 260px"
+                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="bool?" Value="null">усі</MudSelectItem>
+                <MudSelectItem T="bool?" Value="false">не прийняті Checkbox</MudSelectItem>
+                <MudSelectItem T="bool?" Value="true">фіскалізовані</MudSelectItem>
+            </MudSelect>
+        </div>
+        <MudTable T="ChequeDto" Items="_cheques?.Items" Dense="true" Hover="true" Loading="_cheques is null">
+            <HeaderContent>
+                <MudTh>Чек</MudTh>
+                <MudTh>Замовлення</MudTh>
+                <MudTh>Касир</MudTh>
+                <MudTh>Сума</MudTh>
+                <MudTh>Стан</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Чек">№@context.Id<br /><MudText Typo="Typo.caption">@Fmt.Date(context.DateAdded)</MudText></MudTd>
+                <MudTd DataLabel="Замовлення"><MudLink Href="@OrderRoutes.Order(context.OrderId)">№@context.OrderId</MudLink> @context.Customer</MudTd>
+                <MudTd DataLabel="Касир">@context.Cashier</MudTd>
+                <MudTd DataLabel="Сума">@Fmt.Money(context.Sum)</MudTd>
+                <MudTd DataLabel="Стан">
+                    @if (context.IsFiscalized)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">фіскалізовано</MudChip>
+                        @if (context.ReportId != 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">зміну закрито</MudText>
+                        }
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">не прийнято</MudChip>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: right; white-space: nowrap">
+                    @if (context.ReceiptUrl is { } url)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Href="@url" Target="_blank" StartIcon="@Icons.Material.Filled.Receipt">Чек</MudButton>
+                    }
+                    @if (!context.IsFiscalized)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => FiscalizeAsync(context)" Disabled="_busy">Повторити</MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Видалити чек"
+                                       OnClick="() => DeleteChequeAsync(context)" Disabled="_busy" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Чеків немає.</MudText></NoRecordsContent>
+        </MudTable>
+        @if (_cheques is { TotalPages: > 1 } page)
+        {
+            <MudPagination Count="page.TotalPages" Selected="page.Page" SelectedChanged="ChequePageAsync" Class="mt-2" />
+        }
+    </MudTabPanel>
+
+    <MudTabPanel Text="Зміни й Z-звіти">
+        <MudText Typo="Typo.h6" Class="mb-1">Зміни</MudText>
+        <MudTable T="WorkShiftDto" Items="_shifts" Dense="true" Hover="true" Loading="_shifts is null" Class="mb-4">
+            <HeaderContent>
+                <MudTh>Касир</MudTh>
+                <MudTh>Відкрито</MudTh>
+                <MudTh>Закрито</MudTh>
+                <MudTh>Чеків</MudTh>
+                <MudTh>Сума</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Касир">@context.Cashier</MudTd>
+                <MudTd DataLabel="Відкрито">@Fmt.Date(context.DateStart) @context.OpenedBy</MudTd>
+                <MudTd DataLabel="Закрито">@Fmt.Date(context.DateEnd)</MudTd>
+                <MudTd DataLabel="Чеків">@context.Cheques</MudTd>
+                <MudTd DataLabel="Сума">@Fmt.Money(context.ChequesSum)</MudTd>
+                <MudTd Style="text-align: right">
+                    @if (context.DateEnd is null)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => SyncAsync(context)" Disabled="_busy">Звірити з Checkbox</MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Змін ще не було.</MudText></NoRecordsContent>
+        </MudTable>
+
+        <MudText Typo="Typo.h6" Class="mb-1">Z-звіти</MudText>
+        <MudTable T="ZReportDto" Items="_reports" Dense="true" Hover="true" Loading="_reports is null">
+            <HeaderContent>
+                <MudTh>Дата</MudTh>
+                <MudTh>Касир</MudTh>
+                <MudTh>Хто закрив</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Дата">@Fmt.Date(context.DateAdded)</MudTd>
+                <MudTd DataLabel="Касир">@context.Cashier</MudTd>
+                <MudTd DataLabel="Хто закрив">@(context.ClosedBy ?? "автоматично")</MudTd>
+                <MudTd Style="text-align: right">
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => ZReportAsync(context)" Disabled="_busy">Текст звіту</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Z-звітів ще немає.</MudText></NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <AuthorizeView Roles="@Access.FinanceSetup">
+        <MudTabPanel Text="Склади й реквізити">
+            <MudGrid>
+                @foreach (var (kind, title, entries) in new[] { ("warehouses", "Склади (точки продажу)", _setup?.Warehouses), ("requisites", "Реквізити (ФОП)", _setup?.Requisites) })
+                {
+                    <MudItem xs="12" md="6">
+                        <div class="d-flex align-center mb-1">
+                            <MudText Typo="Typo.h6">@title</MudText>
+                            <MudSpacer />
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" aria-label="Додати" OnClick="() => EditEntryAsync(kind, null)" />
+                        </div>
+                        <MudList T="string" Dense="true">
+                            @foreach (var entry in entries ?? [])
+                            {
+                                <MudListItem T="string">
+                                    <div class="d-flex align-center">
+                                        <MudText>@entry.Name</MudText>
+                                        <MudSpacer />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Перейменувати"
+                                                       OnClick="() => EditEntryAsync(kind, entry)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" aria-label="Видалити"
+                                                       OnClick="() => DeleteEntryAsync(kind, entry)" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudTabPanel>
+    </AuthorizeView>
+</MudTabs>
+
+@code {
+    private CashboxSetupDto? _setup;
+    private PagedResult<ChequeDto>? _cheques;
+    private List<WorkShiftDto>? _shifts;
+    private List<ZReportDto>? _reports;
+    private bool? _fiscalized;
+    private int _chequePage = 1;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _setup = await Api.SetupAsync();
+        _cheques = await Api.ChequesAsync(new ChequeFilter(null, null, null, null, _fiscalized, _chequePage));
+        _shifts = await Api.ShiftsAsync();
+        _reports = await Api.ReportsAsync();
+    }
+
+    private Task FilterChequesAsync(bool? fiscalized)
+    {
+        (_fiscalized, _chequePage) = (fiscalized, 1);
+        return RunAsync(null, () => Task.CompletedTask);
+    }
+
+    private Task ChequePageAsync(int page)
+    {
+        _chequePage = page;
+        return RunAsync(null, () => Task.CompletedTask);
+    }
+
+    private Task OpenShiftAsync(CashierDto cashier) =>
+        RunAsync($"Зміну касира «{cashier.Name}» відкрито.", () => Api.OpenShiftAsync(cashier.Id));
+
+    private async Task CloseShiftAsync(CashierDto cashier)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Закрити зміну?",
+            $"Буде створено Z-звіт, і касир «{cashier.Name}» не зможе видавати чеки до нової зміни.", yesText: "Закрити зміну", cancelText: "Ні");
+        if (confirmed != true)
+            return;
+        await RunAsync(null, async () =>
+        {
+            var report = await Api.CloseShiftAsync(cashier.Id);
+            Snackbar.Add(report is null ? "Checkbox ще закриває зміну. Звірте її трохи згодом." : "Зміну закрито, Z-звіт створено.",
+                report is null ? Severity.Info : Severity.Success);
+        });
+    }
+
+    private Task SyncAsync(WorkShiftDto shift) => RunAsync(null, async () =>
+    {
+        var report = await Api.SyncShiftAsync(shift.Id);
+        Snackbar.Add(report is null ? "У Checkbox зміна ще відкрита." : "Каса вже закрила зміну: Z-звіт записано.", Severity.Info);
+    });
+
+    private async Task XReportAsync(CashierDto cashier)
+    {
+        try
+        {
+            var report = await Api.XReportAsync(cashier.Id);
+            await ShowReportAsync($"X-звіт: {cashier.Name}", report.Text);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task ZReportAsync(ZReportDto report)
+    {
+        try
+        {
+            await ShowReportAsync($"Z-звіт: {report.Cashier}, {Fmt.Date(report.DateAdded)}", (await Api.ZReportTextAsync(report.Id)).Text);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private Task ShowReportAsync(string title, string text) =>
+        Dialogs.ShowAsync<ReportTextDialog>(title, new DialogParameters<ReportTextDialog> { { d => d.Text, text } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+    private Task FiscalizeAsync(ChequeDto cheque) => RunAsync("Чек фіскалізовано.", () => Api.FiscalizeAsync(cheque.Id));
+
+    private Task DeleteChequeAsync(ChequeDto cheque) => RunAsync("Чек видалено.", () => Api.DeleteChequeAsync(cheque.Id));
+
+    private async Task EditCashierAsync(CashierDto? cashier)
+    {
+        var dialog = await Dialogs.ShowAsync<CashierDialog>(cashier is null ? "Новий касир" : $"Касир «{cashier.Name}»",
+            new DialogParameters<CashierDialog> { { d => d.Setup, _setup! }, { d => d.Cashier, cashier } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await RunAsync("Касира збережено.", () => Task.CompletedTask);
+    }
+
+    private async Task EditEntryAsync(string kind, DirectoryEntryDto? entry)
+    {
+        var dialog = await Dialogs.ShowAsync<TextPromptDialog>(entry is null ? "Додати" : "Перейменувати",
+            new DialogParameters<TextPromptDialog> { { d => d.Label, "Назва" }, { d => d.Value, entry?.Name ?? "" } });
+        if (await dialog.Result is { Canceled: false, Data: string name })
+            await RunAsync("Збережено.", () => Api.SaveEntryAsync(kind, entry?.Id, new SaveDirectoryEntryRequest(name, entry?.Description)));
+    }
+
+    private Task DeleteEntryAsync(string kind, DirectoryEntryDto entry) =>
+        RunAsync($"«{entry.Name}» видалено.", () => Api.DeleteEntryAsync(kind, entry.Id));
+
+    private async Task RunAsync(string? success, Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            if (success is not null)
+                Snackbar.Add(success, Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

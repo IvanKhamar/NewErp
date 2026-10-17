@@ -1,6 +1,7 @@
 @page "/orders/{Id:int}"
 @attribute [Authorize(Roles = Access.Orders)]
 @inject OrdersApi Api
+@inject FinanceApi Finance
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject Clipboard Clipboard
@@ -172,6 +173,46 @@ else
                 }
             </MudPaper>
 
+            <AuthorizeView Roles="@Access.Finance">
+                <MudPaper Class="pa-4 mb-4" Outlined="true" data-test="finance">
+                    <MudText Typo="Typo.h6" Class="mb-2">Чек і оплата</MudText>
+                    @if (_cheque is null)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Фіскального чека ще немає.</MudText>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PointOfSale" OnClick="IssueChequeAsync" Disabled="_busy"
+                                   data-test="issue-cheque">Видати чек</MudButton>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-center flex-wrap gap-2" data-test="cheque">
+                            <MudText>Чек №@_cheque.Id на @Fmt.Money(_cheque.Sum), касир @_cheque.Cashier</MudText>
+                            @if (_cheque.IsFiscalized)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success">фіскалізовано</MudChip>
+                                @if (_cheque.ReceiptUrl is { } url)
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" Href="@url" Target="_blank" StartIcon="@Icons.Material.Filled.Receipt">Відкрити чек</MudButton>
+                                }
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Checkbox не прийняв</MudChip>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="IssueChequeAsync" Disabled="_busy">Повторити</MudButton>
+                            }
+                        </div>
+                    }
+                    <MudText Typo="Typo.subtitle2" Class="mt-3">Надходження на рахунок</MudText>
+                    @if (_payments.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Банківських платежів до замовлення не прив'язано.</MudText>
+                    }
+                    @foreach (var payment in _payments)
+                    {
+                        <MudText Typo="Typo.body2" data-test="payment">@Fmt.Date(payment.Timestamp) · <b>@Fmt.Money(payment.Amount)</b> · @payment.Payer</MudText>
+                    }
+                </MudPaper>
+            </AuthorizeView>
+
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">SMS клієнту</MudText>
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">Поки SMS не надсилаються по-справжньому: спроба лише записується в журнал.</MudAlert>
@@ -201,6 +242,8 @@ else
     private List<LookupItem> _managers = [];
     private List<SmsDto> _sms = [];
     private ShipmentDto? _shipment;
+    private ChequeDto? _cheque;
+    private List<BankPaymentDto> _payments = [];
     private int _newStatusId;
     private int? _managerId;
     private string _smsText = "";
@@ -228,6 +271,7 @@ else
         _order = await Api.GetAsync(Id);
         _sms = await Api.SmsAsync(Id);
         _shipment = await Api.ShipmentAsync(Id);
+        await LoadFinanceAsync();
         _newStatusId = _order.StatusId;
         _managerId = _order.ManagerId;
         _breadcrumbs = [new("Замовлення", href: "orders"), new($"№{Id}", href: null, disabled: true)];
@@ -257,6 +301,27 @@ else
         Snackbar.Add(result.Sent ? "SMS надіслано." : "SMS записано в журнал, але не надіслано: сервіс SMS ще не підключено.",
             result.Sent ? Severity.Success : Severity.Warning);
         _smsText = "";
+    });
+
+    // Чек і платежі — окремий розділ (каса): якщо він недоступний чи впав, решта картки однаково працює.
+    private async Task LoadFinanceAsync()
+    {
+        try
+        {
+            _cheque = await Finance.OrderChequeAsync(Id);
+            _payments = await Finance.OrderPaymentsAsync(Id);
+        }
+        catch (ApiException)
+        {
+            (_cheque, _payments) = (null, []);
+        }
+    }
+
+    private Task IssueChequeAsync() => RunAsync(null, async () =>
+    {
+        var cheque = await Finance.IssueChequeAsync(Id, null);
+        Snackbar.Add(cheque.IsFiscalized ? "Чек фіскалізовано." : "Чек створено, але Checkbox його не прийняв.",
+            cheque.IsFiscalized ? Severity.Success : Severity.Warning);
     });
 
     private async Task CreateShipmentAsync()

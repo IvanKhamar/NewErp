@@ -1,0 +1,15 @@
+@* Текст звіту Checkbox так, як його друкує каса. *@
+<MudDialog>
+    <DialogContent>
+        <pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.85rem" data-test="report-text">@Text</pre>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Close()">Закрити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public string Text { get; set; } = "";
+}

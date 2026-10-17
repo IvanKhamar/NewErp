@@ -1,0 +1,156 @@
+@page "/payments"
+@using NewErp.Web.Pages.Sales
+@attribute [Authorize(Roles = Access.Finance)]
+@inject FinanceApi Api
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Надходження на рахунок — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-2">
+    <MudText Typo="Typo.h4">Надходження на рахунок</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="ImportAsync" Disabled="_busy"
+               data-test="import">Завантажити виписку</MudButton>
+</div>
+@if (_import is { } import)
+{
+    <MudAlert Severity="@(import.ClientConfigured ? Severity.Success : Severity.Info)" Class="mb-3" data-test="import-result">
+        @(import.ClientConfigured
+            ? $"Отримано операцій: {import.Fetched}, нових надходжень: {import.Added}."
+            : "Ключі ПриватБанку не задано, тож виписка не завантажувалась. Так і має бути в локальній розробці.")
+    </MudAlert>
+}
+
+<div class="d-flex align-center flex-wrap gap-2 mb-2">
+    <MudSelect T="string" Value="_view" ValueChanged="ViewChangedAsync" Label="Показати" Dense="true" Style="max-width: 240px"
+               Variant="Variant.Outlined" Margin="Margin.Dense">
+        <MudSelectItem T="string" Value="@("unlinked")">не прив'язані</MudSelectItem>
+        <MudSelectItem T="string" Value="@("linked")">прив'язані</MudSelectItem>
+        <MudSelectItem T="string" Value="@("all")">усі</MudSelectItem>
+        <MudSelectItem T="string" Value="@("hidden")">приховані</MudSelectItem>
+    </MudSelect>
+    <MudTextField @bind-Value="_search" Label="Пошук у призначенні, платнику чи сумі" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  OnKeyUp="SearchKeyUp" Immediate="true" Style="max-width: 360px" />
+</div>
+
+<MudTable T="BankPaymentDto" Items="_page?.Items" Dense="true" Hover="true" Loading="_page is null">
+    <HeaderContent>
+        <MudTh>Дата</MudTh>
+        <MudTh>Сума</MudTh>
+        <MudTh>Платник і призначення</MudTh>
+        <MudTh>Замовлення</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Дата" Style="white-space: nowrap">@Fmt.Date(context.Timestamp)</MudTd>
+        <MudTd DataLabel="Сума" Style="white-space: nowrap"><b>@Fmt.Money(context.Amount)</b></MudTd>
+        <MudTd DataLabel="Платник і призначення">
+            <MudText Typo="Typo.body2">@context.Payer</MudText>
+            <MudText Typo="Typo.caption" Style="white-space: pre-line">@context.Description</MudText>
+        </MudTd>
+        <MudTd DataLabel="Замовлення">
+            @if (context.OrderId != 0)
+            {
+                <MudLink Href="@OrderRoutes.Order(context.OrderId)">№@context.OrderId</MudLink> @context.OrderCustomer
+            }
+        </MudTd>
+        <MudTd Style="text-align: right; white-space: nowrap">
+            @if (context.OrderId == 0)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => MatchAsync(context)" Disabled="_busy"
+                           data-test="match">Підібрати замовлення</MudButton>
+            }
+            else
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => UnlinkAsync(context)" Disabled="_busy">Відв'язати</MudButton>
+            }
+            @if (context.IsVisible)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" aria-label="Приховати (не стосується замовлень)"
+                               OnClick="() => SetVisibleAsync(context, false)" Disabled="_busy" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" aria-label="Повернути до списку"
+                               OnClick="() => SetVisibleAsync(context, true)" Disabled="_busy" />
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Надходжень немає.</MudText></NoRecordsContent>
+</MudTable>
+@if (_page is { TotalPages: > 1 } page)
+{
+    <MudPagination Count="page.TotalPages" Selected="page.Page" SelectedChanged="PageAsync" Class="mt-2" />
+}
+
+@code {
+    private PagedResult<BankPaymentDto>? _page;
+    private BankImportResult? _import;
+    private string _view = "unlinked";
+    private string _search = "";
+    private int _pageNumber = 1;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => RunAsync(null, () => Task.CompletedTask);
+
+    private Task ViewChangedAsync(string view)
+    {
+        (_view, _pageNumber) = (view, 1);
+        return RunAsync(null, () => Task.CompletedTask);
+    }
+
+    private async Task SearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _pageNumber = 1;
+            await RunAsync(null, () => Task.CompletedTask);
+        }
+    }
+
+    private Task PageAsync(int page)
+    {
+        _pageNumber = page;
+        return RunAsync(null, () => Task.CompletedTask);
+    }
+
+    private Task ImportAsync() => RunAsync(null, async () => _import = await Api.ImportAsync());
+
+    private async Task MatchAsync(BankPaymentDto payment)
+    {
+        var dialog = await Dialogs.ShowAsync<MatchPaymentDialog>("Якому замовленню належить платіж?",
+            new DialogParameters<MatchPaymentDialog> { { d => d.Payment, payment } },
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        if (await dialog.Result is { Canceled: false, Data: BankPaymentDto linked })
+            await RunAsync($"Платіж прив'язано до замовлення №{linked.OrderId}.", () => Task.CompletedTask);
+    }
+
+    private Task UnlinkAsync(BankPaymentDto payment) => RunAsync("Платіж відв'язано.", () => Api.LinkAsync(payment.Id, 0));
+
+    private Task SetVisibleAsync(BankPaymentDto payment, bool visible) =>
+        RunAsync(visible ? "Платіж повернуто до списку." : "Платіж приховано.", () => Api.SetVisibleAsync(payment.Id, visible));
+
+    private async Task RunAsync(string? success, Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            if (success is not null)
+                Snackbar.Add(success, Severity.Success);
+            _page = await Api.PaymentsAsync(Filter());
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private BankPaymentFilter Filter() => new(
+        null, null, _view switch { "linked" => true, "unlinked" => false, _ => null }, null, _search, _view == "hidden", _pageNumber);
+}

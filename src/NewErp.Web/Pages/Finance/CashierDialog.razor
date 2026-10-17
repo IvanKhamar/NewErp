@@ -1,0 +1,78 @@
+@* Новий касир чи зміна наявного. Ключі Checkbox тут не вводяться: вони лише в user-secrets на сервері. *@
+@inject FinanceApi Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Ім'я (друкується в чеку)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" />
+        <MudTextField @bind-Value="_description" Label="Опис" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_paymentCode" Label="Код оплати замовлень (cod, liqpay...); порожньо — касир за замовчуванням"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="128" />
+        <MudTimePicker @bind-Time="_autoClose" Label="Автоматично закривати зміну о" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSelect T="int" @bind-Value="_warehouseId" Label="Склад (точка продажу)" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="int" Value="0">не вказано</MudSelectItem>
+            @foreach (var w in Setup.Warehouses)
+            {
+                <MudSelectItem T="int" Value="w.Id">@w.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="int" @bind-Value="_requisitesId" Label="Реквізити (ФОП)" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="int" Value="0">не вказано</MudSelectItem>
+            @foreach (var r in Setup.Requisites)
+            {
+                <MudSelectItem T="int" Value="r.Id">@r.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSwitch @bind-Value="_active" Label="Активний" Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy || string.IsNullOrWhiteSpace(_name)">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public CashboxSetupDto Setup { get; set; } = null!;
+
+    /// <summary>null — новий касир.</summary>
+    [Parameter] public CashierDto? Cashier { get; set; }
+
+    private string _name = "";
+    private string _description = "";
+    private string _paymentCode = "";
+    private TimeSpan? _autoClose;
+    private int _warehouseId;
+    private int _requisitesId;
+    private bool _active = true;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (Cashier is not { } c)
+            return;
+        (_name, _description, _paymentCode, _warehouseId, _requisitesId, _active) =
+            (c.Name, c.Description, c.PaymentCode, c.WarehouseId, c.RequisitesId, c.IsActive);
+        _autoClose = c.AutoCloseTime?.ToTimeSpan();
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var autoClose = _autoClose is { } t ? TimeOnly.FromTimeSpan(t) : (TimeOnly?)null;
+            await Api.SaveCashierAsync(Cashier?.Id, new SaveCashierRequest(_name, _description, _paymentCode, autoClose, _warehouseId, _requisitesId, _active));
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
