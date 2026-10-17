@@ -130,4 +130,6 @@ public partial class DdOrder
     public int OrderSourceId { get; set; }
 
     public DateTime? DateRemind { get; set; }
+
+    public decimal Prepayment { get; set; }
 }

@@ -13,5 +13,6 @@ public partial class ErpDbContext
         ConfigureSms(modelBuilder);
         ConfigureDelivery(modelBuilder);
         ConfigureAuth(modelBuilder);
+        ConfigureCashbox(modelBuilder);
     }
 }

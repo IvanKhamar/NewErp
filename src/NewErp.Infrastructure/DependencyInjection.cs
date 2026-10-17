@@ -3,15 +3,19 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
+using NewErp.Application.Cashbox;
 using NewErp.Application.Delivery;
 using NewErp.Application.Orders;
+using NewErp.Application.Payments;
 using NewErp.Application.Production;
 using NewErp.Application.Sms;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
 using NewErp.Infrastructure.Auth;
+using NewErp.Infrastructure.Cashbox;
 using NewErp.Infrastructure.Delivery;
 using NewErp.Infrastructure.Orders;
+using NewErp.Infrastructure.Payments;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Production;
 using NewErp.Infrastructure.Sms;
@@ -43,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<ISmsLog, SmsLog>();
         services.AddScoped<IShipmentRepository, ShipmentRepository>();
         services.AddScoped<IWarehouseDirectory, WarehouseDirectory>();
+        services.AddScoped<ICashboxRepository, CashboxRepository>();
+        services.AddScoped<IBankPaymentRepository, BankPaymentRepository>();
 
         // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets: NovaPoshta:ApiKey чи ключі відправників).
         // Без ключа заглушка: локальна розробка ніколи не звертається до справжнього сервісу.
@@ -51,6 +57,17 @@ public static class DependencyInjection
             services.AddSingleton<INovaPoshtaClient>(new StubNovaPoshtaClient(novaPoshta.FakeDocuments));
         else
             services.AddSingleton<INovaPoshtaClient>(_ => new NovaPoshtaClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, novaPoshta));
+        // Checkbox і ПриватБанк — так само: справжній клієнт лише з ключами в user-secrets, інакше заглушка.
+        var checkbox = configuration.GetSection(CheckboxOptions.SectionName).Get<CheckboxOptions>() ?? new CheckboxOptions();
+        if (checkbox.Cashiers.Any(c => c.Login != "" && c.Password != ""))
+            services.AddSingleton<ICheckboxClient>(_ => new CheckboxClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, checkbox));
+        else
+            services.AddSingleton<ICheckboxClient>(new StubCheckboxClient(checkbox.FakeReceipts));
+        var privatBank = configuration.GetSection(PrivatBankOptions.SectionName).Get<PrivatBankOptions>() ?? new PrivatBankOptions();
+        if (privatBank.IsConfigured)
+            services.AddSingleton<IBankStatementClient>(_ => new PrivatBankClient(new HttpClient { Timeout = TimeSpan.FromSeconds(60) }, privatBank));
+        else
+            services.AddSingleton<IBankStatementClient, StubBankStatementClient>();
         // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).
         services.AddSingleton<ISmsSender, StubSmsSender>();
         services.AddScoped<IUserLoginStore, UserLoginStore>();

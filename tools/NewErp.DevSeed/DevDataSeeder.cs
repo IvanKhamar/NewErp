@@ -5,7 +5,9 @@ using Microsoft.Extensions.Options;
 
 using NewErp.Application.Auth;
 using NewErp.Application.Production;
+using NewErp.Domain.Cashbox;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Payments;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure;
@@ -179,12 +181,48 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         var shipments = SeedShipments(orders, now);
         await db.SaveChangesAsync();
 
+        var payments = await SeedFinanceAsync(orders, now);
+
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
         await SeedSizeOptionsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
+    }
+
+    /// <summary>
+    /// Каса Checkbox (склад, реквізити, два касири) і вигадана виписка банку: частина платежів уже прив'язана до замовлень,
+    /// частина чекає на зіставлення. Кілька замовлень з накладеним платежем отримують передоплату.
+    /// </summary>
+    private async Task<int> SeedFinanceAsync(List<DdOrder> orders, DateTime now)
+    {
+        var warehouse = new CashboxWarehouse("Склад Київ", "Вигаданий склад для розробки", now);
+        var requisites = new CashboxRequisites("ФОП Тестовий", "Вигадані реквізити для розробки", now);
+        db.CashboxWarehouses.Add(warehouse);
+        db.CashboxRequisites.Add(requisites);
+        await db.SaveChangesAsync();
+
+        db.Cashiers.Add(new Cashier("Каса сайту", "Типовий касир", "", null, warehouse.Id, requisites.Id, true, now));
+        db.Cashiers.Add(new Cashier("Каса Nova Pay", "Накладений платіж", "cod", new TimeOnly(23, 0), warehouse.Id, requisites.Id, true, now));
+
+        foreach (var order in orders.Where(o => o.PaymentCode == "cod" && o.Total > 0).Take(5))
+            order.Prepayment = 200;
+
+        var count = 0;
+        foreach (var order in orders.Where(o => o.Total > 0).Take(8))
+        {
+            var payment = new BankPayment(
+                $"dev-{order.OrderId}", "26000000000000", order.Total, null,
+                $"Оплата за замовлення {order.OrderId}", $"{order.Firstname} {order.Lastname}",
+                DateOnly.FromDateTime(order.DateAdded), new TimeOnly(10 + count, 15));
+            if (count % 2 == 0)
+                payment.LinkTo(order.OrderId); // половина вже зіставлена, решта чекає на менеджера
+            db.BankPayments.Add(payment);
+            count++;
+        }
+        await db.SaveChangesAsync();
+        return count;
     }
 
     private static readonly string[] DevCities = ["Київ", "Львів", "Харків", "Одеса", "Дніпро", "Конотоп", "Ковель", "Житомир"];

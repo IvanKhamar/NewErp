@@ -1,0 +1,114 @@
+@* Підбір замовлення для платежу: підказки (найімовірніші першими) і пошук за клієнтом чи номером. *@
+@inject FinanceApi Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-1"><b>@Fmt.Money(Payment.Amount)</b> · @Fmt.Date(Payment.Timestamp) · @Payment.Payer</MudText>
+        <MudText Typo="Typo.caption" Style="white-space: pre-line" Class="mb-2">@Payment.Description</MudText>
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudTextField @bind-Value="_customer" Label="Пошук: прізвище, телефон чи № замовлення" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          OnKeyUp="OnKeyUp" Immediate="true" />
+            <MudButton Variant="Variant.Outlined" OnClick="LoadAsync" Disabled="_busy">Шукати</MudButton>
+        </div>
+        <MudTable T="PaymentSuggestionDto" Items="_suggestions" Dense="true" Hover="true" Loading="_suggestions is null">
+            <HeaderContent>
+                <MudTh>Замовлення</MudTh>
+                <MudTh>Клієнт</MudTh>
+                <MudTh>Сума</MudTh>
+                <MudTh>Що збіглося</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Замовлення">№@context.OrderId<br /><MudText Typo="Typo.caption">@Fmt.Date(context.DateAdded) · @context.Status</MudText></MudTd>
+                <MudTd DataLabel="Клієнт">@context.Customer<br /><MudText Typo="Typo.caption">@context.Telephone</MudText></MudTd>
+                <MudTd DataLabel="Сума">
+                    @Fmt.Money(context.Total)
+                    @if (context.Prepayment > 0)
+                    {
+                        <MudText Typo="Typo.caption">завдаток @Fmt.Money(context.Prepayment)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Що збіглося">
+                    @foreach (var reason in Reasons(context.Reasons))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@reason</MudChip>
+                    }
+                    @if (context.LinkedPaymentId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">уже має платіж</MudChip>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: right">
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => LinkAsync(context)" Disabled="_busy"
+                               data-test="link">Прив'язати</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Схожих замовлень не знайшлося. Спробуйте пошук.</MudText></NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Закрити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public BankPaymentDto Payment { get; set; } = null!;
+
+    private List<PaymentSuggestionDto>? _suggestions;
+    private string _customer = "";
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    public static IEnumerable<string> Reasons(MatchReason reasons)
+    {
+        if (reasons.HasFlag(MatchReason.OrderNumber)) yield return "номер у призначенні";
+        if (reasons.HasFlag(MatchReason.Total)) yield return "сума";
+        if (reasons.HasFlag(MatchReason.Prepayment)) yield return "завдаток";
+        if (reasons.HasFlag(MatchReason.Phone)) yield return "телефон";
+        if (reasons.HasFlag(MatchReason.Name)) yield return "прізвище";
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            _suggestions = await Api.SuggestionsAsync(Payment.Id, _customer);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LinkAsync(PaymentSuggestionDto order)
+    {
+        _busy = true;
+        try
+        {
+            Dialog.Close(DialogResult.Ok(await Api.LinkAsync(Payment.Id, order.OrderId)));
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

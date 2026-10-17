@@ -26,6 +26,16 @@
                          Text="Список, статуси, менеджери, SMS клієнтам." />
         </MudItem>
     </AuthorizeView>
+    <AuthorizeView Roles="@Access.Finance">
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="cashbox" Icon="@Icons.Material.Filled.PointOfSale" Title="Каса"
+                         Text="Зміни касирів Checkbox, фіскальні чеки до замовлень, X- і Z-звіти." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <SectionCard Href="payments" Icon="@Icons.Material.Filled.AccountBalance" Title="Надходження на рахунок"
+                         Text="Виписка ПриватБанку й прив'язка платежів до замовлень." />
+        </MudItem>
+    </AuthorizeView>
     <AuthorizeView Roles="@Access.Users">
         <MudItem xs="12" sm="6" md="4">
             <SectionCard Href="users" Icon="@Icons.Material.Filled.People" Title="Користувачі"
