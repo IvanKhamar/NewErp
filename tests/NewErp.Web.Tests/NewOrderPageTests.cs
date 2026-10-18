@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 
 using Bunit;
 
@@ -34,7 +34,7 @@ public class NewOrderPageTests : WebTestContext
     }
 
     [Fact]
-    public void Save_SendsLinesWithSizeAndOptionPrice_ThenOpensOrder()
+    public async Task Save_SendsLinesWithSizeAndOptionPrice_ThenOpensOrder()
     {
         Api.Respond("/orders", HttpStatusCode.Created, new CreateOrderResult(700, ["Пошитих бракує"], Risk(CustomerRiskLevel.New)), HttpMethod.Post);
         var page = Render<NewOrder>();
@@ -42,11 +42,11 @@ public class NewOrderPageTests : WebTestContext
 
         // Автодоповнення MudBlazor працює через JavaScript, тож у тесті обираємо товар напряму.
         var product = page.FindComponent<MudAutocomplete<ProductPickDto>>();
-        page.InvokeAsync(() => product.Instance.ValueChanged.InvokeAsync(Dress));
+        await page.InvokeAsync(() => product.Instance.ValueChanged.InvokeAsync(Dress));
         page.Find("[data-test=add-product]").Click();
         var size = page.FindComponent<MudSelect<int?>>();
-        page.InvokeAsync(() => size.Instance.ValueChanged.InvokeAsync(502));
-        page.InvokeAsync(() => page.FindComponents<MudTextField<string>>()[1].Instance.ValueChanged.InvokeAsync("Ганна")); // ім'я
+        await page.InvokeAsync(() => size.Instance.ValueChanged.InvokeAsync(502));
+        await page.InvokeAsync(() => page.FindComponents<MudTextField<string>>()[1].Instance.ValueChanged.InvokeAsync("Ганна")); // ім'я
 
         page.WaitForAssertion(() => Assert.Contains("1600 грн", page.Find("[data-test=totals]").TextContent)); // ціна розміру M замінила базову
         page.Find("[data-test=save]").Click();

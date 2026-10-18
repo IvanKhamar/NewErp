@@ -1,0 +1,56 @@
+@page "/partners"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject PartnersApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Партнери — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Партнери</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="@OrderRoutes.NewPartner">Новий партнер</MudButton>
+</div>
+
+<MudText Typo="Typo.body2" Class="mb-3">
+    Перепродавці, яким магазин віддає XML-фід товарів з їхніми категоріями й цінами. Фід увімкненого партнера доступний без входу
+    за адресою /feeds/код.xml.
+</MudText>
+
+<MudTable T="PartnerListItemDto" Items="_partners" Hover="true" Dense="true" Loading="_partners is null" RowStyle="cursor: pointer"
+          OnRowClick="row => Navigation.NavigateTo(OrderRoutes.Partner(row.Item!.Id))">
+    <HeaderContent>
+        <MudTh>Партнер</MudTh>
+        <MudTh>Код</MudTh>
+        <MudTh>Бренд у фіді</MudTh>
+        <MudTh Style="text-align: right">Категорій</MudTh>
+        <MudTh Style="text-align: right">Окремих товарів</MudTh>
+        <MudTh>Фід</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Партнер">
+            @context.Name
+            @if (!context.IsActive)
+            {
+                <MudChip T="string" Size="Size.Small">вимкнено</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Код">@context.Code</MudTd>
+        <MudTd DataLabel="Бренд у фіді">@context.VendorName</MudTd>
+        <MudTd DataLabel="Категорій" Style="text-align: right">@context.Categories</MudTd>
+        <MudTd DataLabel="Окремих товарів" Style="text-align: right">@context.Products</MudTd>
+        <MudTd DataLabel="Фід">
+            <MudChip T="string" Size="Size.Small" Color="@(context.FeedEnabled ? Color.Success : Color.Default)">
+                @(context.FeedEnabled ? "увімкнено" : "вимкнено")
+            </MudChip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Партнерів ще немає.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<PartnerListItemDto>? _partners;
+
+    protected override async Task OnInitializedAsync() => _partners = await Api.ListAsync();
+}

@@ -14,6 +14,8 @@ public partial class ErpDbContext : DbContext
     {
     }
 
+    public virtual DbSet<DdCategoryDescription> DdCategoryDescriptions { get; set; }
+
     public virtual DbSet<DdOptionDescription> DdOptionDescriptions { get; set; }
 
     public virtual DbSet<DdOptionValueDescription> DdOptionValueDescriptions { get; set; }
@@ -36,6 +38,8 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdProductDescription> DdProductDescriptions { get; set; }
 
+    public virtual DbSet<DdProductImage> DdProductImages { get; set; }
+
     public virtual DbSet<DdProductOption> DdProductOptions { get; set; }
 
     public virtual DbSet<DdProductOptionValue> DdProductOptionValues { get; set; }
@@ -48,6 +52,31 @@ public partial class ErpDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DdCategoryDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.CategoryId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_category_description");
+
+            entity.HasIndex(e => e.Name, "name");
+
+            entity.Property(e => e.CategoryId).HasColumnName("category_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Description)
+                .HasColumnType("text")
+                .HasColumnName("description");
+            entity.Property(e => e.MetaDescription)
+                .HasMaxLength(255)
+                .HasColumnName("meta_description");
+            entity.Property(e => e.MetaKeyword)
+                .HasMaxLength(255)
+                .HasColumnName("meta_keyword");
+            entity.Property(e => e.MetaTitle)
+                .HasMaxLength(255)
+                .HasColumnName("meta_title");
+            entity.Property(e => e.Name).HasColumnName("name");
+        });
+
         modelBuilder.Entity<DdOptionDescription>(entity =>
         {
             entity.HasKey(e => new { e.OptionId, e.LanguageId }).HasName("PRIMARY");
@@ -496,6 +525,22 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.Tag)
                 .HasColumnType("text")
                 .HasColumnName("tag");
+        });
+
+        modelBuilder.Entity<DdProductImage>(entity =>
+        {
+            entity.HasKey(e => e.ProductImageId).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_image");
+
+            entity.HasIndex(e => e.ProductId, "product_id");
+
+            entity.Property(e => e.ProductImageId).HasColumnName("product_image_id");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasColumnName("image");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
         });
 
         modelBuilder.Entity<DdProductOption>(entity =>

@@ -1,9 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
 using NewErp.Application.Auth;
 using NewErp.Application.Cashbox;
 using NewErp.Application.Delivery;
 using NewErp.Application.Orders;
+using NewErp.Application.Partners;
 using NewErp.Application.Payments;
 using NewErp.Application.Production;
 using NewErp.Application.Sms;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ShipmentService>();
         services.AddScoped<CashboxService>();
         services.AddScoped<BankPaymentService>();
+        services.AddScoped<PartnerService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.
         services.AddScoped<IOrderStatusHandler, OrderSewnStockHandler>();
         services.AddScoped<AuthService>();
