@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
@@ -28,6 +28,7 @@ builder.Services.AddScoped<ProductionApi>();
 builder.Services.AddScoped<OrdersApi>();
 builder.Services.AddScoped<AdminApi>();
 builder.Services.AddScoped<FinanceApi>();
+builder.Services.AddScoped<PartnersApi>();
 builder.Services.AddScoped<Clipboard>();
 
 await builder.Build().RunAsync();

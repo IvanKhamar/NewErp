@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 
 namespace NewErp.Infrastructure.Persistence;
 
@@ -14,5 +14,6 @@ public partial class ErpDbContext
         ConfigureDelivery(modelBuilder);
         ConfigureAuth(modelBuilder);
         ConfigureCashbox(modelBuilder);
+        ConfigurePartners(modelBuilder);
     }
 }

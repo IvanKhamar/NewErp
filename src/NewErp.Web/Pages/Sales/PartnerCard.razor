@@ -1,0 +1,291 @@
+@page "/partners/new"
+@page "/partners/{Id:int}"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject PartnersApi Api
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>@(Id is null ? "Новий партнер" : _name) — NewErp</PageTitle>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_categories is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <div class="d-flex align-center flex-wrap gap-2 mb-3">
+        <MudText Typo="Typo.h4">@(Id is null ? "Новий партнер" : _name)</MudText>
+        <MudSpacer />
+        @if (Id is not null)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="DeleteAsync" Disabled="_busy">Видалити</MudButton>
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveAsync" Disabled="_busy"
+                   data-test="save">Зберегти</MudButton>
+    </div>
+
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <div class="d-flex flex-wrap gap-3">
+            <MudTextField @bind-Value="_name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="name" />
+            <MudTextField @bind-Value="_code" Label="Код (латиницею)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 12rem" data-test="code" />
+            <MudTextField @bind-Value="_vendorName" Label="Бренд у фіді" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 12rem" />
+            <MudNumericField T="int" @bind-Value="_defaultQuantity" Label="Кількість у фіді" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 10rem" />
+        </div>
+        <div class="d-flex flex-wrap align-center gap-3 mt-2">
+            <MudTextField @bind-Value="_feedUrl" Label="Адреса фіда в партнера (довідково)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudSwitch @bind-Value="_feedEnabled" Color="Color.Success" Label="Фід увімкнено" data-test="feed-enabled" />
+            <MudSwitch @bind-Value="_isActive" Color="Color.Primary" Label="Партнер активний" />
+        </div>
+        <MudTextField @bind-Value="_notes" Label="Нотатки" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+        @if (Id is not null && _savedFeedEnabled)
+        {
+            <MudText Typo="Typo.body2" Class="mt-2" data-test="feed-link">
+                Фід: <MudLink Href="@FeedUrl" Target="_blank">@FeedUrl</MudLink>
+            </MudText>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <MudText Typo="Typo.subtitle1">Категорії</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Усі увімкнені товари категорії потрапляють у фід, кожен розмір окремо. Ціна — ціна розміру плюс націнка, стара ціна — ціна розміру
+            плюс свій відсоток. Рядок з розміром важливіший за рядок усієї категорії.
+        </MudText>
+        <MudSimpleTable Dense="true" Elevation="0" data-test="category-map">
+            <thead><tr><th>№ у фіді</th><th>Категорія магазину</th><th>Розмір</th><th>Id у партнера</th><th>Назва в партнера</th><th>Націнка, %</th><th>Стара ціна, +%</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var row in _categoryMap)
+                {
+                    <tr>
+                        <td>@(row.Id?.ToString() ?? "нова")</td>
+                        <td style="min-width: 14rem">
+                            <MudSelect T="int" @bind-Value="row.CategoryId" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                                <MudSelectItem T="int" Value="0">—</MudSelectItem>
+                                @foreach (var category in _categories)
+                                {
+                                    <MudSelectItem T="int" Value="category.Id">@category.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </td>
+                        <td style="min-width: 8rem">
+                            <MudSelect T="string" @bind-Value="row.SizeName" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                                <MudSelectItem T="string" Value="@("")">усі</MudSelectItem>
+                                @foreach (var size in SizesOf(row))
+                                {
+                                    <MudSelectItem T="string" Value="size">@size</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </td>
+                        <td><MudTextField @bind-Value="row.ExternalId" Variant="Variant.Outlined" Margin="Margin.Dense" /></td>
+                        <td><MudTextField @bind-Value="row.ExternalName" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="як у магазині" /></td>
+                        <td><MudNumericField T="decimal?" @bind-Value="row.PercentSupply" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 7rem" /></td>
+                        <td><MudNumericField T="decimal?" @bind-Value="row.PercentSale" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 7rem" /></td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Прибрати рядок" OnClick="() => _categoryMap.Remove(row)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mt-2" OnClick="() => _categoryMap.Add(new CategoryRow())"
+                   data-test="add-category">Додати категорію</MudButton>
+    </MudPaper>
+
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <MudText Typo="Typo.subtitle1">Окремі товари</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Товари з власним артикулом, назвою чи ціною для партнера. Порожня ціна — ціна з магазину. Такий товар не дублюється пропозицією з категорії.
+        </MudText>
+        <MudAutocomplete T="PartnerProductPickDto" ValueChanged="AddProduct" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
+                         ToStringFunc="@(p => p is null ? null : $"{p.Name} (№{p.Id})")" ResetValueOnEmptyText="true" Label="Додати товар"
+                         Placeholder="Назва чи №" Variant="Variant.Outlined" Margin="Margin.Dense" AdornmentIcon="@Icons.Material.Filled.Search"
+                         Class="mb-2" data-test="product-search" />
+        <MudSimpleTable Dense="true" Elevation="0" data-test="product-map">
+            <thead><tr><th>Товар</th><th>Розмір</th><th>Артикул у партнера</th><th>Назва в партнера</th><th>Ціна, грн</th><th>Стара ціна, грн</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var row in _productMap)
+                {
+                    <tr>
+                        <td>
+                            @row.ProductName <MudText Typo="Typo.caption">№@row.ProductId</MudText>
+                            @if (!row.ProductEnabled)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">вимкнено, у фід не йде</MudChip>
+                            }
+                        </td>
+                        <td style="min-width: 8rem">
+                            <MudTextField @bind-Value="row.SizeName" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="усі"
+                                          HelperText="@row.SizesHint" />
+                        </td>
+                        <td><MudTextField @bind-Value="row.ExternalId" Variant="Variant.Outlined" Margin="Margin.Dense" /></td>
+                        <td><MudTextField @bind-Value="row.ExternalName" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="як у магазині" /></td>
+                        <td><MudNumericField T="decimal?" @bind-Value="row.PriceSupply" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" /></td>
+                        <td><MudNumericField T="decimal?" @bind-Value="row.PriceSale" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" /></td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Прибрати товар" OnClick="() => _productMap.Remove(row)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private List<ShopCategoryDto>? _categories;
+    private string? _error;
+    private bool _busy;
+
+    private string _name = "";
+    private string _code = "";
+    private string _vendorName = "Vidro";
+    private int _defaultQuantity = 5;
+    private string _feedUrl = "";
+    private bool _feedEnabled;
+    private bool _savedFeedEnabled;
+    private bool _isActive = true;
+    private string _notes = "";
+    private string _savedCode = "";
+    private List<CategoryRow> _categoryMap = [];
+    private List<ProductRow> _productMap = [];
+
+    private string FeedUrl => Navigation.ToAbsoluteUri(PartnersApi.FeedPath(_savedCode)).ToString();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _categories ??= await Api.CategoriesAsync();
+            if (Id is { } id)
+                Load(await Api.GetAsync(id));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private void Load(PartnerDto partner)
+    {
+        _name = partner.Name;
+        _code = partner.Code;
+        _savedCode = partner.Code;
+        _vendorName = partner.VendorName;
+        _defaultQuantity = partner.DefaultQuantity;
+        _feedUrl = partner.FeedUrl;
+        _feedEnabled = partner.FeedEnabled;
+        _savedFeedEnabled = partner.FeedEnabled;
+        _isActive = partner.IsActive;
+        _notes = partner.Notes;
+        _categoryMap = partner.CategoryMap.Select(r => new CategoryRow
+        {
+            Id = r.Id, CategoryId = r.CategoryId, SizeName = r.SizeName ?? "", ExternalId = r.ExternalId, ExternalName = r.ExternalName,
+            PercentSupply = r.PercentSupply, PercentSale = r.PercentSale,
+        }).ToList();
+        _productMap = partner.ProductMap.Select(r => new ProductRow
+        {
+            ProductId = r.ProductId, ProductName = r.ProductName, ProductEnabled = r.ProductEnabled, SizeName = r.SizeName ?? "",
+            ExternalId = r.ExternalId, ExternalName = r.ExternalName, PriceSupply = r.PriceSupply, PriceSale = r.PriceSale,
+        }).ToList();
+    }
+
+    private IEnumerable<string> SizesOf(CategoryRow row)
+    {
+        var sizes = _categories!.FirstOrDefault(c => c.Id == row.CategoryId)?.Sizes ?? [];
+        // Розмір, якого вже немає в товарах категорії, лишається у списку, щоб не зникнути мовчки при збереженні.
+        return row.SizeName != "" && !sizes.Contains(row.SizeName) ? sizes.Append(row.SizeName) : sizes;
+    }
+
+    private async Task<IEnumerable<PartnerProductPickDto>> SearchProductsAsync(string text, CancellationToken ct) => await Api.ProductsAsync(text);
+
+    private void AddProduct(PartnerProductPickDto? product)
+    {
+        if (product is null)
+            return;
+        _productMap.Add(new ProductRow
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            ProductEnabled = product.IsEnabled,
+            SizesHint = string.Join(", ", product.Sizes.Select(s => s.Name == "" ? Fmt.Money(s.Price) : $"{s.Name} — {Fmt.Money(s.Price)}")),
+        });
+    }
+
+    private SavePartnerRequest ToRequest() => new(
+        _code, _name, _isActive, _feedUrl, _feedEnabled, _vendorName, _notes, _defaultQuantity,
+        _categoryMap.Select(r => new CategoryMapRow(r.CategoryId, r.SizeName, r.ExternalId, r.ExternalName, r.PercentSupply, r.PercentSale)).ToList(),
+        _productMap.Select(r => new ProductMapRow(r.ProductId, r.SizeName, r.ExternalId, r.ExternalName, r.PriceSupply, r.PriceSale)).ToList());
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            if (Id is { } id)
+            {
+                await Api.UpdateAsync(id, ToRequest());
+                Load(await Api.GetAsync(id));
+                Snackbar.Add("Партнера збережено.", Severity.Success);
+            }
+            else
+            {
+                var newId = await Api.CreateAsync(ToRequest());
+                Snackbar.Add("Партнера додано.", Severity.Success);
+                Navigation.NavigateTo(OrderRoutes.Partner(newId));
+            }
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Видалити партнера?", $"Партнера «{_name}» і всі його відповідності буде видалено, а фід перестане відкриватися.",
+            yesText: "Видалити", cancelText: "Скасувати");
+        if (confirmed != true)
+            return;
+        try
+        {
+            await Api.DeleteAsync(Id!.Value);
+            Navigation.NavigateTo(OrderRoutes.Partners);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private sealed class CategoryRow
+    {
+        public int? Id { get; set; }
+        public int CategoryId { get; set; }
+        public string SizeName { get; set; } = "";
+        public string ExternalId { get; set; } = "";
+        public string ExternalName { get; set; } = "";
+        public decimal? PercentSupply { get; set; }
+        public decimal? PercentSale { get; set; }
+    }
+
+    private sealed class ProductRow
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public bool ProductEnabled { get; set; }
+        public string SizeName { get; set; } = "";
+        public string? SizesHint { get; set; }
+        public string ExternalId { get; set; } = "";
+        public string ExternalName { get; set; } = "";
+        public decimal? PriceSupply { get; set; }
+        public decimal? PriceSale { get; set; }
+    }
+}

@@ -397,3 +397,52 @@ ALTER TABLE `dd_order`
 -- Товар додано до замовлення як супутній (cross-sell). Звірити.
 ALTER TABLE `dd_order_product`
   ADD COLUMN `crosssell` tinyint(1) NOT NULL DEFAULT '0';
+
+-- ═══ Партнери-перепродавці та фід для них ═══
+-- Відновлено з admin/model/sale/partner.php і catalog/model/feed/eva.php. DDL у коді немає: типи, довжини й ключі вгадані, звірити.
+-- code — короткий код партнера, з ним формується адреса фіда; default_quantity — кількість, яку фід показує для кожної пропозиції.
+CREATE TABLE `dd_partner` (
+  `partner_id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` varchar(32) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT '1',
+  `feed_url` varchar(255) NOT NULL DEFAULT '',
+  `feed_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `vendor_name` varchar(64) NOT NULL DEFAULT '',
+  `notes` text NOT NULL,
+  `default_quantity` int(11) NOT NULL DEFAULT '5',
+  `date_added` datetime NOT NULL,
+  `date_modified` datetime NOT NULL,
+  PRIMARY KEY (`partner_id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Категорія магазину (за потреби лише один розмір) → категорія партнера, з націнкою до ціни (percent_supply)
+-- і до перекресленої «старої» ціни (percent_sale) у відсотках. NULL — без націнки чи без старої ціни. Звірити.
+CREATE TABLE `dd_partner_category_map` (
+  `partner_category_map_id` int(11) NOT NULL AUTO_INCREMENT,
+  `partner_id` int(11) NOT NULL,
+  `category_id` int(11) NOT NULL,
+  `size_name` varchar(64) DEFAULT NULL,
+  `external_id` varchar(64) NOT NULL DEFAULT '',
+  `external_name` varchar(255) NOT NULL DEFAULT '',
+  `percent_supply` decimal(8,2) DEFAULT NULL,
+  `percent_sale` decimal(8,2) DEFAULT NULL,
+  PRIMARY KEY (`partner_category_map_id`),
+  KEY `partner_id` (`partner_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Окремий товар (за потреби лише один розмір) у фіді партнера: свій артикул і назва в партнера, фіксовані ціни.
+-- Ключа partner_product_map_id старий код не читає, але таблиці потрібен первинний ключ. Звірити.
+CREATE TABLE `dd_partner_product_map` (
+  `partner_product_map_id` int(11) NOT NULL AUTO_INCREMENT,
+  `partner_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `size_name` varchar(64) DEFAULT NULL,
+  `external_id` varchar(64) NOT NULL DEFAULT '',
+  `external_name` varchar(255) NOT NULL DEFAULT '',
+  `price_supply` decimal(15,4) DEFAULT NULL,
+  `price_sale` decimal(15,4) DEFAULT NULL,
+  PRIMARY KEY (`partner_product_map_id`),
+  KEY `partner_id` (`partner_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

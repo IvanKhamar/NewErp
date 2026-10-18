@@ -1,4 +1,4 @@
-using Bogus;
+﻿using Bogus;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -7,6 +7,7 @@ using NewErp.Application.Auth;
 using NewErp.Application.Production;
 using NewErp.Domain.Cashbox;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Partners;
 using NewErp.Domain.Payments;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
@@ -185,9 +186,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
 
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
         await SeedSizeOptionsAsync();
+        await SeedPartnerAsync(now);
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -347,6 +349,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                 {
                     ProductOptionId = 1000 + i, ProductId = FirstProductId + i, OptionId = SizeOptionId, OptionValueId = valueId,
                     Quantity = 3, Subtract = true, PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
+                    Price = 900 + i * 150, // як на сайті: ціна розміру — повна ціна товару
                 };
                 db.DdProductOptionValues.Add(value);
                 optionValues[(FirstProductId + i, size)] = value;
@@ -366,6 +369,36 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                 Name = "Розмір", Value = size, Type = "radio",
             });
         }
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Дві категорії каталогу з фото товарів і партнер «eva» з увімкненим фідом: сукні й спідниці з націнкою,
+    /// окремо — сорочка з власним артикулом і ціною. Фід: /feeds/eva.xml.
+    /// </summary>
+    private async Task SeedPartnerAsync(DateTime now)
+    {
+        const int dresses = 20, tops = 21;
+        foreach (var (id, name) in new[] { (dresses, "Сукні та спідниці"), (tops, "Сорочки й жакети") })
+            db.DdCategoryDescriptions.Add(new DdCategoryDescription
+            {
+                CategoryId = id, LanguageId = LanguageId, Name = name, Description = "", MetaTitle = name, MetaDescription = "", MetaKeyword = "",
+            });
+        for (var i = 0; i < Products.Length; i++)
+        {
+            var category = Products[i].StartsWith("Сукня") || Products[i].StartsWith("Спідниця") ? dresses : tops;
+            db.DdProductToCategories.Add(new DdProductToCategory { ProductId = FirstProductId + i, CategoryId = category });
+            await db.DdProducts.Where(p => p.ProductId == FirstProductId + i)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Image, $"catalog/products/vd-{FirstProductId + i}.jpg"));
+        }
+
+        var partner = new Partner(new PartnerSettings("eva", "EVA (вигаданий партнер)", true, "", true, "Vidro", "", 5), now);
+        partner.SetCategoryMap([
+            new CategoryMapping(dresses, null, "1001", "Жіночий одяг / Сукні", 15, 30),
+            new CategoryMapping(dresses, "XL", "1002", "Жіночий одяг / Великі розміри", 20, null),
+        ]);
+        partner.SetProductMap([new ProductMapping(FirstProductId + 1, null, "EVA-SHIRT-01", "", 1200, 1500)]);
+        db.Partners.Add(partner);
         await db.SaveChangesAsync();
     }
 
