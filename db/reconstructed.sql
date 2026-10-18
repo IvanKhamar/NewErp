@@ -512,3 +512,11 @@ CREATE TABLE `dd_product_manual_pin` (
   PRIMARY KEY (`id`),
   KEY `group` (`group_type`,`group_key`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Передзамовлення ═══
+-- Відновлено з admin/model/catalog/product.php, system/library/cart/cart.php і admin/controller/tool/console.php (updatePreOrdersQuantity).
+-- pre_order_quantity — скільки штук розміру можна продати наперед, коли залишку немає; date_available — коли розмір очікується.
+-- Типи вгадані (старий код пише дату рядком), звірити.
+ALTER TABLE `dd_product_option_value`
+  ADD COLUMN `pre_order_quantity` int(11) NOT NULL DEFAULT '0',
+  ADD COLUMN `date_available` date DEFAULT NULL;

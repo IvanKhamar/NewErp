@@ -13,6 +13,7 @@ using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure;
 using NewErp.Infrastructure.Auth;
+using NewErp.Infrastructure.Catalog;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
 using NewErp.Infrastructure.Production;
@@ -190,7 +191,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await SeedProductSortAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -287,7 +288,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     private async Task<int> SeedProductionOperationsAsync(int userId, string username)
     {
         var erpOptions = Options.Create(new ErpOptions { LanguageId = LanguageId });
-        var service = new ProductionService(new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions), TimeProvider.System);
+        var service = new ProductionService(new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions, new PreOrderStore(db, erpOptions)), TimeProvider.System);
         var warnings = 0;
         foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
         {
@@ -355,6 +356,13 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                 db.DdProductOptionValues.Add(value);
                 optionValues[(FirstProductId + i, size)] = value;
             }
+        }
+        // Передзамовлення: найбільший розмір двох останніх товарів закінчився, але його продають наперед до дати.
+        var largest = SizeOptionValues.Keys.Last();
+        for (var i = Products.Length - 2; i < Products.Length; i++)
+        {
+            var value = optionValues[(FirstProductId + i, largest)];
+            (value.Quantity, value.PreOrderQuantity, value.DateAvailable) = (i == Products.Length - 1 ? -2 : 0, 5, DateTime.Today.AddDays(14));
         }
         await db.SaveChangesAsync();
 

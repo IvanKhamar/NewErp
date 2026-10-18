@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IBankPaymentRepository, BankPaymentRepository>();
         services.AddScoped<IPartnerRepository, PartnerRepository>();
         services.AddScoped<IProductSortStore, ProductSortStore>();
+        services.AddScoped<IPreOrderStore, PreOrderStore>();
 
         // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets: NovaPoshta:ApiKey чи ключі відправників).
         // Без ключа заглушка: локальна розробка ніколи не звертається до справжнього сервісу.

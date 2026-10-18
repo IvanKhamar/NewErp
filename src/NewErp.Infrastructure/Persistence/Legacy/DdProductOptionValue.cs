@@ -30,4 +30,8 @@ public partial class DdProductOptionValue
     public decimal Weight { get; set; }
 
     public string WeightPrefix { get; set; } = null!;
+
+    public int PreOrderQuantity { get; set; }
+
+    public DateTime? DateAvailable { get; set; }
 }

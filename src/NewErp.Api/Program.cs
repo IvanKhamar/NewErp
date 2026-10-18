@@ -27,6 +27,8 @@ builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockO
 builder.Services.Configure<ProductionOptions>(builder.Configuration.GetSection(ProductionOptions.SectionName));
 builder.Services.Configure<PartnerFeedOptions>(builder.Configuration.GetSection(PartnerFeedOptions.SectionName));
 builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(ProductSortOptions.SectionName));
+builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(PreOrderOptions.SectionName));
+builder.Services.AddHostedService<PreOrderSettleWorker>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
@@ -58,6 +60,7 @@ app.MapCashboxEndpoints();
 app.MapPaymentEndpoints();
 app.MapPartnerEndpoints();
 app.MapProductSortEndpoints();
+app.MapPreOrderEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.
