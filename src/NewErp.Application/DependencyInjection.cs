@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<BankPaymentService>();
         services.AddScoped<PartnerService>();
         services.AddScoped<ProductSortService>();
+        services.AddScoped<PreOrderService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.
         services.AddScoped<IOrderStatusHandler, OrderSewnStockHandler>();
         services.AddScoped<AuthService>();

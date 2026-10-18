@@ -698,12 +698,16 @@ public partial class ErpDbContext : DbContext
             entity.ToTable("dd_product_option_value");
 
             entity.Property(e => e.ProductOptionValueId).HasColumnName("product_option_value_id");
+            entity.Property(e => e.DateAvailable)
+                .HasColumnType("date")
+                .HasColumnName("date_available");
             entity.Property(e => e.OptionId).HasColumnName("option_id");
             entity.Property(e => e.OptionValueId).HasColumnName("option_value_id");
             entity.Property(e => e.Points).HasColumnName("points");
             entity.Property(e => e.PointsPrefix)
                 .HasMaxLength(1)
                 .HasColumnName("points_prefix");
+            entity.Property(e => e.PreOrderQuantity).HasColumnName("pre_order_quantity");
             entity.Property(e => e.Price)
                 .HasPrecision(15, 4)
                 .HasColumnName("price");

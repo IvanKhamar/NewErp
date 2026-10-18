@@ -1,13 +1,14 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+using NewErp.Application.Catalog;
 using NewErp.Application.Production;
 using NewErp.Domain.Production;
 using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Production;
 
-public sealed class StorefrontStock(ErpDbContext db, IOptions<ErpOptions> options) : IStorefrontStock
+public sealed class StorefrontStock(ErpDbContext db, IOptions<ErpOptions> options, IPreOrderStore preOrders) : IStorefrontStock
 {
     private readonly int _languageId = options.Value.LanguageId;
 
@@ -28,6 +29,10 @@ public sealed class StorefrontStock(ErpDbContext db, IOptions<ErpOptions> option
             var productIds = owners.Where(o => o.Value == model.Id).Select(o => o.Key).ToList();
             if (quantities.Count == 0 || productIds.Count == 0)
                 continue;
+
+            // Мінусовий залишок — продане наперед. Його спершу списуємо з ліміту передзамовлення, інакше новий залишок його затре,
+            // а ліміт лишиться повним.
+            await preOrders.SettleAsync(productIds, ct);
 
             // Таблиці OpenCart — MyISAM, без транзакцій, тож оновлюємо прямими UPDATE, як старий модуль.
             foreach (var (optionValueId, quantity) in quantities)

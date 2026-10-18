@@ -1,0 +1,150 @@
+@page "/preorders"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject PreOrdersApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Передзамовлення — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-2">
+    <MudText Typo="Typo.h4">Передзамовлення</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" OnClick="SettleAsync" Disabled="_busy" data-test="settle">Списати продане наперед</MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Коли розміру немає в наявності, вітрина продає його наперед, доки не вичерпається ліміт, і показує дату, коли розмір очікується.
+    Продане наперед (мінусовий залишок) списується з ліміту автоматично; кнопка робить це одразу.
+</MudText>
+
+<div class="d-flex align-center flex-wrap gap-3 mb-3">
+    <MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Label="Товар чи артикул" DebounceInterval="400" Clearable="true"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 320px" AdornmentIcon="@Icons.Material.Filled.Search" />
+    <MudSwitch T="bool" Value="_onlyWithQuota" ValueChanged="OnlyWithQuotaAsync" Color="Color.Primary" data-test="only-with-quota">
+        Лише з лімітом
+    </MudSwitch>
+</div>
+
+<MudSimpleTable Dense="true" Elevation="0" data-test="sizes">
+    <thead>
+        <tr><th>Товар</th><th>Розмір</th><th style="text-align: right">Залишок</th><th>Ліміт</th><th>Очікується</th><th>На вітрині</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var row in _rows)
+        {
+            <tr>
+                <td>@row.Name <MudText Typo="Typo.caption">@row.Model</MudText></td>
+                <td>@row.Size</td>
+                <td style="text-align: right">@row.Quantity</td>
+                <td><MudNumericField T="int" @bind-Value="row.Quota" Min="0" Max="PreOrder.MaxQuota" Margin="Margin.Dense" Style="max-width: 90px" /></td>
+                <td><MudDatePicker @bind-Date="row.Date" DateFormat="dd.MM.yyyy" Clearable="true" Margin="Margin.Dense" Style="max-width: 150px" /></td>
+                <td>
+                    <MudChip T="string" Size="Size.Small" Color="@AvailabilityColor(row.Availability)">@AvailabilityText(row.Availability)</MudChip>
+                    @if (row.Quantity < 0)
+                    {
+                        <MudText Typo="Typo.caption">продано наперед: @(-row.Quantity)</MudText>
+                    }
+                </td>
+                <td>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(!row.Changed || _busy)" OnClick="() => SaveAsync(row)">Зберегти</MudButton>
+                </td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+@if (_loaded && _rows.Count == 0)
+{
+    <MudText Class="mt-2">Нічого не знайдено.</MudText>
+}
+
+@code {
+    private List<Row> _rows = [];
+    private string? _search;
+    private bool _onlyWithQuota;
+    private bool _loaded;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _rows = (await Api.ListAsync(_search, _onlyWithQuota)).Select(r => new Row(r)).ToList();
+        _loaded = true;
+    }
+
+    private async Task SearchAsync(string? search)
+    {
+        _search = search;
+        await LoadAsync();
+    }
+
+    private async Task OnlyWithQuotaAsync(bool value)
+    {
+        _onlyWithQuota = value;
+        await LoadAsync();
+    }
+
+    private async Task SaveAsync(Row row)
+    {
+        _busy = true;
+        try
+        {
+            await Api.UpdateAsync(row.Id, new UpdatePreOrderRequest(row.Quota, row.Date is { } date ? DateOnly.FromDateTime(date) : null));
+            Snackbar.Add($"{row.Name}, {row.Size}: збережено.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SettleAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await Api.SettleAsync();
+            Snackbar.Add(result.Sizes == 0 ? "Списувати нічого." : $"Списано з лімітів у розмірах: {result.Sizes}.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string AvailabilityText(SizeAvailability availability) => availability switch
+    {
+        SizeAvailability.InStock => "в наявності",
+        SizeAvailability.PreOrder => "передзамовлення",
+        _ => "немає",
+    };
+
+    private static Color AvailabilityColor(SizeAvailability availability) => availability switch
+    {
+        SizeAvailability.InStock => Color.Success,
+        SizeAvailability.PreOrder => Color.Warning,
+        _ => Color.Default,
+    };
+
+    /// <summary>Рядок таблиці, який можна редагувати: ліміт і дата змінюються на місці, а «Зберегти» вмикається, коли вони інші.</summary>
+    private sealed class Row(PreOrderRow source)
+    {
+        public int Id => source.ProductOptionValueId;
+        public string Name => source.ProductName;
+        public string Model => source.Model;
+        public string Size => source.Size;
+        public int Quantity => source.Quantity;
+        public SizeAvailability Availability => source.Availability;
+        public int Quota { get; set; } = source.Quota;
+        public DateTime? Date { get; set; } = source.DateAvailable?.ToDateTime(TimeOnly.MinValue);
+        public bool Changed => Quota != source.Quota || Date?.Date != source.DateAvailable?.ToDateTime(TimeOnly.MinValue);
+    }
+}
