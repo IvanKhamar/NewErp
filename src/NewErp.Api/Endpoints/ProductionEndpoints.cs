@@ -53,6 +53,9 @@ public static class ProductionEndpoints
         })
             .WithSummary("Специфікація пошиву: деталі крою й розхідники на один виріб");
 
+        production.MapPost("/storefront/sync", (ProductionService service, CancellationToken ct) => service.PushStorefrontAsync(ct))
+            .WithSummary("Передати пошиті залишки всіх активних моделей на вітрину магазину (кількість розмірів і товарів у OpenCart)");
+
         // Чотири операції з залишками. Кожна приймає кількості для кількох розмірів одразу.
         MapOperation(production, "cut", ProductionOperation.Cut,
             "+Покроєно: крій зростає, розхідники списуються за специфікацією крою (бракує — списується те, що є, у warnings)");

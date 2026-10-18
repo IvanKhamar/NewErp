@@ -34,10 +34,31 @@ public class OrderSewnStockHandlerTests
         _repo.Models.Add(_model);
         _repo.Lines = [new OrderSizeLine(101, "Сукня", 2, ProductionId: 1, OptionValueIds: [OptionM])];
         _handler = new OrderSewnStockHandler(
-            _repo, Options.Create(new ProductionOptions { OrderSubtractStatusIds = [Accepted, Manufacturing] }), new FakeTimeProvider());
+            _repo, _storefront, Options.Create(new ProductionOptions { OrderSubtractStatusIds = [Accepted, Manufacturing] }), new FakeTimeProvider());
     }
 
+    private readonly FakeStorefront _storefront = new();
+
     private decimal Sewn => _model.Sizes[0].SewnStock;
+
+    [Fact]
+    public async Task Change_PushesChangedModelToStorefront()
+    {
+        await Change(Pending, Accepted);
+
+        Assert.Equal([1], Assert.Single(_storefront.Pushed));
+    }
+
+    internal sealed class FakeStorefront : IStorefrontStock
+    {
+        public List<IReadOnlyCollection<int>?> Pushed { get; } = [];
+
+        public Task<StorefrontSyncResult> PushAsync(IReadOnlyCollection<int>? productionIds, CancellationToken ct)
+        {
+            Pushed.Add(productionIds);
+            return Task.FromResult(new StorefrontSyncResult(productionIds?.Count ?? 0, 0));
+        }
+    }
 
     private Task<IReadOnlyList<string>> Change(int from, int to) =>
         _handler.OnStatusChangingAsync(new OrderStatusChange(OrderId, from, to, 3, DateTime.Now), CancellationToken.None);

@@ -9,7 +9,7 @@ namespace NewErp.Application.Production;
 /// Сценарії виробництва (на основі модуля StockTrack старого сайту): моделі, розміри, деталі крою, специфікації,
 /// операції крою й пошиву зі списанням розхідників.
 /// </summary>
-public sealed class ProductionService(IProductionRepository repository, TimeProvider clock)
+public sealed class ProductionService(IProductionRepository repository, IStorefrontStock storefront, TimeProvider clock)
 {
     /// <summary>
     /// Виконує операцію для кількох розмірів одразу. Крій і пошив списують розхідники та деталі за специфікаціями:
@@ -51,6 +51,9 @@ public sealed class ProductionService(IProductionRepository repository, TimeProv
         }
 
         await repository.SaveChangesAsync(ct);
+        // Як у старому модулі: після зміни пошитого залишку він одразу йде на вітрину.
+        if (operation is ProductionOperation.Sewn or ProductionOperation.Ship)
+            await storefront.PushAsync([productionId], ct);
         return new ProductionOperationResult(changes, consumption?.Warnings ?? []);
     }
 
@@ -139,6 +142,9 @@ public sealed class ProductionService(IProductionRepository repository, TimeProv
         private static string Invariant(FormattableString text) => FormattableString.Invariant(text);
     }
 
+    /// <summary>Передати на вітрину пошиті залишки всіх активних моделей (наприклад, після змін на старому сайті).</summary>
+    public Task<StorefrontSyncResult> PushStorefrontAsync(CancellationToken ct) => storefront.PushAsync(null, ct);
+
     public async Task<int> CreateModelAsync(SaveProductionModelRequest request, CancellationToken ct)
     {
         var model = new ProductionModel(request.Name, request.Type, request.MinTotal, request.SortOrder);
@@ -175,6 +181,7 @@ public sealed class ProductionService(IProductionRepository repository, TimeProv
             (request.Categories ?? []).Select(c => (c.CategoryId, c.NameFilter, c.MatchExact)).ToList());
         model.SetSizeOptions((request.SizeOptions ?? []).Select(o => (o.SizeId, o.OptionValueId)).ToList());
         await repository.SaveChangesAsync(ct);
+        await storefront.PushAsync([productionId], ct);
     }
 
     public async Task<int> AddComponentAsync(int productionId, SaveComponentRequest request, CancellationToken ct)

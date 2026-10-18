@@ -4,12 +4,15 @@
 @inject ProductionApi Api
 @inject IDialogService Dialogs
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Моделі — NewErp</PageTitle>
 
 <div class="d-flex align-center flex-wrap gap-2 mb-3">
     <MudText Typo="Typo.h4">Моделі</MudText>
     <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Storefront" Disabled="_syncing" OnClick="SyncStorefrontAsync"
+               data-test="storefront-sync">Передати залишки на сайт</MudButton>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NewModelAsync">Нова модель</MudButton>
 </div>
 
@@ -56,6 +59,7 @@
     private string? _search;
     private string? _type;
     private bool _belowMinimumOnly;
+    private bool _syncing;
 
     private IEnumerable<ProductionModelSummaryDto> Filtered => (_models ?? [])
         .Where(m => string.IsNullOrWhiteSpace(_search) || m.Name.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase))
@@ -63,6 +67,25 @@
         .Where(m => !_belowMinimumOnly || m.Deficit > 0);
 
     protected override async Task OnInitializedAsync() => _models = await Api.ModelsAsync();
+
+    // Пошив і відвантаження передають залишки самі; кнопка — для повної звірки (наприклад, після змін на старому сайті).
+    private async Task SyncStorefrontAsync()
+    {
+        _syncing = true;
+        try
+        {
+            var result = await Api.SyncStorefrontAsync();
+            Snackbar.Add($"Залишки передано: моделей {result.Models}, товарів на сайті {result.Products}.", Severity.Success);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
 
     private async Task NewModelAsync()
     {
