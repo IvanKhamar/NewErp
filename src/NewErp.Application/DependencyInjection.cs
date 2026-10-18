@@ -4,6 +4,7 @@ using NewErp.Application.Auth;
 using NewErp.Application.Cashbox;
 using NewErp.Application.Catalog;
 using NewErp.Application.Delivery;
+using NewErp.Application.Marketing;
 using NewErp.Application.Orders;
 using NewErp.Application.Partners;
 using NewErp.Application.Payments;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<PartnerService>();
         services.AddScoped<ProductSortService>();
         services.AddScoped<PreOrderService>();
+        services.AddScoped<MarketingService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.
         services.AddScoped<IOrderStatusHandler, OrderSewnStockHandler>();
         services.AddScoped<AuthService>();

@@ -1,0 +1,184 @@
+@page "/marketing/birthdays"
+@attribute [Authorize(Roles = Access.Orders)]
+@using NewErp.Web.Pages.Sales
+@inject MarketingApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Дні народження — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Дні народження</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Клієнти, які вказали день народження в замовленні. Привітання можна надіслати з персональним купоном на знижку
+    (одне використання, діє обмежений час) або одним текстом кільком клієнтам одразу.
+</MudText>
+
+<MudChipSet T="BirthdayPeriod" SelectedValue="_period" SelectedValueChanged="SelectPeriodAsync" SelectionMode="SelectionMode.SingleSelection"
+            CheckMark="true" Class="mb-3" data-test="period">
+    @foreach (var (period, title) in Periods)
+    {
+        <MudChip Value="period">@title</MudChip>
+    }
+</MudChipSet>
+
+<MudTable T="BirthdayContactDto" Items="_contacts" Dense="true" Hover="true" Loading="_contacts is null" MultiSelection="true"
+          @bind-SelectedItems="_selected" OnRowClick="row => SelectAsync(row.Item!)" RowStyle="cursor: pointer" data-test="contacts">
+    <HeaderContent>
+        <MudTh>Клієнт</MudTh>
+        <MudTh>Телефон</MudTh>
+        <MudTh>Місто</MudTh>
+        <MudTh>День народження</MudTh>
+        <MudTh>Привітань цього року</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Клієнт">
+            @context.FirstName @context.LastName
+            @if (!string.IsNullOrEmpty(context.Instagram))
+            {
+                <MudText Typo="Typo.caption">@context.Instagram</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Телефон">@context.Phone</MudTd>
+        <MudTd DataLabel="Місто">@context.City</MudTd>
+        <MudTd DataLabel="День народження">@context.Day.ToString("00").@context.Month.ToString("00")</MudTd>
+        <MudTd DataLabel="Привітань цього року">
+            @if (context.SentThisYear > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">@context.SentThisYear</MudChip>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Іменинників за цей період немає.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@if (_selected.Count > 1)
+{
+    <MudPaper Class="pa-3 mt-3" Outlined="true" data-test="bulk">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Однаковий текст вибраним: @_selected.Count</MudText>
+        <MudTextField @bind-Value="_bulkText" Label="Текст SMS" Lines="3" Variant="Variant.Outlined" MaxLength="SmsMaxLength" Counter="SmsMaxLength" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SendBulkAsync"
+                   Disabled="@(_busy || string.IsNullOrWhiteSpace(_bulkText))" data-test="send-bulk">Надіслати вибраним</MudButton>
+    </MudPaper>
+}
+
+@if (_current is not null)
+{
+    <MudPaper Class="pa-3 mt-3" Outlined="true" data-test="greeting">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Привітання: @_current.FirstName @_current.LastName, @_current.Phone</MudText>
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudTextField @bind-Value="_couponCode" Label="Купон" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 200px" />
+            <MudButton Variant="Variant.Outlined" OnClick="NewCouponAsync" Disabled="_busy" data-test="coupon">Згенерувати купон</MudButton>
+            @if (_couponCode is not null)
+            {
+                <MudButton Variant="Variant.Text" OnClick="() => _couponCode = null">Без купона</MudButton>
+            }
+        </div>
+        <MudTextField @bind-Value="_text" Label="Текст SMS" Lines="3" Variant="Variant.Outlined" MaxLength="SmsMaxLength" Counter="SmsMaxLength" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SendAsync"
+                   Disabled="@(_busy || string.IsNullOrWhiteSpace(_text))" data-test="send">Надіслати</MudButton>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-1">Замовлення клієнта</MudText>
+        <MudSimpleTable Dense="true" Elevation="0" data-test="orders">
+            <tbody>
+                @foreach (var order in _orders)
+                {
+                    <tr>
+                        <td><MudLink Href="@OrderRoutes.Order(order.OrderId)">№@order.OrderId</MudLink></td>
+                        <td>@order.DateAdded.ToString("dd.MM.yyyy")</td>
+                        <td>@order.Status</td>
+                        <td>@order.Products</td>
+                        <td style="text-align: right">@order.Total.ToString("0.##") грн</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    private const int SmsMaxLength = 670;
+
+    private static readonly (BirthdayPeriod Period, string Title)[] Periods =
+    [
+        (BirthdayPeriod.Today, "Сьогодні"), (BirthdayPeriod.Tomorrow, "Завтра"), (BirthdayPeriod.Week, "Тиждень"),
+        (BirthdayPeriod.Month, "Цей місяць"), (BirthdayPeriod.All, "Усі"),
+    ];
+
+    private BirthdayPeriod _period = BirthdayPeriod.Today;
+    private List<BirthdayContactDto>? _contacts;
+    private HashSet<BirthdayContactDto> _selected = [];
+    private BirthdayContactDto? _current;
+    private List<CustomerOrderDto> _orders = [];
+    private string? _couponCode;
+    private string? _text;
+    private string? _bulkText;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _contacts = await Api.BirthdaysAsync(_period);
+        _selected = [];
+    }
+
+    private async Task SelectPeriodAsync(BirthdayPeriod period)
+    {
+        _period = period;
+        _current = null;
+        await LoadAsync();
+    }
+
+    private async Task SelectAsync(BirthdayContactDto contact)
+    {
+        _current = contact;
+        _couponCode = null;
+        _text = Greeting(contact.FirstName, null);
+        _orders = await Api.CustomerOrdersAsync(contact.Phone);
+    }
+
+    private Task NewCouponAsync() => RunAsync(async () =>
+    {
+        _couponCode = await Api.NewCouponCodeAsync();
+        _text = Greeting(_current!.FirstName, _couponCode);
+    });
+
+    private Task SendAsync() => RunAsync(async () =>
+    {
+        var result = await Api.SendAsync(new BirthdaySmsRequest(_current!.Phone, _text!, _couponCode));
+        Snackbar.Add(result.Sent ? "Привітання надіслано." : $"SMS не пішло: {result.Response}", result.Sent ? Severity.Success : Severity.Warning);
+        if (result.CouponId is not null)
+            Snackbar.Add($"Купон {_couponCode} створено.", Severity.Info);
+        _current = null;
+        await LoadAsync();
+    });
+
+    private Task SendBulkAsync() => RunAsync(async () =>
+    {
+        var result = await Api.SendBulkAsync(new BulkSmsRequest(_selected.Select(c => c.Phone).ToList(), _bulkText!));
+        Snackbar.Add($"Надіслано: {result.Sent}, не пішло: {result.NotSent}.", result.NotSent == 0 ? Severity.Success : Severity.Warning);
+        _bulkText = null;
+        await LoadAsync();
+    });
+
+    private static string Greeting(string name, string? code) =>
+        $"{name}, вітаємо з днем народження!" + (code is null ? "" : $" Ваш подарунок — знижка за промокодом {code}.") + " Vidro";
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

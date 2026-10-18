@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 using NewErp.Domain.Common;
 
@@ -10,7 +10,14 @@ public partial class SmsMessage
     /// <summary>Розумна межа: довше — це вже кілька SMS, і менеджер, найпевніше, помилився.</summary>
     public const int MaxLength = 670;
 
+    /// <summary>Значення pre_order_id, яким старий сайт позначає SMS з привітанням.</summary>
+    public const int BirthdayMarker = 1;
+
     private SmsMessage() { }
+
+    /// <summary>Привітання з днем народження: без замовлення, з позначкою <see cref="BirthdayMarker"/>.</summary>
+    public static SmsMessage Birthday(string phone, string text, string response, DateTime sentAt) =>
+        new(0, phone, text, response, sentAt) { PreOrderId = BirthdayMarker };
 
     public SmsMessage(int orderId, string phone, string text, string response, DateTime sentAt)
     {
@@ -25,7 +32,9 @@ public partial class SmsMessage
 
     public int OrderId { get; private set; }
 
-    /// <summary>Передзамовлення; NewErp їх ще не підтримує, тож завжди 0.</summary>
+    /// <summary>
+    /// Попри назву, старий сайт пише сюди 1 для привітань з днем народження (<see cref="BirthdayMarker"/>), інакше 0.
+    /// </summary>
     public int PreOrderId { get; private set; }
 
     public string Phone { get; private set; } = "";
