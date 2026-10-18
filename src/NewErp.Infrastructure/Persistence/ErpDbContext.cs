@@ -16,6 +16,8 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdCategoryDescription> DdCategoryDescriptions { get; set; }
 
+    public virtual DbSet<DdCoupon> DdCoupons { get; set; }
+
     public virtual DbSet<DdCrosssellItem> DdCrosssellItems { get; set; }
 
     public virtual DbSet<DdCrosssellSort> DdCrosssellSorts { get; set; }
@@ -68,7 +70,11 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdProductToStore> DdProductToStores { get; set; }
 
+    public virtual DbSet<DdQuestion> DdQuestions { get; set; }
+
     public virtual DbSet<DdSetting> DdSettings { get; set; }
+
+    public virtual DbSet<DdSubscribe> DdSubscribes { get; set; }
 
     public virtual DbSet<DdUser> DdUsers { get; set; }
 
@@ -99,6 +105,49 @@ public partial class ErpDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("meta_title");
             entity.Property(e => e.Name).HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdCoupon>(entity =>
+        {
+            entity.HasKey(e => e.CouponId).HasName("PRIMARY");
+
+            entity.ToTable("dd_coupon");
+
+            entity.Property(e => e.CouponId).HasColumnName("coupon_id");
+            entity.Property(e => e.Code)
+                .HasMaxLength(20)
+                .HasColumnName("code");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.DateEnd)
+                .HasDefaultValueSql("'0000-00-00'")
+                .HasColumnType("date")
+                .HasColumnName("date_end");
+            entity.Property(e => e.DateStart)
+                .HasDefaultValueSql("'0000-00-00'")
+                .HasColumnType("date")
+                .HasColumnName("date_start");
+            entity.Property(e => e.Discount)
+                .HasPrecision(15, 4)
+                .HasColumnName("discount");
+            entity.Property(e => e.Logged).HasColumnName("logged");
+            entity.Property(e => e.Name)
+                .HasMaxLength(128)
+                .HasColumnName("name");
+            entity.Property(e => e.Shipping).HasColumnName("shipping");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Total)
+                .HasPrecision(15, 4)
+                .HasColumnName("total");
+            entity.Property(e => e.Type)
+                .HasMaxLength(1)
+                .IsFixedLength()
+                .HasColumnName("type");
+            entity.Property(e => e.UsesCustomer)
+                .HasMaxLength(11)
+                .HasColumnName("uses_customer");
+            entity.Property(e => e.UsesTotal).HasColumnName("uses_total");
         });
 
         modelBuilder.Entity<DdCrosssellItem>(entity =>
@@ -785,6 +834,30 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.StoreId).HasColumnName("store_id");
         });
 
+        modelBuilder.Entity<DdQuestion>(entity =>
+        {
+            entity.HasKey(e => e.QuestionId).HasName("PRIMARY");
+
+            entity.ToTable("dd_question");
+
+            entity.Property(e => e.QuestionId).HasColumnName("question_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasDefaultValueSql("''")
+                .HasColumnName("name");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.Question)
+                .HasColumnType("text")
+                .HasColumnName("question");
+            entity.Property(e => e.Telephone)
+                .HasMaxLength(32)
+                .HasDefaultValueSql("''")
+                .HasColumnName("telephone");
+        });
+
         modelBuilder.Entity<DdSetting>(entity =>
         {
             entity.HasKey(e => e.SettingId).HasName("PRIMARY");
@@ -803,6 +876,21 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.Value)
                 .HasColumnType("text")
                 .HasColumnName("value");
+        });
+
+        modelBuilder.Entity<DdSubscribe>(entity =>
+        {
+            entity.HasKey(e => e.SubscribeId).HasName("PRIMARY");
+
+            entity.ToTable("dd_subscribe");
+
+            entity.Property(e => e.SubscribeId).HasColumnName("subscribe_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.Email)
+                .HasMaxLength(96)
+                .HasColumnName("email");
         });
 
         modelBuilder.Entity<DdUser>(entity =>

@@ -6,6 +6,7 @@ using NewErp.Application.Auth;
 using NewErp.Application.Cashbox;
 using NewErp.Application.Catalog;
 using NewErp.Application.Delivery;
+using NewErp.Application.Marketing;
 using NewErp.Application.Orders;
 using NewErp.Application.Partners;
 using NewErp.Application.Payments;
@@ -17,6 +18,7 @@ using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Cashbox;
 using NewErp.Infrastructure.Catalog;
 using NewErp.Infrastructure.Delivery;
+using NewErp.Infrastructure.Marketing;
 using NewErp.Infrastructure.Orders;
 using NewErp.Infrastructure.Partners;
 using NewErp.Infrastructure.Payments;
@@ -58,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IPartnerRepository, PartnerRepository>();
         services.AddScoped<IProductSortStore, ProductSortStore>();
         services.AddScoped<IPreOrderStore, PreOrderStore>();
+        services.AddScoped<IMarketingStore, MarketingStore>();
 
         // Справжній клієнт Нової Пошти — лише якщо ключ задано (dotnet user-secrets: NovaPoshta:ApiKey чи ключі відправників).
         // Без ключа заглушка: локальна розробка ніколи не звертається до справжнього сервісу.

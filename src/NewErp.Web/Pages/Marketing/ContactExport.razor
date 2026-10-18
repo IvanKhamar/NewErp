@@ -1,0 +1,54 @@
+@page "/marketing/export"
+@attribute [Authorize(Roles = Access.Orders)]
+
+<PageTitle>Вивантаження контактів — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Вивантаження контактів</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Унікальні телефони чи e-mail клієнтів для розсилки, з ім'ям і містом з останнього замовлення. Файл CSV відкривається в Excel.
+    Телефони — лише українські мобільні у вигляді 380XXXXXXXXX.
+</MudText>
+
+<MudPaper Class="pa-3" Outlined="true" Style="max-width: 560px">
+    <MudRadioGroup T="ContactField" @bind-Value="_field" data-test="field">
+        <MudRadio Value="ContactField.Phone">Телефони</MudRadio>
+        <MudRadio Value="ContactField.Email">E-mail</MudRadio>
+    </MudRadioGroup>
+    <MudText Typo="Typo.subtitle2" Class="mt-3">Звідки</MudText>
+    <MudCheckBox @bind-Value="_orders" Label="Замовлення" />
+    @if (_field == ContactField.Phone)
+    {
+        <MudCheckBox @bind-Value="_questions" Label="Запитання про товар" />
+    }
+    else
+    {
+        <MudCheckBox @bind-Value="_subscribers" Label="Підписка на розсилку" />
+    }
+    <div class="d-flex gap-3 mt-2">
+        <MudDatePicker @bind-Date="_from" Label="З" Clearable="true" DateFormat="dd.MM.yyyy" />
+        <MudDatePicker @bind-Date="_to" Label="По" Clearable="true" DateFormat="dd.MM.yyyy" />
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" Href="@Url" Target="_blank" Disabled="@(!Sources.Any())"
+               StartIcon="@Icons.Material.Filled.Download" data-test="download">Завантажити CSV</MudButton>
+</MudPaper>
+
+@code {
+    private ContactField _field = ContactField.Phone;
+    private bool _orders = true;
+    private bool _questions = true;
+    private bool _subscribers = true;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    private IEnumerable<ContactSource> Sources =>
+        new[]
+        {
+            (_orders, ContactSource.Orders),
+            (_field == ContactField.Phone && _questions, ContactSource.Questions),
+            (_field == ContactField.Email && _subscribers, ContactSource.Subscribers),
+        }.Where(s => s.Item1).Select(s => s.Item2);
+
+    private string Url => MarketingApi.ExportUrl(_field, Sources, Date(_from), Date(_to));
+
+    private static DateOnly? Date(DateTime? value) => value is { } date ? DateOnly.FromDateTime(date) : null;
+}

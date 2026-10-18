@@ -189,9 +189,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await SeedSizeOptionsAsync();
         await SeedPartnerAsync(now);
         await SeedProductSortAsync();
+        var birthdays = await SeedMarketingAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -429,6 +430,37 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         db.DdCrosssellItems.Add(new DdCrosssellItem { Type = "category", TargetId = 21 });
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Для маркетингу: дні народження в частині замовлень (кілька — сьогодні й цього тижня, щоб сторінка не була порожньою),
+    /// запитання про товар і підписки на розсилку для вивантаження контактів.
+    /// </summary>
+    private async Task<int> SeedMarketingAsync()
+    {
+        var today = DateTime.Today;
+        var orders = await db.DdOrders.Where(o => o.OrderStatusId > 0).OrderBy(o => o.OrderId).ToListAsync();
+        var birthdays = 0;
+        for (var i = 0; i < orders.Count; i += 7)
+        {
+            var date = i < 7 * 5 ? today.AddDays(i / 7) : today.AddDays(_random.Next(365));
+            (orders[i].BirthdayDay, orders[i].BirthdayMonth) = (date.Day, date.Month);
+            birthdays++;
+        }
+        foreach (var order in orders.Where((_, i) => i % 11 == 0))
+            order.Instagram = "@" + order.Firstname.ToLowerInvariant() + order.OrderId;
+
+        for (var i = 0; i < 20; i++)
+        {
+            db.DdQuestions.Add(new DdQuestion
+            {
+                ProductId = FirstProductId + i % Products.Length, Name = "Гість " + (i + 1), Telephone = $"+38 (093) {i:000}-00-{i % 100:00}",
+                Question = "Чи буде цей розмір знову?", DateAdded = today.AddDays(-i * 3),
+            });
+            db.DdSubscribes.Add(new DdSubscribe { Email = $"subscriber{i + 1}@example.com", DateAdded = today.AddDays(-i * 5) });
+        }
+        await db.SaveChangesAsync();
+        return birthdays;
     }
 
     private async Task<int> SeedProductionAsync()

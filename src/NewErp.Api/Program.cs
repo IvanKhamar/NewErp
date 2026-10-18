@@ -3,6 +3,7 @@ using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
 using NewErp.Application.Catalog;
+using NewErp.Application.Marketing;
 using NewErp.Application.Partners;
 using NewErp.Application.Production;
 using NewErp.Application.Staff;
@@ -29,6 +30,7 @@ builder.Services.Configure<PartnerFeedOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(ProductSortOptions.SectionName));
 builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(PreOrderOptions.SectionName));
 builder.Services.AddHostedService<PreOrderSettleWorker>();
+builder.Services.Configure<MarketingOptions>(builder.Configuration.GetSection(MarketingOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
@@ -61,6 +63,7 @@ app.MapPaymentEndpoints();
 app.MapPartnerEndpoints();
 app.MapProductSortEndpoints();
 app.MapPreOrderEndpoints();
+app.MapMarketingEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.

@@ -520,3 +520,24 @@ CREATE TABLE `dd_product_manual_pin` (
 ALTER TABLE `dd_product_option_value`
   ADD COLUMN `pre_order_quantity` int(11) NOT NULL DEFAULT '0',
   ADD COLUMN `date_available` date DEFAULT NULL;
+
+-- ═══ Маркетинг ═══
+-- Запитання покупців про товар (форма на сайті). Відновлено з catalog/model/catalog/question.php; DDL у коді немає,
+-- типи й рушій вгадані, звірити. NewErp лише читає телефони звідси для вивантаження контактів.
+CREATE TABLE `dd_question` (
+  `question_id` int(11) NOT NULL AUTO_INCREMENT,
+  `product_id` int(11) NOT NULL DEFAULT '0',
+  `name` varchar(64) NOT NULL DEFAULT '',
+  `telephone` varchar(32) NOT NULL DEFAULT '',
+  `question` text NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`question_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Підписка на розсилку (e-mail). Відновлено з catalog/model/catalog/subscribe.php; типи вгадані, звірити.
+CREATE TABLE `dd_subscribe` (
+  `subscribe_id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(96) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`subscribe_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
