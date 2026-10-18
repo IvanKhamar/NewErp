@@ -1,0 +1,262 @@
+@page "/catalog/sort"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ProductSortApi Api
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Порядок товарів — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Порядок товарів</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Товари в групі стають за спаданням продажів за період, закріплені — на свої позиції. Порядок у товару один, тож при перерахунку
+    всіх груп товар отримує місце з останньої групи, де він є (теми → категорії → мітки). Перед кожним записом зберігається знімок.
+</MudText>
+
+<MudPaper Class="pa-3 mb-3" Outlined="true">
+    <div class="d-flex align-center flex-wrap gap-3">
+        <MudSelect T="SortGroupDto" Value="_group" ValueChanged="SelectGroupAsync" Label="Група" ToStringFunc="@(g => g?.Name)"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 280px" data-test="group">
+            @foreach (var group in _groups)
+            {
+                <MudSelectItem Value="group">@group.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField T="int" @bind-Value="_days" Label="Днів продажів" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense"
+                         Style="max-width: 140px" Disabled="@(_from is not null && _to is not null)" data-test="days" />
+        <MudDatePicker @bind-Date="_from" Label="З" Clearable="true" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+        <MudDatePicker @bind-Date="_to" Label="По" Clearable="true" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+        <MudButton Variant="Variant.Outlined" OnClick="PreviewAsync" Disabled="@(_group is null || _busy)" data-test="preview">Переглянути</MudButton>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="RecalculateAllAsync" Disabled="_busy" data-test="recalculate-all">
+            Перерахувати всі групи
+        </MudButton>
+    </div>
+    @if (_group?.Type == SortGroupType.CrossSell)
+    {
+        <MudSwitch T="bool" Value="_panelOnly" ValueChanged="SetMetricAsync" Color="Color.Primary" Class="mt-2" data-test="panel-only">
+            Рахувати лише продажі, додані через панель допродажу
+        </MudSwitch>
+    }
+</MudPaper>
+
+@if (_preview is not null)
+{
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <div class="d-flex align-center mb-2">
+            <MudText Typo="Typo.subtitle1">Новий порядок: @_group?.Name</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyAsync" Disabled="@(_busy || _preview.Count == 0)" data-test="apply">
+                Записати порядок
+            </MudButton>
+        </div>
+        <MudSimpleTable Dense="true" Elevation="0" data-test="preview-table">
+            <thead><tr><th>Нове місце</th><th>Товар</th><th style="text-align: right">Продано</th><th style="text-align: right">Зараз</th><th></th></tr></thead>
+            <tbody>
+                @for (var i = 0; i < _preview.Count; i++)
+                {
+                    var index = i;
+                    var row = _preview[i];
+                    <tr>
+                        <td>@(index + 1)</td>
+                        <td>
+                            @row.Name <MudText Typo="Typo.caption">№@row.ProductId</MudText>
+                            @if (row.Pinned)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">закріплено</MudChip>
+                            }
+                        </td>
+                        <td style="text-align: right">@row.Sales</td>
+                        <td style="text-align: right">@row.CurrentPosition</td>
+                        <td style="white-space: nowrap">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@(index == 0)" OnClick="() => Move(index, -1)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Disabled="@(index == _preview.Count - 1)"
+                                           OnClick="() => Move(index, 1)" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        @if (_preview.Count == 0)
+        {
+            <MudText Class="mt-2">У групі немає увімкнених товарів.</MudText>
+        }
+    </MudPaper>
+}
+
+<MudPaper Class="pa-3 mb-3" Outlined="true">
+    <MudText Typo="Typo.subtitle1">Закріплені товари</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">Закріплений товар стоїть на своїй позиції в групі за будь-яких продажів.</MudText>
+    @if (_group is not null)
+    {
+        <div class="d-flex align-center flex-wrap gap-2 mb-2">
+            <MudNumericField T="int" @bind-Value="_pinPosition" Label="Позиція" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense"
+                             Style="max-width: 110px" data-test="pin-position" />
+            <MudAutocomplete T="SortProductDto" @bind-Value="_pinProduct" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
+                             ToStringFunc="@(p => p is null ? null : $"{p.Name} (№{p.ProductId})")" Label="Товар" Placeholder="Назва"
+                             Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 280px" data-test="pin-product" />
+            <MudButton Variant="Variant.Outlined" OnClick="PinAsync" Disabled="@(_pinProduct is null || _busy)" data-test="pin">
+                Закріпити в «@_group.Name»
+            </MudButton>
+        </div>
+    }
+    <MudSimpleTable Dense="true" Elevation="0" data-test="pins">
+        <thead><tr><th>Група</th><th>Позиція</th><th>Товар</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var pin in _pins)
+            {
+                <tr>
+                    <td>@GroupName(pin)</td>
+                    <td>@pin.Position</td>
+                    <td>@pin.ProductName <MudText Typo="Typo.caption">№@pin.ProductId</MudText></td>
+                    <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => UnpinAsync(pin)" /></td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+<MudPaper Class="pa-3" Outlined="true">
+    <MudText Typo="Typo.subtitle1" Class="mb-2">Знімки порядку</MudText>
+    <MudSimpleTable Dense="true" Elevation="0" data-test="snapshots">
+        <thead><tr><th>Коли</th><th>Перед чим</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var snapshot in _snapshots)
+            {
+                <tr>
+                    <td>@snapshot.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>@snapshot.Note</td>
+                    <td><MudButton Size="Size.Small" OnClick="() => RestoreAsync(snapshot)">Повернути</MudButton></td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    private List<SortGroupDto> _groups = [];
+    private List<SortPinDto> _pins = [];
+    private List<SortSnapshotDto> _snapshots = [];
+    private List<SortPreviewRow>? _preview;
+    private SortGroupDto? _group;
+    private int _days = 90;
+    private DateTime? _from;
+    private DateTime? _to;
+    private bool _panelOnly;
+    private int _pinPosition = 1;
+    private SortProductDto? _pinProduct;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _groups = await Api.GroupsAsync();
+        _panelOnly = (await Api.CrossSellMetricAsync()).PanelOnly;
+        await ReloadListsAsync();
+    }
+
+    private async Task ReloadListsAsync()
+    {
+        _pins = await Api.PinsAsync();
+        _snapshots = await Api.SnapshotsAsync();
+    }
+
+    private SalesPeriod Period() =>
+        _from is { } from && _to is { } to ? new SalesPeriod(null, DateOnly.FromDateTime(from), DateOnly.FromDateTime(to)) : new SalesPeriod(_days);
+
+    private string GroupName(SortPinDto pin) =>
+        _groups.FirstOrDefault(g => g.Type == pin.Type && g.Key == pin.Key)?.Name ?? $"{pin.Key} (групи вже немає)";
+
+    private async Task SelectGroupAsync(SortGroupDto group)
+    {
+        _group = group;
+        await PreviewAsync();
+    }
+
+    private Task PreviewAsync() => RunAsync(async () => _preview = await Api.PreviewAsync(_group!.Type, _group.Key, Period()));
+
+    private void Move(int index, int step)
+    {
+        // Рядок міняється місцями із сусіднім; записується лише після «Записати порядок».
+        (_preview![index], _preview[index + step]) = (_preview[index + step], _preview[index]);
+    }
+
+    private Task ApplyAsync() => RunAsync(async () =>
+    {
+        var result = await Api.ApplyAsync(new ApplySortRequest(_group!.Type, _group.Key, _preview!.Select(r => r.ProductId).ToList()));
+        Snackbar.Add($"Порядок записано: {result.Updated} товарів.", Severity.Success);
+        await ReloadListsAsync();
+        _preview = await Api.PreviewAsync(_group.Type, _group.Key, Period());
+    });
+
+    private async Task RecalculateAllAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Перерахувати всі групи?",
+            "Порядок усіх товарів на вітрині зміниться за продажами за вибраний період. Попередній порядок збережеться у знімку.",
+            yesText: "Перерахувати", cancelText: "Скасувати");
+        if (confirmed != true)
+            return;
+        await RunAsync(async () =>
+        {
+            var result = await Api.RecalculateAllAsync(Period());
+            Snackbar.Add($"Перераховано: {result.Updated} записів порядку.", Severity.Success);
+            await ReloadListsAsync();
+            _preview = null;
+        });
+    }
+
+    private Task SetMetricAsync(bool panelOnly) => RunAsync(async () =>
+    {
+        await Api.SetCrossSellMetricAsync(panelOnly);
+        _panelOnly = panelOnly;
+        _preview = await Api.PreviewAsync(_group!.Type, _group.Key, Period());
+    });
+
+    private async Task<IEnumerable<SortProductDto>> SearchProductsAsync(string text, CancellationToken ct) => await Api.ProductsAsync(text);
+
+    private Task PinAsync() => RunAsync(async () =>
+    {
+        await Api.SetPinAsync(new SetPinRequest(_group!.Type, _group.Key, _pinPosition, _pinProduct!.ProductId));
+        _pinProduct = null;
+        await ReloadListsAsync();
+        _preview = await Api.PreviewAsync(_group.Type, _group.Key, Period());
+    });
+
+    private Task UnpinAsync(SortPinDto pin) => RunAsync(async () =>
+    {
+        await Api.RemovePinAsync(pin.Id);
+        await ReloadListsAsync();
+        if (_group is not null && _preview is not null)
+            _preview = await Api.PreviewAsync(_group.Type, _group.Key, Period());
+    });
+
+    private async Task RestoreAsync(SortSnapshotDto snapshot)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Повернути порядок?",
+            $"Порядок товарів стане таким, як був {snapshot.CreatedAt:dd.MM.yyyy HH:mm}.", yesText: "Повернути", cancelText: "Скасувати");
+        if (confirmed != true)
+            return;
+        await RunAsync(async () =>
+        {
+            await Api.RestoreSnapshotAsync(snapshot.Id);
+            Snackbar.Add("Порядок повернуто.", Severity.Success);
+            if (_group is not null && _preview is not null)
+                _preview = await Api.PreviewAsync(_group.Type, _group.Key, Period());
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

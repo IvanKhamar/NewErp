@@ -261,3 +261,41 @@ CREATE TABLE `dd_product_image` (
   PRIMARY KEY (`product_image_id`),
   KEY `product_id` (`product_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Фільтри, налаштування й магазини товарів (для порядку товарів за продажами) ═══
+CREATE TABLE `dd_filter` (
+  `filter_id` int(11) NOT NULL AUTO_INCREMENT,
+  `filter_group_id` int(11) NOT NULL,
+  `sort_order` int(3) NOT NULL,
+  PRIMARY KEY (`filter_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_filter_description` (
+  `filter_id` int(11) NOT NULL,
+  `language_id` int(11) NOT NULL,
+  `filter_group_id` int(11) NOT NULL,
+  `name` varchar(64) NOT NULL,
+  PRIMARY KEY (`filter_id`,`language_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_product_filter` (
+  `product_id` int(11) NOT NULL,
+  `filter_id` int(11) NOT NULL,
+  PRIMARY KEY (`product_id`,`filter_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_product_to_store` (
+  `product_id` int(11) NOT NULL,
+  `store_id` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`product_id`,`store_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_setting` (
+  `setting_id` int(11) NOT NULL AUTO_INCREMENT,
+  `store_id` int(11) NOT NULL DEFAULT '0',
+  `code` varchar(128) NOT NULL,
+  `key` varchar(128) NOT NULL,
+  `value` text NOT NULL,
+  `serialized` tinyint(1) NOT NULL,
+  PRIMARY KEY (`setting_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

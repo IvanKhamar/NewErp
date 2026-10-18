@@ -187,9 +187,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         var stockItems = await SeedStockAsync(storekeeper.UserId, storekeeper.Username, now);
         await SeedSizeOptionsAsync();
         await SeedPartnerAsync(now);
+        await SeedProductSortAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -399,6 +400,26 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         ]);
         partner.SetProductMap([new ProductMapping(FirstProductId + 1, null, "EVA-SHIRT-01", "", 1200, 1500)]);
         db.Partners.Add(partner);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Для сторінки «Порядок товарів»: мітки «Хіт» і «Новинка», усі товари в магазині 0, категорія сорочок — у панелі допродажу.
+    /// </summary>
+    private async Task SeedProductSortAsync()
+    {
+        db.DdProductLabels.AddRange(
+            new DdProductLabel { LabelId = 1, Name = "Хіт", BackgroundColor = "#d32f2f", TextColor = "#ffffff", SortOrder = 1, Status = true },
+            new DdProductLabel { LabelId = 2, Name = "Новинка", BackgroundColor = "#388e3c", TextColor = "#ffffff", SortOrder = 2, Status = true });
+        for (var i = 0; i < Products.Length; i++)
+        {
+            db.DdProductToStores.Add(new DdProductToStore { ProductId = FirstProductId + i, StoreId = 0 });
+            if (i < 3)
+                db.DdProductToLabels.Add(new DdProductToLabel { ProductId = FirstProductId + i, LabelId = 1 });
+            if (i >= Products.Length - 2)
+                db.DdProductToLabels.Add(new DdProductToLabel { ProductId = FirstProductId + i, LabelId = 2 });
+        }
+        db.DdCrosssellItems.Add(new DdCrosssellItem { Type = "category", TargetId = 21 });
         await db.SaveChangesAsync();
     }
 

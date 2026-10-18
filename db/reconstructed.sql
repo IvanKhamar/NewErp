@@ -446,3 +446,69 @@ CREATE TABLE `dd_partner_product_map` (
   PRIMARY KEY (`partner_product_map_id`),
   KEY `partner_id` (`partner_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Порядок товарів за продажами ═══
+-- Відновлено з admin/model/catalog/product_order.php, label.php і crosssell.php. DDL у коді немає: типи, довжини, ключі й рушій вгадані, звірити.
+-- Хто створив замовлення в адмінці. Порядок товарів не рахує продажі одного користувача (B2B). Звірити.
+ALTER TABLE `dd_order`
+  ADD COLUMN `user_id` int(11) NOT NULL DEFAULT '0';
+
+-- Мітки товарів («Новинка», «Хіт»...).
+CREATE TABLE `dd_product_label` (
+  `label_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) NOT NULL,
+  `background_color` varchar(16) NOT NULL DEFAULT '',
+  `text_color` varchar(16) NOT NULL DEFAULT '',
+  `sort_order` int(3) NOT NULL DEFAULT '0',
+  `status` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`label_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_product_to_label` (
+  `product_id` int(11) NOT NULL,
+  `label_id` int(11) NOT NULL,
+  PRIMARY KEY (`product_id`,`label_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Панель допродажу при оформленні: окремі товари (type = 'product') і категорії (type = 'category') зі знижкою, %.
+CREATE TABLE `dd_crosssell_item` (
+  `crosssell_item_id` int(11) NOT NULL AUTO_INCREMENT,
+  `type` varchar(16) NOT NULL,
+  `target_id` int(11) NOT NULL,
+  `discount` decimal(5,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`crosssell_item_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Власний порядок товарів у панелі допродажу.
+CREATE TABLE `dd_crosssell_sort` (
+  `product_id` int(11) NOT NULL,
+  `sort_order` int(11) NOT NULL,
+  PRIMARY KEY (`product_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Знімки sort_order усіх товарів перед кожним перерахунком (для відкату).
+CREATE TABLE `dd_product_order_snapshot` (
+  `snapshot_id` int(11) NOT NULL AUTO_INCREMENT,
+  `note` varchar(255) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`snapshot_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_product_order_snapshot_item` (
+  `snapshot_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `sort_order` int(11) NOT NULL,
+  PRIMARY KEY (`snapshot_id`,`product_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Закріплені вручну позиції: товар product_id стоїть на позиції position у групі (group_type, group_key).
+CREATE TABLE `dd_product_manual_pin` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `group_type` varchar(32) NOT NULL,
+  `group_key` varchar(128) NOT NULL,
+  `position` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `group` (`group_type`,`group_key`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

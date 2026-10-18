@@ -2,6 +2,7 @@
 using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
+using NewErp.Application.Catalog;
 using NewErp.Application.Partners;
 using NewErp.Application.Production;
 using NewErp.Application.Staff;
@@ -25,6 +26,7 @@ builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusO
 builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockOptions.SectionName));
 builder.Services.Configure<ProductionOptions>(builder.Configuration.GetSection(ProductionOptions.SectionName));
 builder.Services.Configure<PartnerFeedOptions>(builder.Configuration.GetSection(PartnerFeedOptions.SectionName));
+builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(ProductSortOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
@@ -55,6 +57,7 @@ app.MapDeliveryEndpoints();
 app.MapCashboxEndpoints();
 app.MapPaymentEndpoints();
 app.MapPartnerEndpoints();
+app.MapProductSortEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.
