@@ -56,6 +56,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string Branch1 = "Відділення №1: вул. Хрещатик, 1";
     // Каса: касир за замовчуванням (тестова заглушка Checkbox «фіскалізує» чеки в пам'яті).
     public const int CashierId = 1;
+
+    public const int CancelledOrderId = 6; // скасоване замовлення клієнта RiskyPhone (для перевірки ризику)
+    public const string RiskyPhone = "+38 (093) 555-44-33";
     // Надходження на 2000 грн від клієнта замовлення 2 (сума й прізвище збігаються) — має бути першою підказкою.
     public const string BankAppCode = "tx-2000";
 
@@ -160,6 +163,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.BankPayments.Add(new BankPayment(BankAppCode, "UA00", 2000m, 5000m, "Оплата за замовлення 2", "Тарас Клієнт2",
             new DateOnly(2026, 10, 3), new TimeOnly(10, 0)));
 
+        // Товар CategoryProductId у каталозі (ціна й розмір M) — для створення замовлення вручну.
+        db.DdProducts.Add(Product(CategoryProductId, "T-2", 900m));
+        db.DdOptionDescriptions.Add(new DdOptionDescription { OptionId = 11, LanguageId = LanguageId, Name = "Розмір" });
+        db.DdOptionValueDescriptions.Add(new DdOptionValueDescription { OptionValueId = SizeMOptionValueId, LanguageId = LanguageId, OptionId = 11, Name = "M" });
+        var cancelled = Order(CancelledOrderId, Cancelled, 700m, new DateTime(2025, 3, 1, 12, 0, 0));
+        (cancelled.Telephone, cancelled.ShippingMethod, cancelled.ShippingCode, cancelled.PaymentMethod, cancelled.PaymentCode) =
+            (RiskyPhone, "Нова Пошта", "novaposhta_warehouse.novaposhta_warehouse", "Накладений платіж", "cod");
+        db.DdOrders.Add(cancelled);
+
         var category = new StockCategory("Тканини");
         db.StockCategories.Add(category);
         await db.SaveChangesAsync();
@@ -189,6 +201,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Ip = "",
         Status = active,
         DateAdded = DateTime.Now,
+    };
+
+    private static DdProduct Product(int id, string model, decimal price) => new()
+    {
+        ProductId = id, Model = model, Price = price, Quantity = 5, Status = true, Shipping = true, Subtract = true,
+        Sku = "", Upc = "", Ean = "", Jan = "", Isbn = "", Mpn = "", Location = "",
+        DateAvailable = new DateTime(2026, 1, 1), DateAdded = new DateTime(2026, 1, 1), DateModified = new DateTime(2026, 1, 1),
     };
 
     private static DdOrder Order(int id, int statusId, decimal total, DateTime date) => new()

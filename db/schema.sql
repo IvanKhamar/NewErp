@@ -164,3 +164,78 @@ CREATE TABLE `dd_product_description` (
   PRIMARY KEY (`product_id`,`language_id`),
   KEY `name` (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Товари, опції й підсумки замовлення (для швидкого створення замовлення в NewErp) ═══
+-- Справжня база OpenCart зберігає «нульові» дати ('0000-00-00'), тож для цих таблиць вимикаємо
+-- NO_ZERO_DATE лише в поточному сеансі, інакше MySQL 8 не прийме DEFAULT '0000-00-00'.
+SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
+CREATE TABLE `dd_product` (
+  `product_id` int(11) NOT NULL AUTO_INCREMENT,
+  `model` varchar(64) NOT NULL,
+  `sku` varchar(64) NOT NULL,
+  `upc` varchar(12) NOT NULL,
+  `ean` varchar(14) NOT NULL,
+  `jan` varchar(13) NOT NULL,
+  `isbn` varchar(17) NOT NULL,
+  `mpn` varchar(64) NOT NULL,
+  `location` varchar(128) NOT NULL,
+  `quantity` int(4) NOT NULL DEFAULT '0',
+  `stock_status_id` int(11) NOT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `manufacturer_id` int(11) NOT NULL,
+  `shipping` tinyint(1) NOT NULL DEFAULT '1',
+  `price` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `points` int(8) NOT NULL DEFAULT '0',
+  `tax_class_id` int(11) NOT NULL,
+  `date_available` date NOT NULL DEFAULT '0000-00-00',
+  `weight` decimal(15,8) NOT NULL DEFAULT '0.00000000',
+  `weight_class_id` int(11) NOT NULL DEFAULT '0',
+  `length` decimal(15,8) NOT NULL DEFAULT '0.00000000',
+  `width` decimal(15,8) NOT NULL DEFAULT '0.00000000',
+  `height` decimal(15,8) NOT NULL DEFAULT '0.00000000',
+  `length_class_id` int(11) NOT NULL DEFAULT '0',
+  `subtract` tinyint(1) NOT NULL DEFAULT '1',
+  `minimum` int(11) NOT NULL DEFAULT '1',
+  `sort_order` int(11) NOT NULL DEFAULT '0',
+  `status` tinyint(1) NOT NULL DEFAULT '0',
+  `viewed` int(5) NOT NULL DEFAULT '0',
+  `date_added` datetime NOT NULL,
+  `date_modified` datetime NOT NULL,
+  PRIMARY KEY (`product_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_product_option` (
+  `product_option_id` int(11) NOT NULL AUTO_INCREMENT,
+  `product_id` int(11) NOT NULL,
+  `option_id` int(11) NOT NULL,
+  `value` text NOT NULL,
+  `required` tinyint(1) NOT NULL,
+  PRIMARY KEY (`product_option_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_option_description` (
+  `option_id` int(11) NOT NULL,
+  `language_id` int(11) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  PRIMARY KEY (`option_id`,`language_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_option_value_description` (
+  `option_value_id` int(11) NOT NULL,
+  `language_id` int(11) NOT NULL,
+  `option_id` int(11) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  PRIMARY KEY (`option_value_id`,`language_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_order_total` (
+  `order_total_id` int(10) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `code` varchar(32) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `value` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `sort_order` int(3) NOT NULL,
+  PRIMARY KEY (`order_total_id`),
+  KEY `order_id` (`order_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

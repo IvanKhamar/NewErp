@@ -1,0 +1,302 @@
+@page "/orders/new"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@* Замовлення за дзвінком чи із соцмереж (як «Швидке замовлення» старого сайту). *@
+<PageTitle>Нове замовлення — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Нове замовлення</MudText>
+
+@if (_methods is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Клієнт</MudText>
+                <MudAutocomplete T="CustomerPickDto" ValueChanged="PickCustomer" SearchFunc="SearchCustomersAsync" MinCharacters="3" DebounceInterval="300"
+                                 ToStringFunc="@(c => c is null ? null : $"{c.Firstname} {c.Lastname}, {c.Telephone}")" ResetValueOnEmptyText="true"
+                                 Label="Знайти клієнта з попередніх замовлень" Placeholder="Телефон, ім'я чи email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 AdornmentIcon="@Icons.Material.Filled.PersonSearch" Class="mb-2" data-test="customer-search" />
+                <div class="d-flex flex-wrap gap-3">
+                    <MudTextField @bind-Value="_telephone" Label="Телефон" Variant="Variant.Outlined" Margin="Margin.Dense" OnBlur="CheckRiskAsync" data-test="telephone" />
+                    <MudTextField @bind-Value="_firstname" Label="Ім'я" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="firstname" />
+                    <MudTextField @bind-Value="_lastname" Label="Прізвище" Variant="Variant.Outlined" Margin="Margin.Dense" OnBlur="CheckRiskAsync" />
+                    <MudTextField @bind-Value="_email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="_instagram" Label="Instagram" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </div>
+                @if (_risk is { Level: not CustomerRiskLevel.New } risk)
+                {
+                    <MudAlert Severity="@RiskSeverity(risk.Level)" Dense="true" Class="mt-2" data-test="risk">
+                        @risk.Message Замовлень: @risk.TotalOrders, скасовано: @risk.CancelledOrders
+                        @if (risk.CancelledOrderIds.Count > 0)
+                        {
+                            <span> (№ @string.Join(", ", risk.CancelledOrderIds))</span>
+                        }
+                    </MudAlert>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Товари</MudText>
+                <MudAutocomplete T="ProductPickDto" @bind-Value="_productToAdd" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
+                                 ToStringFunc="@(p => p is null ? null : $"{p.Name} ({p.Model})")" ResetValueOnEmptyText="true" Label="Додати товар"
+                                 Placeholder="Назва, модель чи №" Variant="Variant.Outlined" Margin="Margin.Dense" AdornmentIcon="@Icons.Material.Filled.Search"
+                                 OnAdornmentClick="AddProduct" data-test="product-search" />
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="mt-2" Disabled="_productToAdd is null" OnClick="AddProduct" data-test="add-product">Додати</MudButton>
+
+                <MudSimpleTable Dense="true" Elevation="0" Class="mt-2" data-test="lines">
+                    <thead><tr><th>Товар</th><th>Розмір</th><th>Кількість</th><th>Ціна, грн</th><th>Сума</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var line in _lines)
+                        {
+                            <tr>
+                                <td>@line.Product.Name<br /><MudText Typo="Typo.caption">@line.Product.Model</MudText></td>
+                                <td>
+                                    @if (line.Product.Options.Count > 0)
+                                    {
+                                        <MudSelect T="int?" Value="line.OptionValueId" ValueChanged="v => ChooseOption(line, v)" Dense="true" Margin="Margin.Dense">
+                                            @foreach (var option in line.Product.Options)
+                                            {
+                                                <MudSelectItem T="int?" Value="option.ProductOptionValueId">@option.Value (є @option.Quantity)</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    }
+                                </td>
+                                <td style="width: 7rem"><MudNumericField @bind-Value="line.Quantity" Min="1" Margin="Margin.Dense" /></td>
+                                <td style="width: 9rem"><MudNumericField @bind-Value="line.Price" Min="0" Format="0.##" Margin="Margin.Dense" /></td>
+                                <td>@((line.Price * line.Quantity).ToString("0.##"))</td>
+                                <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => _lines.Remove(line)" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Доставка</MudText>
+                <div class="d-flex flex-wrap gap-3">
+                    <MudSelect T="OrderMethodDto" @bind-Value="_shipping" ToStringFunc="@(m => m?.Name)" Label="Спосіб доставки" Variant="Variant.Outlined"
+                               Margin="Margin.Dense" Style="min-width: 16rem" data-test="shipping">
+                        @foreach (var method in _methods.Shipping)
+                        {
+                            <MudSelectItem T="OrderMethodDto" Value="method">@method.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudNumericField @bind-Value="_shippingCost" Label="Вартість доставки, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </div>
+                <div class="d-flex flex-wrap gap-3 mt-2">
+                    <MudAutocomplete T="CityDto" Value="_city" ValueChanged="CityChanged" SearchFunc="SearchCitiesAsync" ToStringFunc="@(c => c?.Name)"
+                                     Label="Місто" Variant="Variant.Outlined" Margin="Margin.Dense" MinCharacters="2" DebounceInterval="300"
+                                     ResetValueOnEmptyText="true" CoerceText="false" />
+                    <MudAutocomplete T="WarehouseDto" @bind-Value="_warehouse" SearchFunc="SearchWarehousesAsync" ToStringFunc="@(w => w?.Name)"
+                                     Label="Відділення чи поштомат" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_city is null"
+                                     DebounceInterval="300" ResetValueOnEmptyText="true" MaxItems="null" Style="min-width: 20rem" />
+                </div>
+                <div class="d-flex flex-wrap gap-3 mt-2">
+                    <MudTextField @bind-Value="_street" Label="Вулиця (для кур'єра)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="_house" Label="Будинок" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" />
+                    <MudTextField @bind-Value="_flat" Label="Квартира" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Оплата й підсумок</MudText>
+                <MudSelect T="OrderMethodDto" @bind-Value="_payment" ToStringFunc="@(m => m?.Name)" Label="Спосіб оплати" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Class="mb-2" data-test="payment">
+                    @foreach (var method in _methods.Payment)
+                    {
+                        <MudSelectItem T="OrderMethodDto" Value="method">@method.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudNumericField @bind-Value="_discount" Label="Знижка, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudNumericField @bind-Value="_prepayment" Label="Завдаток, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 HelperText="Накладений платіж буде меншим на цю суму" Class="mb-2" />
+                <MudSimpleTable Dense="true" Elevation="0" data-test="totals">
+                    <tbody>
+                        <tr><td>Товари</td><td class="text-right">@SubTotal.ToString("0.##")</td></tr>
+                        <tr><td>Доставка</td><td class="text-right">@_shippingCost.ToString("0.##")</td></tr>
+                        <tr><td>Знижка</td><td class="text-right">−@_discount.ToString("0.##")</td></tr>
+                        <tr><td><b>Всього</b></td><td class="text-right"><b>@Total.ToString("0.##") грн</b></td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudSelect T="int" @bind-Value="_statusId" Label="Статус" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    @foreach (var status in _statuses)
+                    {
+                        <MudSelectItem T="int" Value="status.Id">@status.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="int" @bind-Value="_sourceId" Label="Джерело" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem T="int" Value="0">Не вказано</MudSelectItem>
+                    @foreach (var source in _sources)
+                    {
+                        <MudSelectItem T="int" Value="source.Id">@source.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="int?" @bind-Value="_managerId" Label="Менеджер" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                           HelperText="Не вибрано — відповідальним станете ви" Class="mb-2">
+                    @foreach (var manager in _managers)
+                    {
+                        <MudSelectItem T="int?" Value="manager.Id">@manager.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_comment" Label="Коментар" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudPaper>
+
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2" data-test="error">@_error</MudAlert>
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="_saving" OnClick="SaveAsync" data-test="save">
+                Створити замовлення
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private sealed class Line(ProductPickDto product)
+    {
+        public ProductPickDto Product { get; } = product;
+        public int? OptionValueId { get; set; }
+        public int Quantity { get; set; } = 1;
+        public decimal Price { get; set; } = product.Price;
+    }
+
+    private OrderMethodsDto? _methods;
+    private List<OrderStatusDto> _statuses = [];
+    private List<LookupItem> _sources = [];
+    private List<LookupItem> _managers = [];
+
+    private string _telephone = "", _firstname = "", _lastname = "", _email = "", _instagram = "";
+    private CustomerRiskDto? _risk;
+    private ProductPickDto? _productToAdd;
+    private readonly List<Line> _lines = [];
+    private OrderMethodDto? _shipping, _payment;
+    private CityDto? _city;
+    private WarehouseDto? _warehouse;
+    private string _street = "", _house = "", _flat = "", _comment = "";
+    private decimal _shippingCost, _discount, _prepayment;
+    private int _statusId, _sourceId;
+    private int? _managerId;
+    private string? _error;
+    private bool _saving;
+
+    private decimal SubTotal => _lines.Sum(l => l.Price * l.Quantity);
+
+    private decimal Total => SubTotal + _shippingCost - _discount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var methods = Api.MethodsAsync();
+        var statuses = Api.StatusesAsync();
+        var sources = Api.SourcesAsync();
+        var managers = Api.ManagersAsync();
+        (_statuses, _sources, _managers) = (await statuses, await sources, await managers);
+        _methods = await methods;
+        _statusId = _statuses.FirstOrDefault()?.Id ?? 0;
+        _shipping = _methods.Shipping.FirstOrDefault();
+        _payment = _methods.Payment.FirstOrDefault();
+    }
+
+    private async Task<IEnumerable<CustomerPickDto>> SearchCustomersAsync(string text, CancellationToken ct) => await Api.CustomersAsync(text);
+
+    private async Task<IEnumerable<ProductPickDto>> SearchProductsAsync(string text, CancellationToken ct) => await Api.ProductsAsync(text);
+
+    private async Task<IEnumerable<CityDto>> SearchCitiesAsync(string text, CancellationToken ct) => await Api.CitiesAsync(text);
+
+    private async Task<IEnumerable<WarehouseDto>> SearchWarehousesAsync(string text, CancellationToken ct) =>
+        _city is null ? [] : await Api.WarehousesAsync(_city.Ref, text ?? "");
+
+    private async Task PickCustomer(CustomerPickDto? customer)
+    {
+        if (customer is null)
+            return;
+        (_telephone, _firstname, _lastname, _email, _instagram) =
+            (customer.Telephone, customer.Firstname, customer.Lastname, customer.Email, customer.Instagram);
+        _street = customer.Address1;
+        await CheckRiskAsync();
+    }
+
+    private async Task CheckRiskAsync()
+    {
+        try
+        {
+            _risk = await Api.CustomerRiskAsync(_telephone, _firstname, _lastname, _email);
+        }
+        catch (ApiException)
+        {
+            _risk = null; // перевірка лише підказує, без неї замовлення однаково можна створити
+        }
+    }
+
+    private void AddProduct()
+    {
+        if (_productToAdd is not { } product)
+            return;
+        var line = new Line(product);
+        ChooseOption(line, product.Options.FirstOrDefault()?.ProductOptionValueId);
+        _lines.Add(line);
+        _productToAdd = null;
+    }
+
+    // Як на старому сайті: ціна опції, якщо вона більша за 0, замінює ціну товару.
+    private static void ChooseOption(Line line, int? optionValueId)
+    {
+        line.OptionValueId = optionValueId;
+        var option = line.Product.Options.FirstOrDefault(o => o.ProductOptionValueId == optionValueId);
+        line.Price = option is { Price: > 0 } ? option.Price : line.Product.Price;
+    }
+
+    private void CityChanged(CityDto? city)
+    {
+        _city = city;
+        _warehouse = null;
+    }
+
+    private static Severity RiskSeverity(CustomerRiskLevel level) => level switch
+    {
+        CustomerRiskLevel.Red => Severity.Error,
+        CustomerRiskLevel.Yellow => Severity.Warning,
+        _ => Severity.Success,
+    };
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _saving = true;
+        try
+        {
+            var request = new CreateOrderRequest(
+                _firstname, _lastname, _telephone, _email, _instagram, _sourceId, _statusId, _managerId,
+                _shipping?.Code ?? "", _shipping?.Name ?? "", _city?.Name ?? "", _street, _warehouse?.Name ?? "", _house, _flat,
+                _payment?.Code ?? "", _payment?.Name ?? "",
+                _lines.Select(l => new NewOrderLineRequest(l.Product.Id, l.OptionValueId, l.Quantity, l.Price)).ToList(),
+                _shippingCost, _discount, _prepayment, _comment);
+            var result = await Api.CreateAsync(request);
+
+            Snackbar.Add($"Замовлення №{result.OrderId} створено.", Severity.Success);
+            foreach (var warning in result.Warnings)
+                Snackbar.Add(warning, Severity.Warning);
+            Navigation.NavigateTo(OrderRoutes.Order(result.OrderId));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -75,6 +75,21 @@ public sealed class OrdersApi(HttpClient http)
     public async Task<WarehouseRefreshResult> RefreshWarehousesAsync() =>
         await ReadAsync<WarehouseRefreshResult>(await http.PostAsync("/delivery/warehouses/refresh", null));
 
+    public async Task<CreateOrderResult> CreateAsync(CreateOrderRequest request) =>
+        await ReadAsync<CreateOrderResult>(await http.PostAsJsonAsync("/orders", request));
+
+    public Task<OrderMethodsDto> MethodsAsync() => GetAsync<OrderMethodsDto>("/orders/new/methods");
+
+    public Task<List<ProductPickDto>> ProductsAsync(string search) =>
+        GetAsync<List<ProductPickDto>>($"/orders/new/products?search={Uri.EscapeDataString(search)}");
+
+    public Task<List<CustomerPickDto>> CustomersAsync(string search) =>
+        GetAsync<List<CustomerPickDto>>($"/orders/new/customers?search={Uri.EscapeDataString(search)}");
+
+    public Task<CustomerRiskDto> CustomerRiskAsync(string telephone, string firstname, string lastname, string email) =>
+        GetAsync<CustomerRiskDto>($"/orders/customer-risk?telephone={Uri.EscapeDataString(telephone)}&firstname={Uri.EscapeDataString(firstname)}" +
+            $"&lastname={Uri.EscapeDataString(lastname)}&email={Uri.EscapeDataString(email)}");
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

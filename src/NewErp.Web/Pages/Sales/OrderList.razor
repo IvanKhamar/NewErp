@@ -5,7 +5,11 @@
 
 <PageTitle>Замовлення — NewErp</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-3">Замовлення</MudText>
+<div class="d-flex align-center mb-3">
+    <MudText Typo="Typo.h4">Замовлення</MudText>
+    <MudSpacer />
+    <MudButton Href="@OrderRoutes.NewOrder" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Нове замовлення</MudButton>
+</div>
 
 <MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
     <MudTextField T="string" Value="_search" ValueChanged="v => SetAsync(() => _search = v)" Placeholder="Телефон, ім'я, email або №"

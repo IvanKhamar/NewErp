@@ -4,4 +4,6 @@ namespace NewErp.Web.Pages.Sales;
 public static class OrderRoutes
 {
     public static string Order(int id) => $"orders/{id}";
+
+    public const string NewOrder = "orders/new";
 }

@@ -109,7 +109,7 @@ public class OrderServiceTests
     }
 
     /// <summary>Підробка (fake) сховища в пам'яті: тест перевіряє логіку сервісу без бази даних.</summary>
-    private sealed class FakeOrderStore : IOrderStore
+    internal sealed class FakeOrderStore : IOrderStore
     {
         public Dictionary<int, int> Orders { get; } = [];
         public HashSet<int> Statuses { get; } = [];
