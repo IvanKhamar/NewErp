@@ -40,6 +40,7 @@ public static class DependencyInjection
 
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IOrderStore, OrderStore>();
+        services.AddScoped<INewOrderStore, NewOrderStore>();
         services.AddScoped<IBonusDataSource, BonusDataSource>();
         services.AddScoped<IStockRepository, StockRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();

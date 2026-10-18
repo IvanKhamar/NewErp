@@ -319,6 +319,25 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// </summary>
     private async Task SeedSizeOptionsAsync()
     {
+        // Каталог магазину: товар (ціна, наявність), його назва й назви опції «Розмір» та її значень.
+        for (var i = 0; i < Products.Length; i++)
+        {
+            db.DdProducts.Add(new DdProduct
+            {
+                ProductId = FirstProductId + i, Model = $"VD-{FirstProductId + i}", Price = 900 + i * 150, Quantity = 10, Status = true,
+                Shipping = true, Subtract = true, Sku = "", Upc = "", Ean = "", Jan = "", Isbn = "", Mpn = "", Location = "",
+                DateAvailable = DateTime.Today, DateAdded = DateTime.Today, DateModified = DateTime.Today,
+            });
+            db.DdProductDescriptions.Add(new DdProductDescription
+            {
+                ProductId = FirstProductId + i, LanguageId = LanguageId, Name = Products[i],
+                Description = "", Tag = "", MetaTitle = Products[i], MetaDescription = "", MetaKeyword = "",
+            });
+        }
+        db.DdOptionDescriptions.Add(new DdOptionDescription { OptionId = SizeOptionId, LanguageId = LanguageId, Name = "Розмір" });
+        foreach (var (size, valueId) in SizeOptionValues)
+            db.DdOptionValueDescriptions.Add(new DdOptionValueDescription { OptionValueId = valueId, LanguageId = LanguageId, OptionId = SizeOptionId, Name = size });
+
         var optionValues = new Dictionary<(int ProductId, string Size), DdProductOptionValue>();
         for (var i = 0; i < Products.Length; i++)
         {
@@ -327,7 +346,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
                 var value = new DdProductOptionValue
                 {
                     ProductOptionId = 1000 + i, ProductId = FirstProductId + i, OptionId = SizeOptionId, OptionValueId = valueId,
-                    Quantity = 0, Subtract = true, PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
+                    Quantity = 3, Subtract = true, PricePrefix = "+", PointsPrefix = "+", WeightPrefix = "+",
                 };
                 db.DdProductOptionValues.Add(value);
                 optionValues[(FirstProductId + i, size)] = value;

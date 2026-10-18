@@ -30,6 +30,26 @@ public static class OrderEndpoints
         orders.MapGet("/sources", (IOrderQueries queries, CancellationToken ct) => queries.ListSourcesAsync(ct))
             .WithSummary("Довідник джерел замовлення");
 
+        orders.MapPost("/", async (CreateOrderRequest request, ClaimsPrincipal user, NewOrderService service, CancellationToken ct) =>
+        {
+            var result = await service.CreateAsync(request, user.GetUserId(), ct);
+            return Results.Created($"/orders/{result.OrderId}", result);
+        })
+        .WithSummary("Створити замовлення вручну (дзвінок, соцмережі). risk — чи скасовував клієнт попередні замовлення");
+
+        orders.MapGet("/new/methods", (NewOrderService service, CancellationToken ct) => service.ListMethodsAsync(ct))
+            .WithSummary("Способи доставки й оплати, які вже траплялись у замовленнях");
+
+        orders.MapGet("/new/products", (string? search, NewOrderService service, CancellationToken ct) => service.SearchProductsAsync(search, ct))
+            .WithSummary("Пошук товару за назвою, моделлю чи id: ціна й розміри для нового замовлення");
+
+        orders.MapGet("/new/customers", (string? search, NewOrderService service, CancellationToken ct) => service.SearchCustomersAsync(search, ct))
+            .WithSummary("Клієнти з попередніх замовлень (від 3 символів імені, телефону чи email)");
+
+        orders.MapGet("/customer-risk", ([AsParameters] CustomerRiskQuery query, NewOrderService service, CancellationToken ct) =>
+            service.CheckRiskAsync(query, ct))
+            .WithSummary("Чи скасовував клієнт замовлення за останні 4 роки (за телефоном, ім'ям і прізвищем або email)");
+
         orders.MapPut("/{id:int}/status", (int id, ChangeOrderStatusRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
             service.ChangeStatusAsync(id, request, user.GetUserId(), ct))
         .WithSummary("Змінити статус (із записом у журнал). warnings — попередження від інших модулів");

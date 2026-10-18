@@ -24,4 +24,6 @@ public partial class DdOrderProduct
     public decimal Tax { get; set; }
 
     public int Reward { get; set; }
+
+    public bool Crosssell { get; set; }
 }

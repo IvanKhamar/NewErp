@@ -382,3 +382,18 @@ CREATE TABLE `dd_privatbank` (
   KEY `appcode` (`appcode`),
   KEY `order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ═══ Власні колонки замовлення, які пише оформлення замовлення старого сайту ═══
+-- Відновлено з catalog/model/checkout/order.php (addOrder) і admin/model/sale/order.php. Типи й значення за замовчуванням вгадані, звірити.
+-- Instagram клієнта, будинок і квартира для адресної доставки, день народження (для привітань), «передзвоніть мені».
+ALTER TABLE `dd_order`
+  ADD COLUMN `instagram` varchar(128) NOT NULL DEFAULT '',
+  ADD COLUMN `birthday_day` int(2) NOT NULL DEFAULT '0',
+  ADD COLUMN `birthday_month` int(2) NOT NULL DEFAULT '0',
+  ADD COLUMN `shipping_house` varchar(32) NOT NULL DEFAULT '',
+  ADD COLUMN `shipping_flat` varchar(32) NOT NULL DEFAULT '',
+  ADD COLUMN `callback` tinyint(1) NOT NULL DEFAULT '0';
+
+-- Товар додано до замовлення як супутній (cross-sell). Звірити.
+ALTER TABLE `dd_order_product`
+  ADD COLUMN `crosssell` tinyint(1) NOT NULL DEFAULT '0';

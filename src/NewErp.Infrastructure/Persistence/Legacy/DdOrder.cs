@@ -132,4 +132,16 @@ public partial class DdOrder
     public DateTime? DateRemind { get; set; }
 
     public decimal Prepayment { get; set; }
+
+    public string Instagram { get; set; } = null!;
+
+    public int BirthdayDay { get; set; }
+
+    public int BirthdayMonth { get; set; }
+
+    public string ShippingHouse { get; set; } = null!;
+
+    public string ShippingFlat { get; set; } = null!;
+
+    public bool Callback { get; set; }
 }

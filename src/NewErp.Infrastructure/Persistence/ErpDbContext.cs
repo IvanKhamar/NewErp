@@ -14,6 +14,10 @@ public partial class ErpDbContext : DbContext
     {
     }
 
+    public virtual DbSet<DdOptionDescription> DdOptionDescriptions { get; set; }
+
+    public virtual DbSet<DdOptionValueDescription> DdOptionValueDescriptions { get; set; }
+
     public virtual DbSet<DdOrder> DdOrders { get; set; }
 
     public virtual DbSet<DdOrderOption> DdOrderOptions { get; set; }
@@ -26,7 +30,13 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdOrderStatusLog> DdOrderStatusLogs { get; set; }
 
+    public virtual DbSet<DdOrderTotal> DdOrderTotals { get; set; }
+
+    public virtual DbSet<DdProduct> DdProducts { get; set; }
+
     public virtual DbSet<DdProductDescription> DdProductDescriptions { get; set; }
+
+    public virtual DbSet<DdProductOption> DdProductOptions { get; set; }
 
     public virtual DbSet<DdProductOptionValue> DdProductOptionValues { get; set; }
 
@@ -38,6 +48,33 @@ public partial class ErpDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DdOptionDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.OptionId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_option_description");
+
+            entity.Property(e => e.OptionId).HasColumnName("option_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(128)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdOptionValueDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.OptionValueId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_option_value_description");
+
+            entity.Property(e => e.OptionValueId).HasColumnName("option_value_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(128)
+                .HasColumnName("name");
+            entity.Property(e => e.OptionId).HasColumnName("option_id");
+        });
+
         modelBuilder.Entity<DdOrder>(entity =>
         {
             entity.HasKey(e => e.OrderId).HasName("PRIMARY");
@@ -49,6 +86,9 @@ public partial class ErpDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("accept_language");
             entity.Property(e => e.AffiliateId).HasColumnName("affiliate_id");
+            entity.Property(e => e.BirthdayDay).HasColumnName("birthday_day");
+            entity.Property(e => e.BirthdayMonth).HasColumnName("birthday_month");
+            entity.Property(e => e.Callback).HasColumnName("callback");
             entity.Property(e => e.Comment)
                 .HasColumnType("text")
                 .HasColumnName("comment");
@@ -89,6 +129,10 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.ForwardedIp)
                 .HasMaxLength(40)
                 .HasColumnName("forwarded_ip");
+            entity.Property(e => e.Instagram)
+                .HasMaxLength(128)
+                .HasDefaultValueSql("''")
+                .HasColumnName("instagram");
             entity.Property(e => e.InvoiceNo).HasColumnName("invoice_no");
             entity.Property(e => e.InvoicePrefix)
                 .HasMaxLength(26)
@@ -175,6 +219,14 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.ShippingFirstname)
                 .HasMaxLength(32)
                 .HasColumnName("shipping_firstname");
+            entity.Property(e => e.ShippingFlat)
+                .HasMaxLength(32)
+                .HasDefaultValueSql("''")
+                .HasColumnName("shipping_flat");
+            entity.Property(e => e.ShippingHouse)
+                .HasMaxLength(32)
+                .HasDefaultValueSql("''")
+                .HasColumnName("shipping_house");
             entity.Property(e => e.ShippingLastname)
                 .HasMaxLength(32)
                 .HasColumnName("shipping_lastname");
@@ -240,6 +292,7 @@ public partial class ErpDbContext : DbContext
             entity.HasIndex(e => e.OrderId, "order_id");
 
             entity.Property(e => e.OrderProductId).HasColumnName("order_product_id");
+            entity.Property(e => e.Crosssell).HasColumnName("crosssell");
             entity.Property(e => e.Model)
                 .HasMaxLength(64)
                 .HasColumnName("model");
@@ -313,6 +366,110 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.UserId).HasColumnName("user_id");
         });
 
+        modelBuilder.Entity<DdOrderTotal>(entity =>
+        {
+            entity.HasKey(e => e.OrderTotalId).HasName("PRIMARY");
+
+            entity.ToTable("dd_order_total");
+
+            entity.HasIndex(e => e.OrderId, "order_id");
+
+            entity.Property(e => e.OrderTotalId).HasColumnName("order_total_id");
+            entity.Property(e => e.Code)
+                .HasMaxLength(32)
+                .HasColumnName("code");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Title)
+                .HasMaxLength(255)
+                .HasColumnName("title");
+            entity.Property(e => e.Value)
+                .HasPrecision(15, 4)
+                .HasColumnName("value");
+        });
+
+        modelBuilder.Entity<DdProduct>(entity =>
+        {
+            entity.HasKey(e => e.ProductId).HasName("PRIMARY");
+
+            entity.ToTable("dd_product");
+
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.DateAvailable)
+                .HasDefaultValueSql("'0000-00-00'")
+                .HasColumnType("date")
+                .HasColumnName("date_available");
+            entity.Property(e => e.DateModified)
+                .HasColumnType("datetime")
+                .HasColumnName("date_modified");
+            entity.Property(e => e.Ean)
+                .HasMaxLength(14)
+                .HasColumnName("ean");
+            entity.Property(e => e.Height)
+                .HasPrecision(15, 8)
+                .HasColumnName("height");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasColumnName("image");
+            entity.Property(e => e.Isbn)
+                .HasMaxLength(17)
+                .HasColumnName("isbn");
+            entity.Property(e => e.Jan)
+                .HasMaxLength(13)
+                .HasColumnName("jan");
+            entity.Property(e => e.Length)
+                .HasPrecision(15, 8)
+                .HasColumnName("length");
+            entity.Property(e => e.LengthClassId).HasColumnName("length_class_id");
+            entity.Property(e => e.Location)
+                .HasMaxLength(128)
+                .HasColumnName("location");
+            entity.Property(e => e.ManufacturerId).HasColumnName("manufacturer_id");
+            entity.Property(e => e.Minimum)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("minimum");
+            entity.Property(e => e.Model)
+                .HasMaxLength(64)
+                .HasColumnName("model");
+            entity.Property(e => e.Mpn)
+                .HasMaxLength(64)
+                .HasColumnName("mpn");
+            entity.Property(e => e.Points).HasColumnName("points");
+            entity.Property(e => e.Price)
+                .HasPrecision(15, 4)
+                .HasColumnName("price");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Shipping)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("shipping");
+            entity.Property(e => e.Sku)
+                .HasMaxLength(64)
+                .HasColumnName("sku");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StockStatusId).HasColumnName("stock_status_id");
+            entity.Property(e => e.Subtract)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("subtract");
+            entity.Property(e => e.TaxClassId).HasColumnName("tax_class_id");
+            entity.Property(e => e.Upc)
+                .HasMaxLength(12)
+                .HasColumnName("upc");
+            entity.Property(e => e.Viewed).HasColumnName("viewed");
+            entity.Property(e => e.Weight)
+                .HasPrecision(15, 8)
+                .HasColumnName("weight");
+            entity.Property(e => e.WeightClassId).HasColumnName("weight_class_id");
+            entity.Property(e => e.Width)
+                .HasPrecision(15, 8)
+                .HasColumnName("width");
+        });
+
         modelBuilder.Entity<DdProductDescription>(entity =>
         {
             entity.HasKey(e => new { e.ProductId, e.LanguageId }).HasName("PRIMARY");
@@ -339,6 +496,21 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.Tag)
                 .HasColumnType("text")
                 .HasColumnName("tag");
+        });
+
+        modelBuilder.Entity<DdProductOption>(entity =>
+        {
+            entity.HasKey(e => e.ProductOptionId).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_option");
+
+            entity.Property(e => e.ProductOptionId).HasColumnName("product_option_id");
+            entity.Property(e => e.OptionId).HasColumnName("option_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.Required).HasColumnName("required");
+            entity.Property(e => e.Value)
+                .HasColumnType("text")
+                .HasColumnName("value");
         });
 
         modelBuilder.Entity<DdProductOptionValue>(entity =>
