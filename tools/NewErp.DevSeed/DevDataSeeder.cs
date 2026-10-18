@@ -283,8 +283,8 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// </summary>
     private async Task<int> SeedProductionOperationsAsync(int userId, string username)
     {
-        var repository = new ProductionRepository(db, Options.Create(new ErpOptions { LanguageId = LanguageId }));
-        var service = new ProductionService(repository, TimeProvider.System);
+        var erpOptions = Options.Create(new ErpOptions { LanguageId = LanguageId });
+        var service = new ProductionService(new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions), TimeProvider.System);
         var warnings = 0;
         foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
         {

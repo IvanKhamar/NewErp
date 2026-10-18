@@ -17,6 +17,20 @@ public class ProductionModelTests
         typeof(ProductionSize).GetProperty(property)!.SetValue(size, value);
 
     [Fact]
+    public void StorefrontQuantities_AreWholeSewnStockOfMappedSizes()
+    {
+        var model = NewModel("S", "M", "L", "XL");
+        for (var i = 0; i < model.Sizes.Count; i++)
+            typeof(ProductionSize).GetProperty(nameof(ProductionSize.Id))!.SetValue(model.Sizes[i], i + 1);
+        SetStock(model.Sizes[0], nameof(ProductionSize.SewnStock), 4.7m);
+        SetStock(model.Sizes[1], nameof(ProductionSize.SewnStock), 2);
+        SetStock(model.Sizes[2], nameof(ProductionSize.SewnStock), 9);
+        model.SetSizeOptions([(1, 46), (2, 47), (3, 47)]); // L зв'язано з тим самим значенням, що й M; XL не зв'язано
+
+        Assert.Equal(new Dictionary<int, int> { [46] = 4, [47] = 2 }, model.StorefrontQuantities());
+    }
+
+    [Fact]
     public void SetSizes_MatchesByNameKeepingObjectsAndStock()
     {
         var model = NewModel("S", "M", "L");

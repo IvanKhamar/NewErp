@@ -47,6 +47,9 @@ public sealed class ProductionApi(HttpClient http)
         _ => throw new ArgumentOutOfRangeException(nameof(operation)),
     };
 
+    public async Task<StorefrontSyncResult> SyncStorefrontAsync() =>
+        await ReadAsync<StorefrontSyncResult>(await http.PostAsync("/production/storefront/sync", null));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private async Task<int> CreateAsync<T>(string url, T body) => (await ReadAsync<Created>(await http.PostAsJsonAsync(url, body))).Id;

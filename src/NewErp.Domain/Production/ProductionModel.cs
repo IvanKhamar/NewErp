@@ -134,6 +134,19 @@ public class ProductionModel
     }
 
     /// <summary>
+    /// Скільки виробів показати на вітрині для кожного зв'язаного значення опції «Розмір»: пошитий залишок розміру,
+    /// округлений униз до цілих (кількість у OpenCart ціла). Якщо два розміри зв'язано з тим самим значенням,
+    /// береться перший, як у старому модулі.
+    /// </summary>
+    public IReadOnlyDictionary<int, int> StorefrontQuantities()
+    {
+        var result = new Dictionary<int, int>();
+        foreach (var size in _sizes.Where(s => s.OptionValueId is not null).OrderBy(s => s.SortOrder).ThenBy(s => s.Id))
+            result.TryAdd(size.OptionValueId!.Value, (int)Math.Floor(Math.Max(size.SewnStock, 0)));
+        return result;
+    }
+
+    /// <summary>
     /// Замінює специфікацію пошиву. Кожен рядок — або деталь крою цієї моделі, або розхідник, не обидва.
     /// </summary>
     public void SetSewnBom(

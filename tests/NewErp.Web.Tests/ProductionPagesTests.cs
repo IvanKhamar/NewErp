@@ -68,4 +68,17 @@ public class ProductionPagesTests : WebTestContext
 
         Assert.Contains("Сукня", Assert.Single(page.FindAll("tbody tr")).TextContent);
     }
+
+    [Fact]
+    public void Models_StorefrontSync_ReportsResult()
+    {
+        Api.Respond("/production/models", HttpStatusCode.OK, new List<ProductionModelSummaryDto>());
+        Api.Respond("/production/storefront/sync", HttpStatusCode.OK, new StorefrontSyncResult(3, 12));
+        var snackbar = Render<MudBlazor.MudSnackbarProvider>();
+        var page = Render<Models>();
+
+        page.Find("[data-test=storefront-sync]").Click();
+
+        snackbar.WaitForAssertion(() => Assert.Contains("моделей 3, товарів на сайті 12", snackbar.Markup));
+    }
 }

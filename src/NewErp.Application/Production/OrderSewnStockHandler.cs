@@ -11,7 +11,8 @@ namespace NewErp.Application.Production;
 /// з Production:OrderSubtractStatusIds, вироби потрібного розміру списуються; коли виходить — повертаються.
 /// Розмір береться з опції товару в замовленні, зв'язаної з розміром моделі.
 /// </summary>
-public sealed class OrderSewnStockHandler(IProductionRepository repository, IOptions<ProductionOptions> options, TimeProvider clock)
+public sealed class OrderSewnStockHandler(
+    IProductionRepository repository, IStorefrontStock storefront, IOptions<ProductionOptions> options, TimeProvider clock)
     : IOrderStatusHandler
 {
     /// <summary>Як у старому сайті: автоматичні зміни журналу підписані "system", а user_id — того, хто змінив статус.</summary>
@@ -57,6 +58,8 @@ public sealed class OrderSewnStockHandler(IProductionRepository repository, IOpt
             Return(change, bySize, held, now);
 
         await repository.SaveChangesAsync(ct);
+        // Сайт сам віднімає залишок лише при оформленні замовлення на вітрині, тож після зміни в NewErp передаємо його.
+        await storefront.PushAsync(bySize.Keys.Select(k => k.Model.Id).Distinct().ToList(), ct);
         return warnings;
     }
 
