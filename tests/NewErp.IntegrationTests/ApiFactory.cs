@@ -203,14 +203,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         DateAdded = DateTime.Now,
     };
 
-    private static DdProduct Product(int id, string model, decimal price) => new()
+    internal static DdProduct Product(int id, string model, decimal price) => new()
     {
         ProductId = id, Model = model, Price = price, Quantity = 5, Status = true, Shipping = true, Subtract = true,
         Sku = "", Upc = "", Ean = "", Jan = "", Isbn = "", Mpn = "", Location = "",
         DateAvailable = new DateTime(2026, 1, 1), DateAdded = new DateTime(2026, 1, 1), DateModified = new DateTime(2026, 1, 1),
     };
 
-    private static DdOrder Order(int id, int statusId, decimal total, DateTime date) => new()
+    internal static DdOrder Order(int id, int statusId, decimal total, DateTime date) => new()
     {
         OrderId = id,
         OrderStatusId = statusId,

@@ -16,6 +16,14 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdCategoryDescription> DdCategoryDescriptions { get; set; }
 
+    public virtual DbSet<DdCrosssellItem> DdCrosssellItems { get; set; }
+
+    public virtual DbSet<DdCrosssellSort> DdCrosssellSorts { get; set; }
+
+    public virtual DbSet<DdFilter> DdFilters { get; set; }
+
+    public virtual DbSet<DdFilterDescription> DdFilterDescriptions { get; set; }
+
     public virtual DbSet<DdOptionDescription> DdOptionDescriptions { get; set; }
 
     public virtual DbSet<DdOptionValueDescription> DdOptionValueDescriptions { get; set; }
@@ -38,13 +46,29 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdProductDescription> DdProductDescriptions { get; set; }
 
+    public virtual DbSet<DdProductFilter> DdProductFilters { get; set; }
+
     public virtual DbSet<DdProductImage> DdProductImages { get; set; }
+
+    public virtual DbSet<DdProductLabel> DdProductLabels { get; set; }
+
+    public virtual DbSet<DdProductManualPin> DdProductManualPins { get; set; }
 
     public virtual DbSet<DdProductOption> DdProductOptions { get; set; }
 
     public virtual DbSet<DdProductOptionValue> DdProductOptionValues { get; set; }
 
+    public virtual DbSet<DdProductOrderSnapshot> DdProductOrderSnapshots { get; set; }
+
+    public virtual DbSet<DdProductOrderSnapshotItem> DdProductOrderSnapshotItems { get; set; }
+
     public virtual DbSet<DdProductToCategory> DdProductToCategories { get; set; }
+
+    public virtual DbSet<DdProductToLabel> DdProductToLabels { get; set; }
+
+    public virtual DbSet<DdProductToStore> DdProductToStores { get; set; }
+
+    public virtual DbSet<DdSetting> DdSettings { get; set; }
 
     public virtual DbSet<DdUser> DdUsers { get; set; }
 
@@ -75,6 +99,57 @@ public partial class ErpDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("meta_title");
             entity.Property(e => e.Name).HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdCrosssellItem>(entity =>
+        {
+            entity.HasKey(e => e.CrosssellItemId).HasName("PRIMARY");
+
+            entity.ToTable("dd_crosssell_item");
+
+            entity.Property(e => e.CrosssellItemId).HasColumnName("crosssell_item_id");
+            entity.Property(e => e.Discount)
+                .HasPrecision(5)
+                .HasColumnName("discount");
+            entity.Property(e => e.TargetId).HasColumnName("target_id");
+            entity.Property(e => e.Type)
+                .HasMaxLength(16)
+                .HasColumnName("type");
+        });
+
+        modelBuilder.Entity<DdCrosssellSort>(entity =>
+        {
+            entity.HasKey(e => e.ProductId).HasName("PRIMARY");
+
+            entity.ToTable("dd_crosssell_sort");
+
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<DdFilter>(entity =>
+        {
+            entity.HasKey(e => e.FilterId).HasName("PRIMARY");
+
+            entity.ToTable("dd_filter");
+
+            entity.Property(e => e.FilterId).HasColumnName("filter_id");
+            entity.Property(e => e.FilterGroupId).HasColumnName("filter_group_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<DdFilterDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.FilterId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_filter_description");
+
+            entity.Property(e => e.FilterId).HasColumnName("filter_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.FilterGroupId).HasColumnName("filter_group_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasColumnName("name");
         });
 
         modelBuilder.Entity<DdOptionDescription>(entity =>
@@ -288,6 +363,7 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.UserAgent)
                 .HasMaxLength(255)
                 .HasColumnName("user_agent");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
         });
 
         modelBuilder.Entity<DdOrderOption>(entity =>
@@ -527,6 +603,16 @@ public partial class ErpDbContext : DbContext
                 .HasColumnName("tag");
         });
 
+        modelBuilder.Entity<DdProductFilter>(entity =>
+        {
+            entity.HasKey(e => new { e.ProductId, e.FilterId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_filter");
+
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.FilterId).HasColumnName("filter_id");
+        });
+
         modelBuilder.Entity<DdProductImage>(entity =>
         {
             entity.HasKey(e => e.ProductImageId).HasName("PRIMARY");
@@ -541,6 +627,53 @@ public partial class ErpDbContext : DbContext
                 .HasColumnName("image");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<DdProductLabel>(entity =>
+        {
+            entity.HasKey(e => e.LabelId).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_label");
+
+            entity.Property(e => e.LabelId).HasColumnName("label_id");
+            entity.Property(e => e.BackgroundColor)
+                .HasMaxLength(16)
+                .HasDefaultValueSql("''")
+                .HasColumnName("background_color");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasColumnName("name");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("status");
+            entity.Property(e => e.TextColor)
+                .HasMaxLength(16)
+                .HasDefaultValueSql("''")
+                .HasColumnName("text_color");
+        });
+
+        modelBuilder.Entity<DdProductManualPin>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_manual_pin");
+
+            entity.HasIndex(e => new { e.GroupType, e.GroupKey }, "group");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.GroupKey)
+                .HasMaxLength(128)
+                .HasColumnName("group_key");
+            entity.Property(e => e.GroupType)
+                .HasMaxLength(32)
+                .HasColumnName("group_type");
+            entity.Property(e => e.Position).HasColumnName("position");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
         });
 
         modelBuilder.Entity<DdProductOption>(entity =>
@@ -589,6 +722,33 @@ public partial class ErpDbContext : DbContext
                 .HasColumnName("weight_prefix");
         });
 
+        modelBuilder.Entity<DdProductOrderSnapshot>(entity =>
+        {
+            entity.HasKey(e => e.SnapshotId).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_order_snapshot");
+
+            entity.Property(e => e.SnapshotId).HasColumnName("snapshot_id");
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("''")
+                .HasColumnName("note");
+        });
+
+        modelBuilder.Entity<DdProductOrderSnapshotItem>(entity =>
+        {
+            entity.HasKey(e => new { e.SnapshotId, e.ProductId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_order_snapshot_item");
+
+            entity.Property(e => e.SnapshotId).HasColumnName("snapshot_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
         modelBuilder.Entity<DdProductToCategory>(entity =>
         {
             entity.HasKey(e => new { e.ProductId, e.CategoryId }).HasName("PRIMARY");
@@ -599,6 +759,46 @@ public partial class ErpDbContext : DbContext
 
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
+        });
+
+        modelBuilder.Entity<DdProductToLabel>(entity =>
+        {
+            entity.HasKey(e => new { e.ProductId, e.LabelId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_to_label");
+
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.LabelId).HasColumnName("label_id");
+        });
+
+        modelBuilder.Entity<DdProductToStore>(entity =>
+        {
+            entity.HasKey(e => new { e.ProductId, e.StoreId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_product_to_store");
+
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.StoreId).HasColumnName("store_id");
+        });
+
+        modelBuilder.Entity<DdSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId).HasName("PRIMARY");
+
+            entity.ToTable("dd_setting");
+
+            entity.Property(e => e.SettingId).HasColumnName("setting_id");
+            entity.Property(e => e.Code)
+                .HasMaxLength(128)
+                .HasColumnName("code");
+            entity.Property(e => e.Key)
+                .HasMaxLength(128)
+                .HasColumnName("key");
+            entity.Property(e => e.Serialized).HasColumnName("serialized");
+            entity.Property(e => e.StoreId).HasColumnName("store_id");
+            entity.Property(e => e.Value)
+                .HasColumnType("text")
+                .HasColumnName("value");
         });
 
         modelBuilder.Entity<DdUser>(entity =>

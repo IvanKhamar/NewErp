@@ -144,4 +144,6 @@ public partial class DdOrder
     public string ShippingFlat { get; set; } = null!;
 
     public bool Callback { get; set; }
+
+    public int UserId { get; set; }
 }
