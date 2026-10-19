@@ -190,10 +190,11 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await SeedPartnerAsync(now);
         await SeedProductSortAsync();
         var birthdays = await SeedMarketingAsync();
+        var customers = await SeedCustomersAsync();
         var returns = await SeedReturnsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), {returns} повернень, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), {customers} зареєстрованих покупців, {returns} повернень, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -466,6 +467,54 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
         return birthdays;
+    }
+
+    /// <summary>
+    /// Групи й зареєстровані покупці: кожен п'ятий клієнт замовлень «зареєструвався», його замовлення отримує customer_id.
+    /// Пароля немає (порожній), тож увійти на сайт ними не можна.
+    /// </summary>
+    private async Task<int> SeedCustomersAsync()
+    {
+        db.DdCustomerGroupDescriptions.AddRange(
+            new DdCustomerGroupDescription { CustomerGroupId = 1, LanguageId = LanguageId, Name = "Роздріб", Description = "" },
+            new DdCustomerGroupDescription { CustomerGroupId = 2, LanguageId = LanguageId, Name = "Опт", Description = "" });
+
+        var orders = await db.DdOrders.Where(o => o.OrderStatusId > 0).OrderBy(o => o.OrderId).ToListAsync();
+        var count = 0;
+        foreach (var (order, i) in orders.Where((_, i) => i % 5 == 0).Select((o, i) => (o, i)))
+        {
+            var customer = new DdCustomer
+            {
+                CustomerGroupId = i % 8 == 0 ? 2 : 1, LanguageId = LanguageId, Firstname = order.Firstname, Lastname = order.Lastname,
+                Email = order.Email, Telephone = order.Telephone, Fax = "", Password = "", Salt = "", CustomField = "", Ip = "",
+                Newsletter = i % 3 == 0, Status = i % 10 != 9, Token = "", Code = "", DateAdded = order.DateAdded.AddMinutes(-5),
+            };
+            db.DdCustomers.Add(customer);
+            await db.SaveChangesAsync();
+            var address = new DdAddress
+            {
+                CustomerId = customer.CustomerId, Firstname = order.Firstname, Lastname = order.Lastname, Company = "",
+                Address1 = order.ShippingAddress2, Address2 = "", City = order.ShippingCity, Postcode = "", CustomField = "",
+            };
+            db.DdAddresses.Add(address);
+            await db.SaveChangesAsync();
+            customer.AddressId = address.AddressId;
+            order.CustomerId = customer.CustomerId;
+            if (i % 6 == 0 && orders.IndexOf(order) + 1 < orders.Count)
+            {
+                // Наступне замовлення ця ж людина оформила як гість, записавши телефон інакше: картка знайде його за телефоном.
+                var guest = orders[orders.IndexOf(order) + 1];
+                (guest.Firstname, guest.Lastname, guest.Telephone) = (order.Firstname, order.Lastname, new string(order.Telephone.Where(char.IsAsciiDigit).ToArray()));
+            }
+            if (i % 4 == 0)
+                db.DdCustomerHistories.Add(new DdCustomerHistory
+                {
+                    CustomerId = customer.CustomerId, Comment = "Просила дзвонити після 18:00.", DateAdded = order.DateAdded.AddDays(1),
+                });
+            count++;
+        }
+        await db.SaveChangesAsync();
+        return count;
     }
 
     /// <summary>Довідники повернень (статуси, причини, дії) і кілька повернень з виконаних замовлень, як оформив би менеджер.</summary>

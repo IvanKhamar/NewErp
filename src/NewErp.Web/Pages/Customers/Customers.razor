@@ -1,0 +1,78 @@
+@page "/customers"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CustomersApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Покупці — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Покупці</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">Ті, хто зареєструвався на сайті. Гостей без реєстрації шукайте в замовленнях за телефоном.</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudTextField T="string" Value="_search" ValueChanged="v => SetAsync(() => _search = v)" Placeholder="Ім'я, e-mail, телефон"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Immediate="true"
+                  Style="min-width: 240px" />
+    <MudSelect T="int?" Value="_groupId" ValueChanged="v => SetAsync(() => _groupId = v)" Label="Група" Clearable="true" Style="min-width: 180px">
+        @foreach (var group in _groups)
+        {
+            <MudSelectItem T="int?" Value="group.Id">@group.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="bool?" Value="_status" ValueChanged="v => SetAsync(() => _status = v)" Label="Стан" Clearable="true" Style="min-width: 160px">
+        <MudSelectItem T="bool?" Value="true">Увімкнені</MudSelectItem>
+        <MudSelectItem T="bool?" Value="false">Вимкнені</MudSelectItem>
+    </MudSelect>
+</MudPaper>
+
+<MudTable @ref="_table" T="CustomerListItem" ServerData="LoadAsync" Hover="true" Dense="true" RowStyle="cursor: pointer" RowsPerPage="20"
+          OnRowClick="row => Navigation.NavigateTo(CustomerRoutes.Customer(row.Item!.Id))" data-test="customers">
+    <HeaderContent>
+        <MudTh>Покупець</MudTh>
+        <MudTh>Телефон</MudTh>
+        <MudTh>E-mail</MudTh>
+        <MudTh>Група</MudTh>
+        <MudTh Style="text-align: right">Замовлень</MudTh>
+        <MudTh>Зареєстрований</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Покупець">
+            @context.Name
+            @if (!context.Status)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">вимкнений</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Телефон">@context.Telephone</MudTd>
+        <MudTd DataLabel="E-mail">@context.Email</MudTd>
+        <MudTd DataLabel="Група">@context.GroupName</MudTd>
+        <MudTd DataLabel="Замовлень" Style="text-align: right">@context.OrderCount</MudTd>
+        <MudTd DataLabel="Зареєстрований">@Fmt.Date(context.DateAdded)</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Покупців не знайдено.</MudText></NoRecordsContent>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="На сторінці:" InfoFormat="{first_item}–{last_item} з {all_items}" PageSizeOptions="new[] { 20, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<CustomerListItem>? _table;
+    private IReadOnlyList<CustomerGroupDto> _groups = [];
+    private string? _search;
+    private int? _groupId;
+    private bool? _status;
+
+    protected override async Task OnInitializedAsync() => _groups = await Api.GroupsAsync();
+
+    private async Task<TableData<CustomerListItem>> LoadAsync(TableState state, CancellationToken ct)
+    {
+        var page = await Api.ListAsync(new CustomerFilter(_search, _groupId, _status, state.Page + 1, state.PageSize));
+        return new TableData<CustomerListItem> { Items = page.Items, TotalItems = page.TotalCount };
+    }
+
+    private async Task SetAsync(Action change)
+    {
+        change();
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+}
