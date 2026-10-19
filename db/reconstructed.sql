@@ -541,3 +541,10 @@ CREATE TABLE `dd_subscribe` (
   `date_added` datetime NOT NULL,
   PRIMARY KEY (`subscribe_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ План пошиву ═══
+-- production_period — за скільки днів від дати замовлення товар цієї категорії має бути готовий.
+-- Відновлено з admin/controller/sale/order.php (date_production = date_added + production_period днів); тип і значення
+-- за замовчуванням вгадані, звірити.
+ALTER TABLE `dd_category`
+  ADD COLUMN `production_period` int(11) NOT NULL DEFAULT '0';

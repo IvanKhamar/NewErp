@@ -105,6 +105,9 @@ public sealed class ProductionOptions
     /// перехід усередині набору нічого не змінює (як у старому модулі StockTrack).
     /// </summary>
     public int[] OrderSubtractStatusIds { get; set; } = [];
+
+    /// <summary>Статуси активних замовлень, для яких рахуємо план пошиву (ще не готові до відправки).</summary>
+    public int[] PlanStatusIds { get; set; } = [];
 }
 
 /// <summary>
@@ -112,3 +115,18 @@ public sealed class ProductionOptions
 /// (напряму чи через категорію), і значення опцій OpenCart, серед яких шукаємо розмір.
 /// </summary>
 public sealed record OrderSizeLine(int ProductId, string ProductName, int Quantity, int? ProductionId, IReadOnlyList<int> OptionValueIds);
+
+// ── План пошиву ──
+
+/// <summary>Активне замовлення для плану пошиву: рядки з моделлю й розміром і те, що воно вже тримає (за id розміру).</summary>
+public sealed record PlanOrder(int OrderId, DateTime DateAdded, IReadOnlyList<OrderSizeLine> Lines, IReadOnlyDictionary<int, decimal> Held);
+
+/// <summary>Missing — скільки бракує активним замовленням; ToSew — скільки пошити після вільного запасу; ToCut — скільки ще розкроїти.</summary>
+public sealed record SewingPlanRowDto(
+    int ProductionId, string ModelName, int SizeId, string SizeName, decimal Ordered, decimal Missing, decimal SewnStock,
+    decimal CutStock, decimal ToSew, decimal FromCut, decimal ToCut, DateOnly? Deadline, bool Overdue, IReadOnlyList<int> OrderIds);
+
+/// <summary>Товар активних замовлень, який не вдалося врахувати в плані (без моделі або розмір без зв'язку), і в яких замовленнях він є.</summary>
+public sealed record SewingPlanIssueDto(string ProductName, string Reason, IReadOnlyList<int> OrderIds);
+
+public sealed record SewingPlanDto(int OrderCount, IReadOnlyList<SewingPlanRowDto> Rows, IReadOnlyList<SewingPlanIssueDto> Issues);

@@ -14,6 +14,8 @@ public partial class ErpDbContext : DbContext
     {
     }
 
+    public virtual DbSet<DdCategory> DdCategories { get; set; }
+
     public virtual DbSet<DdCategoryDescription> DdCategoryDescriptions { get; set; }
 
     public virtual DbSet<DdCoupon> DdCoupons { get; set; }
@@ -82,6 +84,32 @@ public partial class ErpDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DdCategory>(entity =>
+        {
+            entity.HasKey(e => e.CategoryId).HasName("PRIMARY");
+
+            entity.ToTable("dd_category");
+
+            entity.HasIndex(e => e.ParentId, "parent_id");
+
+            entity.Property(e => e.CategoryId).HasColumnName("category_id");
+            entity.Property(e => e.Column).HasColumnName("column");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.DateModified)
+                .HasColumnType("datetime")
+                .HasColumnName("date_modified");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasColumnName("image");
+            entity.Property(e => e.ParentId).HasColumnName("parent_id");
+            entity.Property(e => e.ProductionPeriod).HasColumnName("production_period");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Top).HasColumnName("top");
+        });
+
         modelBuilder.Entity<DdCategoryDescription>(entity =>
         {
             entity.HasKey(e => new { e.CategoryId, e.LanguageId }).HasName("PRIMARY");

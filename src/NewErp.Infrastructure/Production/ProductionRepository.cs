@@ -8,15 +8,20 @@ using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Production;
 
-public sealed class ProductionRepository(ErpDbContext db, IOptions<ErpOptions> options) : IProductionRepository
+public sealed class ProductionRepository(ErpDbContext db, IOptions<ErpOptions> options) : IProductionRepository, ISewingPlanSource
 {
     private readonly int _languageId = options.Value.LanguageId;
 
-    public async Task<IReadOnlyList<OrderSizeLine>> GetOrderSizeLinesAsync(int orderId, CancellationToken ct)
+    public async Task<IReadOnlyList<OrderSizeLine>> GetOrderSizeLinesAsync(int orderId, CancellationToken ct) =>
+        (await GetSizeLinesAsync([orderId], ct)).Select(l => l.Line).ToList();
+
+    /// <summary>Рядки кількох замовлень з моделлю виробництва й опціями (для плану пошиву).</summary>
+    private async Task<List<(int OrderId, OrderSizeLine Line)>> GetSizeLinesAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct)
     {
         var products = await db.DdOrderProducts.AsNoTracking()
-            .Where(p => p.OrderId == orderId)
-            .Select(p => new { p.OrderProductId, p.ProductId, p.Name, p.Quantity })
+            .Where(p => orderIds.Contains(p.OrderId))
+            .OrderBy(p => p.OrderId).ThenBy(p => p.OrderProductId)
+            .Select(p => new { p.OrderId, p.OrderProductId, p.ProductId, p.Name, p.Quantity })
             .ToListAsync(ct);
         if (products.Count == 0)
             return [];
@@ -26,7 +31,7 @@ public sealed class ProductionRepository(ErpDbContext db, IOptions<ErpOptions> o
         var options = await (
             from o in db.DdOrderOptions
             join v in db.DdProductOptionValues on o.ProductOptionValueId equals v.ProductOptionValueId
-            where o.OrderId == orderId
+            where orderIds.Contains(o.OrderId)
             select new { o.OrderProductId, v.OptionValueId }
         ).ToListAsync(ct);
 
@@ -58,11 +63,71 @@ public sealed class ProductionRepository(ErpDbContext db, IOptions<ErpOptions> o
                 .OrderByDescending(c => c.HasFilter).ThenBy(c => c.ProductionId)
                 .Select(c => (int?)c.ProductionId).FirstOrDefault();
 
+        var optionsByLine = options.ToLookup(o => o.OrderProductId, o => o.OptionValueId);
         return products
-            .Select(p => new OrderSizeLine(
-                p.ProductId, p.Name, p.Quantity, ProductionFor(p.ProductId),
-                options.Where(o => o.OrderProductId == p.OrderProductId).Select(o => o.OptionValueId).ToList()))
+            .Select(p => (p.OrderId, new OrderSizeLine(
+                p.ProductId, p.Name, p.Quantity, ProductionFor(p.ProductId), optionsByLine[p.OrderProductId].ToList())))
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<PlanOrder>> GetOrdersAsync(IReadOnlyCollection<int> statusIds, CancellationToken ct)
+    {
+        if (statusIds.Count == 0)
+            return [];
+        var orders = await db.DdOrders.AsNoTracking()
+            .Where(o => statusIds.Contains(o.OrderStatusId))
+            .OrderBy(o => o.OrderId)
+            .Select(o => new { o.OrderId, o.DateAdded })
+            .ToListAsync(ct);
+        if (orders.Count == 0)
+            return [];
+
+        var ids = orders.Select(o => o.OrderId).ToList();
+        var lines = (await GetSizeLinesAsync(ids, ct)).ToLookup(l => l.OrderId, l => l.Line);
+        var held = await GetSewnHeldAsync(ids, ct);
+        return orders
+            .Select(o => new PlanOrder(
+                o.OrderId, o.DateAdded, lines[o.OrderId].ToList(),
+                held.GetValueOrDefault(o.OrderId) ?? new Dictionary<int, decimal>()))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> GetProductionDaysAsync(IReadOnlyCollection<int> productIds, CancellationToken ct)
+    {
+        var rows = await (
+            from pc in db.DdProductToCategories
+            join c in db.DdCategories on pc.CategoryId equals c.CategoryId
+            where productIds.Contains(pc.ProductId)
+            select new { pc.ProductId, pc.CategoryId, c.ProductionPeriod }
+        ).ToListAsync(ct);
+        return rows
+            .GroupBy(r => r.ProductId)
+            .ToDictionary(g => g.Key, g => g.MinBy(r => r.CategoryId)!.ProductionPeriod);
+    }
+
+    public Task<IReadOnlyList<ProductionModel>> GetModelsAsync(IReadOnlyCollection<int> productionIds, CancellationToken ct) =>
+        FindModelsAsync(productionIds, ct);
+
+    /// <summary>Те саме, що <see cref="GetSewnHeldByOrderAsync"/>, але для багатьох замовлень одним запитом.</summary>
+    private async Task<Dictionary<int, IReadOnlyDictionary<int, decimal>>> GetSewnHeldAsync(IReadOnlyCollection<int> orderIds, CancellationToken ct)
+    {
+        var byComment = orderIds
+            .SelectMany(id => new[] { (Comment: ProductionModel.OrderComment(id), OrderId: id, Taken: true), (Comment: ProductionModel.CancelComment(id), OrderId: id, Taken: false) })
+            .ToDictionary(x => x.Comment, x => (x.OrderId, x.Taken));
+        var comments = byComment.Keys.ToList();
+        var rows = await db.ProductionLog.AsNoTracking()
+            .Where(l => l.Stage == ProductionLogEntry.Sewn && comments.Contains(l.Comment))
+            .Select(l => new { l.SizeId, l.Direction, l.Comment, l.Quantity })
+            .ToListAsync(ct);
+
+        return rows
+            .Select(r => (Row: r, Key: byComment[r.Comment]))
+            .Where(x => x.Key.Taken ? x.Row.Direction == ProductionLogEntry.Out : x.Row.Direction == ProductionLogEntry.In)
+            .GroupBy(x => x.Key.OrderId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyDictionary<int, decimal>)g.GroupBy(x => x.Row.SizeId)
+                    .ToDictionary(s => s.Key, s => s.Sum(x => x.Key.Taken ? x.Row.Quantity : -x.Row.Quantity)));
     }
 
     public async Task<IReadOnlyList<ProductionModel>> FindModelsAsync(IReadOnlyCollection<int> productionIds, CancellationToken ct) =>

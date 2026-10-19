@@ -383,17 +383,21 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     }
 
     /// <summary>
-    /// Дві категорії каталогу з фото товарів і партнер «eva» з увімкненим фідом: сукні й спідниці з націнкою,
+    /// Дві категорії каталогу (з терміном виготовлення) з фото товарів і партнер «eva» з увімкненим фідом: сукні й спідниці з націнкою,
     /// окремо — сорочка з власним артикулом і ціною. Фід: /feeds/eva.xml.
     /// </summary>
     private async Task SeedPartnerAsync(DateTime now)
     {
         const int dresses = 20, tops = 21;
-        foreach (var (id, name) in new[] { (dresses, "Сукні та спідниці"), (tops, "Сорочки й жакети") })
+        // Термін виготовлення категорії (днів від дати замовлення) — для дати готовності в плані пошиву.
+        foreach (var (id, name, days) in new[] { (dresses, "Сукні та спідниці", 7), (tops, "Сорочки й жакети", 10) })
+        {
+            db.DdCategories.Add(new DdCategory { CategoryId = id, Status = true, ProductionPeriod = days, DateAdded = now, DateModified = now });
             db.DdCategoryDescriptions.Add(new DdCategoryDescription
             {
                 CategoryId = id, LanguageId = LanguageId, Name = name, Description = "", MetaTitle = name, MetaDescription = "", MetaKeyword = "",
             });
+        }
         for (var i = 0; i < Products.Length; i++)
         {
             var category = Products[i].StartsWith("Сукня") || Products[i].StartsWith("Спідниця") ? dresses : tops;
