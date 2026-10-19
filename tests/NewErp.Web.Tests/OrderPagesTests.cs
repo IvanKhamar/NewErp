@@ -91,6 +91,32 @@ public class OrderPagesTests : WebTestContext
     }
 
     [Fact]
+    public async Task Card_EditsComposition_SizeChangeTakesOptionPrice()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 18));
+        Api.Respond("/orders/291/composition", HttpStatusCode.OK, new OrderCompositionDto(291, 18,
+            [new(101, 501, "Сукня лляна", "SL-01", "S", 2, 1500, [new(50, 501, "Розмір", "S", 1, 0), new(50, 502, "Розмір", "M", 2, 1600)])],
+            ShippingCost: 0, Discount: 100, Prepayment: 0, Total: 2900));
+        Api.Respond("/orders/291/composition", HttpStatusCode.OK, new UpdateOrderCompositionResult(3100, []), HttpMethod.Put);
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForElement("[data-test=edit-composition]").Click();
+        provider.WaitForAssertion(() => Assert.Contains("Разом: 2900", provider.Find("[data-test=total]").TextContent));
+
+        var size = provider.FindComponent<MudBlazor.MudSelect<int?>>();
+        await provider.InvokeAsync(() => size.Instance.ValueChanged.InvokeAsync(502));
+        provider.WaitForAssertion(() => Assert.Contains("Разом: 3100", provider.Find("[data-test=total]").TextContent));
+        provider.Find("[data-test=save]").Click();
+
+        provider.WaitForAssertion(() => Assert.Contains("/orders/291/composition", Api.Bodies.Keys));
+        var body = Api.Bodies["/orders/291/composition"];
+        Assert.Contains("\"productOptionValueId\":502", body);
+        Assert.Contains("\"price\":1600", body);
+        Assert.Contains("\"discount\":100", body);
+    }
+
+    [Fact]
     public void Card_CreatesShipmentFromPrefilledDialog()
     {
         Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));

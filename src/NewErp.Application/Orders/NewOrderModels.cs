@@ -59,4 +59,23 @@ public sealed record NewOrderRecord(
     IReadOnlyList<NewOrderLineRecord> Lines,
     DateTime CreatedAt);
 
+/// <summary>
+/// Рядок складу замовлення. ProductOptionValueId — вибраний розмір чи опція (null, якщо товар без опцій);
+/// Options — розміри товару в каталозі зараз, щоб розмір можна було змінити.
+/// </summary>
+public sealed record OrderCompositionLine(
+    int ProductId, int? ProductOptionValueId, string Name, string Model, string Option, int Quantity, decimal Price,
+    IReadOnlyList<ProductOptionValueDto> Options);
+
+/// <summary>Склад замовлення для редагування: товари й суми (доставка, знижка, завдаток) з підсумків OpenCart.</summary>
+public sealed record OrderCompositionDto(
+    int OrderId, int StatusId, IReadOnlyList<OrderCompositionLine> Lines, decimal ShippingCost, decimal Discount, decimal Prepayment, decimal Total);
+
+/// <summary>Новий склад замовлення повністю замінює старий (як редагування замовлення на старому сайті).</summary>
+public sealed record UpdateOrderCompositionRequest(
+    IReadOnlyList<NewOrderLineRequest> Lines, decimal ShippingCost = 0, decimal Discount = 0, decimal Prepayment = 0);
+
+/// <summary>Warnings — попередження складу (наприклад, бракує пошитих виробів для нових рядків).</summary>
+public sealed record UpdateOrderCompositionResult(decimal Total, IReadOnlyList<string> Warnings);
+
 public sealed record NewOrderLineRecord(OrderDraftLine Line, string Name, string Model, ProductOptionValueDto? Option);

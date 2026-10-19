@@ -76,6 +76,44 @@ public class NewOrderServiceTests
     }
 
     [Fact]
+    public async Task UpdateComposition_ReturnsWhatOrderHeld_ReplacesLines_ThenTakesByNewLines()
+    {
+        _store.Compositions[700] = new OrderCompositionDto(700, 24, [], 0, 0, 0, 0);
+        var clock = new FakeTimeProvider();
+        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)]), clock);
+
+        var result = await service.UpdateCompositionAsync(700,
+            new UpdateOrderCompositionRequest([new(5, 501, 2, 1500), new(6, null, 1, 200)], ShippingCost: 50, Discount: 100, Prepayment: 300), 2, default);
+
+        Assert.Equal(["24->0", "replace", "0->24"], _store.Calls);
+        Assert.Equal(["бракує 1 шт."], result.Warnings);
+        Assert.Equal(3150m, result.Total);
+        var (draft, lines) = _store.Replaced!.Value;
+        Assert.Equal((3150m, 300m), (draft.Total, draft.Prepayment));
+        Assert.Equal("S", lines[0].Option!.Value);
+        Assert.Empty(_orders.SavedChanges); // статус і журнал статусів не змінюються
+    }
+
+    [Fact]
+    public async Task UpdateComposition_OrderWithoutStatus_JustReplaces_AndValidatesLikeNewOrder()
+    {
+        _store.Compositions[701] = new OrderCompositionDto(701, 0, [], 0, 0, 0, 0);
+        var clock = new FakeTimeProvider();
+        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)]), clock);
+
+        await service.UpdateCompositionAsync(701, new UpdateOrderCompositionRequest([new(6, null, 1, 200)]), 2, default);
+        Assert.Equal(["replace"], _store.Calls);
+
+        Assert.Contains("Кошик", (await Assert.ThrowsAsync<DomainException>(() =>
+            service.UpdateCompositionAsync(701, new UpdateOrderCompositionRequest([]), 2, default))).Message);
+        Assert.Contains("розмір", (await Assert.ThrowsAsync<DomainException>(() =>
+            service.UpdateCompositionAsync(701, new UpdateOrderCompositionRequest([new(5, null, 1, 1500)]), 2, default))).Message);
+        await Assert.ThrowsAsync<NewErp.Application.Common.NotFoundException>(() =>
+            service.UpdateCompositionAsync(999, new UpdateOrderCompositionRequest([new(6, null, 1, 200)]), 2, default));
+        Assert.Equal(["replace"], _store.Calls);
+    }
+
+    [Fact]
     public async Task CheckRisk_SearchesByPhoneKey_AndNameOnlyWithBothParts()
     {
         _store.CustomerOrders = [(10, 22), (11, 19)];
@@ -131,6 +169,29 @@ public class NewOrderServiceTests
             Created.Add(order);
             orders.Orders[++LastId] = 0; // замовлення без статусу, як пише справжнє сховище
             return Task.FromResult(LastId);
+        }
+
+        public List<string> Calls { get; } = [];
+        public Dictionary<int, OrderCompositionDto> Compositions { get; } = [];
+        public (OrderDraft Draft, IReadOnlyList<NewOrderLineRecord> Lines)? Replaced { get; private set; }
+
+        public Task<OrderCompositionDto?> GetCompositionAsync(int orderId, CancellationToken ct) =>
+            Task.FromResult(Compositions.GetValueOrDefault(orderId));
+
+        public Task ReplaceLinesAsync(int orderId, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, DateTime now, CancellationToken ct)
+        {
+            Calls.Add("replace");
+            Replaced = (draft, lines);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingHandler(List<string> calls) : IOrderStatusHandler
+    {
+        public Task<IReadOnlyList<string>> OnStatusChangingAsync(OrderStatusChange change, CancellationToken ct)
+        {
+            calls.Add($"{change.OldStatusId}->{change.NewStatusId}");
+            return Task.FromResult<IReadOnlyList<string>>(change.NewStatusId == 0 ? [] : ["бракує 1 шт."]);
         }
     }
 }

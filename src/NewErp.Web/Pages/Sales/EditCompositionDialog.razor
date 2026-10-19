@@ -1,0 +1,151 @@
+@inject OrdersApi Api
+
+@* Новий склад замовлення: товари, розміри, кількість, ціни й суми. Повертає Ok(UpdateOrderCompositionResult). *@
+<MudDialog>
+    <DialogContent>
+        @if (!_loaded)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudAutocomplete T="ProductPickDto" @bind-Value="_productToAdd" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
+                             ToStringFunc="@(p => p is null ? null : $"{p.Name} ({p.Model})")" ResetValueOnEmptyText="true" Label="Додати товар"
+                             Placeholder="Назва, модель чи №" Variant="Variant.Outlined" Margin="Margin.Dense" AdornmentIcon="@Icons.Material.Filled.Search"
+                             OnAdornmentClick="AddProduct" />
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="mt-2" Disabled="_productToAdd is null" OnClick="AddProduct" data-test="add-product">Додати</MudButton>
+
+            <MudSimpleTable Dense="true" Elevation="0" Class="mt-2" data-test="lines">
+                <thead><tr><th>Товар</th><th>Розмір</th><th>Кількість</th><th>Ціна, грн</th><th>Сума</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var line in _lines)
+                    {
+                        <tr>
+                            <td>@line.Name<br /><MudText Typo="Typo.caption">@line.Model</MudText></td>
+                            <td>
+                                @if (line.Options.Count > 0)
+                                {
+                                    <MudSelect T="int?" Value="line.OptionValueId" ValueChanged="v => ChooseOption(line, v)" Dense="true" Margin="Margin.Dense">
+                                        @foreach (var option in line.Options)
+                                        {
+                                            <MudSelectItem T="int?" Value="option.ProductOptionValueId">@option.Value (є @option.Quantity)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                            </td>
+                            <td style="width: 7rem"><MudNumericField @bind-Value="line.Quantity" Min="1" Margin="Margin.Dense" /></td>
+                            <td style="width: 9rem"><MudNumericField @bind-Value="line.Price" Min="0" Format="0.##" Margin="Margin.Dense" /></td>
+                            <td>@((line.Price * line.Quantity).ToString("0.##"))</td>
+                            <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => _lines.Remove(line)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+
+            <div class="d-flex flex-wrap gap-3 mt-3">
+                <MudNumericField @bind-Value="_shippingCost" Label="Доставка, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudNumericField @bind-Value="_discount" Label="Знижка, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudNumericField @bind-Value="_prepayment" Label="Завдаток, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+            <MudText Typo="Typo.subtitle1" Class="mt-2" data-test="total">Разом: @Total.ToString("0.##") грн</MudText>
+            <MudText Typo="Typo.caption">Пошиті вироби перерахуються за новим складом, якщо статус замовлення їх списує.</MudText>
+
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_busy || !_loaded)" data-test="save">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    private sealed class Line
+    {
+        public required int ProductId { get; init; }
+        public required string Name { get; init; }
+        public required string Model { get; init; }
+        public required decimal BasePrice { get; init; }
+        public required IReadOnlyList<ProductOptionValueDto> Options { get; init; }
+        public int? OptionValueId { get; set; }
+        public int Quantity { get; set; } = 1;
+        public decimal Price { get; set; }
+    }
+
+    private readonly List<Line> _lines = [];
+    private ProductPickDto? _productToAdd;
+    private decimal _shippingCost, _discount, _prepayment;
+    private bool _loaded;
+    private bool _busy;
+    private string? _error;
+
+    private decimal Total => _lines.Sum(l => l.Price * l.Quantity) + _shippingCost - _discount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var composition = await Api.CompositionAsync(OrderId);
+            // Ціна рядка — та, за якою продали; базова ціна потрібна лише, коли менеджер змінює розмір.
+            _lines.AddRange(composition.Lines.Select(l => new Line
+            {
+                ProductId = l.ProductId, Name = l.Name, Model = l.Model, BasePrice = l.Price, Options = l.Options,
+                OptionValueId = l.ProductOptionValueId, Quantity = l.Quantity, Price = l.Price,
+            }));
+            (_shippingCost, _discount, _prepayment) = (composition.ShippingCost, composition.Discount, composition.Prepayment);
+            _loaded = true;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task<IEnumerable<ProductPickDto>> SearchProductsAsync(string text, CancellationToken ct) => await Api.ProductsAsync(text);
+
+    private void AddProduct()
+    {
+        if (_productToAdd is not { } product)
+            return;
+        var line = new Line { ProductId = product.Id, Name = product.Name, Model = product.Model, BasePrice = product.Price, Options = product.Options };
+        ChooseOption(line, product.Options.FirstOrDefault()?.ProductOptionValueId);
+        _lines.Add(line);
+        _productToAdd = null;
+    }
+
+    // Як у новому замовленні: ціна опції, якщо вона більша за 0, замінює ціну товару.
+    private static void ChooseOption(Line line, int? optionValueId)
+    {
+        line.OptionValueId = optionValueId;
+        var option = line.Options.FirstOrDefault(o => o.ProductOptionValueId == optionValueId);
+        line.Price = option is { Price: > 0 } ? option.Price : line.BasePrice;
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Api.UpdateCompositionAsync(OrderId, new UpdateOrderCompositionRequest(
+                _lines.Select(l => new NewOrderLineRequest(l.ProductId, l.OptionValueId, l.Quantity, l.Price)).ToList(),
+                _shippingCost, _discount, _prepayment));
+            Dialog.Close(DialogResult.Ok(result));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 using NewErp.Application.Orders;
+using NewErp.Domain.Orders;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
 
@@ -195,11 +196,75 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
         db.DdOrders.Add(row);
         await db.SaveChangesAsync(ct);
 
-        foreach (var line in order.Lines)
+        await AddLinesAsync(row.OrderId, row.ShippingMethod, order.Draft, order.Lines, ct);
+        return row.OrderId;
+    }
+
+    public async Task<OrderCompositionDto?> GetCompositionAsync(int orderId, CancellationToken ct)
+    {
+        var order = await db.DdOrders.AsNoTracking()
+            .Where(o => o.OrderId == orderId)
+            .Select(o => new { o.OrderStatusId, o.Prepayment, o.Total })
+            .FirstOrDefaultAsync(ct);
+        if (order is null)
+            return null;
+
+        var products = await db.DdOrderProducts.AsNoTracking()
+            .Where(p => p.OrderId == orderId)
+            .OrderBy(p => p.OrderProductId)
+            .Select(p => new { p.OrderProductId, p.ProductId, p.Name, p.Model, p.Quantity, p.Price })
+            .ToListAsync(ct);
+        var options = (await db.DdOrderOptions.AsNoTracking()
+                .Where(o => o.OrderId == orderId)
+                .OrderBy(o => o.OrderOptionId)
+                .Select(o => new { o.OrderProductId, o.ProductOptionValueId, o.Value })
+                .ToListAsync(ct))
+            .ToLookup(o => o.OrderProductId);
+        var totals = await db.DdOrderTotals.AsNoTracking()
+            .Where(t => t.OrderId == orderId)
+            .Select(t => new { t.Code, t.Value })
+            .ToListAsync(ct);
+
+        var catalog = (await GetProductsAsync(products.Select(p => p.ProductId).Distinct().ToList(), ct)).ToDictionary(p => p.Id);
+
+        // Розмір — перша опція рядка (форма нового замовлення пише одну). Знижку купона OpenCart пише з мінусом.
+        var lines = products.Select(p =>
+        {
+            var option = options[p.OrderProductId].FirstOrDefault();
+            return new OrderCompositionLine(
+                p.ProductId, option?.ProductOptionValueId, p.Name, p.Model, option?.Value ?? "", p.Quantity, p.Price,
+                catalog.GetValueOrDefault(p.ProductId)?.Options ?? []);
+        }).ToList();
+        return new OrderCompositionDto(
+            orderId, order.OrderStatusId, lines,
+            totals.Where(t => t.Code == "shipping").Sum(t => t.Value),
+            -totals.Where(t => t.Code == "coupon").Sum(t => t.Value),
+            order.Prepayment,
+            order.Total);
+    }
+
+    public async Task ReplaceLinesAsync(int orderId, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, DateTime now, CancellationToken ct)
+    {
+        var shippingMethod = await db.DdOrders.Where(o => o.OrderId == orderId).Select(o => o.ShippingMethod).SingleAsync(ct);
+
+        // Як editOrder старого сайту: рядки, опції й підсумки видаляються й пишуться заново (MyISAM, без транзакції).
+        await db.DdOrderOptions.Where(o => o.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrderProducts.Where(p => p.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrderTotals.Where(t => t.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await AddLinesAsync(orderId, shippingMethod, draft, lines, ct);
+        await db.DdOrders.Where(o => o.OrderId == orderId).ExecuteUpdateAsync(s => s
+            .SetProperty(o => o.Total, draft.Total)
+            .SetProperty(o => o.Prepayment, draft.Prepayment)
+            .SetProperty(o => o.DateModified, now), ct);
+    }
+
+    private async Task AddLinesAsync(int orderId, string shippingMethod, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, CancellationToken ct)
+    {
+        foreach (var line in lines)
         {
             var product = new DdOrderProduct
             {
-                OrderId = row.OrderId,
+                OrderId = orderId,
                 ProductId = line.Line.ProductId,
                 Name = line.Name,
                 Model = line.Model,
@@ -213,7 +278,7 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
             if (line.Option is { } option)
                 db.DdOrderOptions.Add(new DdOrderOption
                 {
-                    OrderId = row.OrderId,
+                    OrderId = orderId,
                     OrderProductId = product.OrderProductId,
                     ProductOptionId = option.ProductOptionId,
                     ProductOptionValueId = option.ProductOptionValueId,
@@ -225,15 +290,14 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
 
         var sort = 0;
         void Total(string code, string title, decimal value) =>
-            db.DdOrderTotals.Add(new DdOrderTotal { OrderId = row.OrderId, Code = code, Title = title, Value = value, SortOrder = sort++ });
-        Total("sub_total", "Сума", order.Draft.SubTotal);
-        Total("shipping", row.ShippingMethod, order.Draft.ShippingCost);
-        if (order.Draft.Discount > 0)
-            Total("coupon", "Знижка", -order.Draft.Discount);
-        Total("total", "Всього", order.Draft.Total);
+            db.DdOrderTotals.Add(new DdOrderTotal { OrderId = orderId, Code = code, Title = title, Value = value, SortOrder = sort++ });
+        Total("sub_total", "Сума", draft.SubTotal);
+        Total("shipping", shippingMethod, draft.ShippingCost);
+        if (draft.Discount > 0)
+            Total("coupon", "Знижка", -draft.Discount);
+        Total("total", "Всього", draft.Total);
 
         await db.SaveChangesAsync(ct);
-        return row.OrderId;
     }
 
     private static bool Same(string a, string b) => string.Equals(a.Trim(), b, StringComparison.OrdinalIgnoreCase);

@@ -1,3 +1,4 @@
+using NewErp.Application.Common;
 using NewErp.Domain.Common;
 using NewErp.Domain.Orders;
 
@@ -67,6 +68,29 @@ public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, Or
         var status = await orderService.ChangeStatusAsync(orderId, new ChangeOrderStatusRequest(request.StatusId), userId, ct);
 
         return new CreateOrderResult(orderId, status.Warnings, risk);
+    }
+
+    public async Task<OrderCompositionDto> GetCompositionAsync(int orderId, CancellationToken ct) =>
+        await store.GetCompositionAsync(orderId, ct) ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
+
+    /// <summary>
+    /// Нові товари, розміри, кількість і суми замовлення (форма «Швидке замовлення» старого сайту для наявного замовлення).
+    /// Пошиті вироби перераховуються за новим складом, якщо статус замовлення їх списує.
+    /// </summary>
+    public async Task<UpdateOrderCompositionResult> UpdateCompositionAsync(int orderId, UpdateOrderCompositionRequest request, int userId, CancellationToken ct)
+    {
+        var current = await GetCompositionAsync(orderId, ct);
+        var lines = (request.Lines ?? []).Select(l => new OrderDraftLine(l.ProductId, l.ProductOptionValueId, l.Quantity, l.Price)).ToList();
+        var draft = OrderDraft.ForLines(lines, request.ShippingCost, request.Discount, request.Prepayment);
+        if (!await orders.IsActiveUserAsync(userId, ct))
+            throw new DomainException($"Користувача {userId} не знайдено або його вимкнено.");
+
+        var products = (await store.GetProductsAsync(lines.Select(l => l.ProductId).Distinct().ToList(), ct)).ToDictionary(p => p.Id);
+        var records = lines.Select(line => ToRecord(line, products)).ToList();
+
+        var warnings = await orderService.ReapplyStatusAsync(
+            orderId, current.StatusId, () => store.ReplaceLinesAsync(orderId, draft, records, Now(), ct), userId, ct);
+        return new UpdateOrderCompositionResult(draft.Total, warnings);
     }
 
     private static NewOrderLineRecord ToRecord(OrderDraftLine line, Dictionary<int, ProductPickDto> products)
