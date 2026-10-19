@@ -66,6 +66,11 @@ public static class ProductionEndpoints
         MapOperation(production, "ship", ProductionOperation.Ship,
             "Відвантажено не через замовлення (більше, ніж пошито, не можна)");
 
+        production.MapGet("/plan", (bool? onlyToSew, SewingPlanService service, CancellationToken ct) =>
+            service.GetAsync(onlyToSew ?? true, ct))
+            .WithSummary("План пошиву: скільки кожного розміру пошити й розкроїти для активних замовлень (Production:PlanStatusIds); "
+                + "onlyToSew=false — також розміри, яких вистачає");
+
         production.MapGet("/log", (IProductionRepository repo, [AsParameters] ProductionLogFilter filter, CancellationToken ct) =>
             repo.ListLogAsync(filter, ct))
             .WithSummary("Журнал крою й пошиву (stage = cut або sewn), нові записи першими");

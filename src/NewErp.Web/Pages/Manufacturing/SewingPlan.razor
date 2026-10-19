@@ -1,0 +1,92 @@
+@page "/production/plan"
+@attribute [Authorize(Roles = Access.Production)]
+@inject ProductionApi Api
+
+<PageTitle>План пошиву — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">План пошиву</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Скільки кожного розміру треба пошити для активних замовлень (@_plan?.OrderCount замовлень). Вільний пошитий запас покриває потребу першим,
+    розкроєне шиється раніше за новий крій. Термін — найраніша дата готовності: дата замовлення плюс термін виготовлення категорії товару.
+</MudText>
+
+<MudSwitch T="bool" Value="_onlyToSew" ValueChanged="OnlyToSewAsync" Color="Color.Primary" Class="mb-2" data-test="only-to-sew">
+    Лише те, що треба шити
+</MudSwitch>
+
+@if (_plan is not null)
+{
+    <MudSimpleTable Dense="true" Elevation="0" data-test="plan">
+        <thead>
+            <tr>
+                <th>Модель</th><th>Розмір</th><th style="text-align: right">Замовлено</th><th style="text-align: right">Бракує</th>
+                <th style="text-align: right">Пошито</th><th style="text-align: right">Розкроєно</th>
+                <th style="text-align: right">Пошити</th><th style="text-align: right">Розкроїти</th><th>Термін</th><th>Замовлення</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _plan.Rows)
+            {
+                <tr>
+                    <td><MudLink Href="@ProductionUi.Model(row.ProductionId)">@row.ModelName</MudLink></td>
+                    <td>@row.SizeName</td>
+                    <td style="text-align: right">@Qty(row.Ordered)</td>
+                    <td style="text-align: right">@Qty(row.Missing)</td>
+                    <td style="text-align: right">@Qty(row.SewnStock)</td>
+                    <td style="text-align: right">@Qty(row.CutStock)</td>
+                    <td style="text-align: right"><b>@Qty(row.ToSew)</b></td>
+                    <td style="text-align: right">@Qty(row.ToCut)</td>
+                    <td>
+                        @if (row.Deadline is { } deadline)
+                        {
+                            <MudText Typo="Typo.body2" Color="@(row.Overdue ? Color.Error : Color.Default)">@deadline.ToString("dd.MM.yyyy")</MudText>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var id in row.OrderIds)
+                        {
+                            <MudLink Href="@($"orders/{id}")" Class="mr-2">#@id</MudLink>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    @if (_plan.Rows.Count == 0)
+    {
+        <MudText Class="mt-2">@(_onlyToSew ? "Шити нічого: пошитого запасу вистачає на всі активні замовлення." : "Активних замовлень із моделями немає.")</MudText>
+    }
+
+    @if (_plan.Issues.Count > 0)
+    {
+        <MudExpansionPanels Class="mt-4" Elevation="0">
+            <MudExpansionPanel Text="@($"Не враховано товарів: {_plan.Issues.Count}")">
+                <MudSimpleTable Dense="true" Elevation="0" data-test="issues">
+                    <tbody>
+                        @foreach (var issue in _plan.Issues)
+                        {
+                            <tr><td>@issue.ProductName</td><td>@issue.Reason</td><td>замовлень: @issue.OrderIds.Count</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+}
+
+@code {
+    private SewingPlanDto? _plan;
+    private bool _onlyToSew = true;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _plan = await Api.PlanAsync(_onlyToSew);
+
+    private async Task OnlyToSewAsync(bool value)
+    {
+        _onlyToSew = value;
+        await LoadAsync();
+    }
+
+    private static string Qty(decimal value) => value.ToString("0.###");
+}
