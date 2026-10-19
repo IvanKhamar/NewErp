@@ -1,0 +1,114 @@
+@page "/returns/{Id:int}"
+@using NewErp.Web.Pages.Sales
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ReturnsApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Повернення @Id — NewErp</PageTitle>
+
+@if (_return is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudText Typo="Typo.h4" Class="mb-3">Повернення №@_return.Id</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudSimpleTable Dense="true" Elevation="0" data-test="details">
+                    <tbody>
+                        <tr><td>Замовлення</td><td><MudLink Href="@OrderRoutes.Order(_return.OrderId)">#@_return.OrderId</MudLink></td></tr>
+                        <tr><td>Клієнт</td><td>@_return.Customer, @_return.Telephone @_return.Email</td></tr>
+                        <tr><td>Товар</td><td>@_return.Product (@_return.Model) × @_return.Quantity@(_return.Opened ? ", розпакований" : "")</td></tr>
+                        <tr><td>Причина</td><td>@_return.ReasonName</td></tr>
+                        <tr><td>Дія</td><td>@(_return.ActionName ?? "—")</td></tr>
+                        <tr><td>Статус</td><td data-test="status">@(_return.StatusName ?? $"статус {_return.StatusId}")</td></tr>
+                        <tr><td>Створено</td><td>@Fmt.Date(_return.DateAdded)</td></tr>
+                        @if (!string.IsNullOrWhiteSpace(_return.Comment))
+                        {
+                            <tr><td>Коментар</td><td style="white-space: pre-line">@_return.Comment</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Журнал</MudText>
+            <MudTimeline TimelinePosition="TimelinePosition.Start">
+                @foreach (var entry in _return.History)
+                {
+                    <MudTimelineItem Size="Size.Small">
+                        <MudText Typo="Typo.body2"><b>@(entry.StatusName ?? $"статус {entry.StatusId}")</b></MudText>
+                        <MudText Typo="Typo.caption">@Fmt.Date(entry.DateAdded)</MudText>
+                        @if (!string.IsNullOrWhiteSpace(entry.Comment))
+                        {
+                            <MudText Typo="Typo.body2" Style="white-space: pre-line">@entry.Comment</MudText>
+                        }
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Новий статус</MudText>
+                <MudSelect T="int" @bind-Value="_statusId" Label="Статус" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    @foreach (var status in _lookups?.Statuses ?? [])
+                    {
+                        <MudSelectItem T="int" Value="status.Id">@status.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="int" @bind-Value="_actionId" Label="Дія" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem T="int" Value="0">—</MudSelectItem>
+                    @foreach (var action in _lookups?.Actions ?? [])
+                    {
+                        <MudSelectItem T="int" Value="action.Id">@action.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_comment" Label="Коментар" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddHistoryAsync" Disabled="_busy" data-test="add-history">Зберегти</MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ReturnDetails? _return;
+    private ReturnLookupsDto? _lookups;
+    private int _statusId;
+    private int _actionId;
+    private string _comment = "";
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _lookups = await Api.LookupsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _return = await Api.GetAsync(Id);
+        (_statusId, _actionId, _comment) = (_return.StatusId, _return.ActionId, "");
+    }
+
+    private async Task AddHistoryAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.AddHistoryAsync(Id, new AddReturnHistoryRequest(_statusId, _comment, _actionId));
+            Snackbar.Add("Збережено.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

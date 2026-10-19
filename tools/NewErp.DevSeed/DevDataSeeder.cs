@@ -190,9 +190,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         await SeedPartnerAsync(now);
         await SeedProductSortAsync();
         var birthdays = await SeedMarketingAsync();
+        var returns = await SeedReturnsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), {returns} повернень, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -465,6 +466,44 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
         return birthdays;
+    }
+
+    /// <summary>Довідники повернень (статуси, причини, дії) і кілька повернень з виконаних замовлень, як оформив би менеджер.</summary>
+    private async Task<int> SeedReturnsAsync()
+    {
+        string[] statuses = ["Очікує", "Отримано", "Завершено"];
+        string[] reasons = ["Не підійшов розмір", "Брак", "Не той товар", "Інше"];
+        string[] actions = ["Повернено кошти", "Обмін", "Відмовлено"];
+        for (var i = 0; i < statuses.Length; i++)
+            db.DdReturnStatuses.Add(new DdReturnStatus { ReturnStatusId = i + 1, LanguageId = LanguageId, Name = statuses[i] });
+        for (var i = 0; i < reasons.Length; i++)
+            db.DdReturnReasons.Add(new DdReturnReason { ReturnReasonId = i + 1, LanguageId = LanguageId, Name = reasons[i] });
+        for (var i = 0; i < actions.Length; i++)
+            db.DdReturnActions.Add(new DdReturnAction { ReturnActionId = i + 1, LanguageId = LanguageId, Name = actions[i] });
+
+        var lines = await db.DdOrders.Where(o => o.OrderStatusId == 22)
+            .Join(db.DdOrderProducts, o => o.OrderId, p => p.OrderId, (o, p) => new { Order = o, Line = p })
+            .OrderBy(x => x.Order.OrderId).Take(6).ToListAsync();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var (order, line) = (lines[i].Order, lines[i].Line);
+            var added = order.DateAdded.AddDays(10 + i);
+            var statusId = i % statuses.Length + 1;
+            var item = new DdReturn
+            {
+                OrderId = order.OrderId, ProductId = line.ProductId, CustomerId = order.CustomerId,
+                Firstname = order.Firstname, Lastname = order.Lastname, Email = order.Email, Telephone = order.Telephone,
+                Product = line.Name, Model = line.Model, Quantity = 1, Opened = i % 2 == 0,
+                ReturnReasonId = i % reasons.Length + 1, ReturnActionId = statusId == 3 ? 1 : 0, ReturnStatusId = statusId,
+                Comment = "Клієнт написав у Viber.", DateOrdered = order.DateAdded, DateAdded = added, DateModified = added.AddDays(statusId - 1),
+            };
+            db.DdReturns.Add(item);
+            await db.SaveChangesAsync();
+            for (var s = 1; s <= statusId; s++)
+                db.DdReturnHistories.Add(new DdReturnHistory { ReturnId = item.ReturnId, ReturnStatusId = s, Comment = "", DateAdded = added.AddDays(s - 1) });
+        }
+        await db.SaveChangesAsync();
+        return lines.Count;
     }
 
     private async Task<int> SeedProductionAsync()
