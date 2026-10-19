@@ -5,6 +5,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject Clipboard Clipboard
+@inject NavigationManager Navigation
 
 <PageTitle>Замовлення №@Id — NewErp</PageTitle>
 
@@ -50,6 +51,8 @@ else
             <div class="d-flex align-center mb-2">
                 <MudText Typo="Typo.h6">Товари</MudText>
                 <MudSpacer />
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AssignmentReturn" OnClick="CreateReturnAsync"
+                           Disabled="@(_busy || _order.Products.Count == 0)" Class="mr-2" data-test="create-return">Повернення</MudButton>
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditCompositionAsync"
                            Disabled="_busy" data-test="edit-composition">Змінити склад</MudButton>
             </div>
@@ -351,6 +354,15 @@ else
         foreach (var warning in result.Warnings)
             Snackbar.Add(warning, Severity.Warning);
         await LoadAsync();
+    }
+
+    private async Task CreateReturnAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<CreateReturnDialog>("Повернення товару",
+            new DialogParameters<CreateReturnDialog> { { d => d.OrderId, Id }, { d => d.Products, _order!.Products } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (await dialog.Result is { Canceled: false, Data: int returnId })
+            Navigation.NavigateTo(ReturnRoutes.Return(returnId));
     }
 
     private async Task DeleteShipmentAsync()

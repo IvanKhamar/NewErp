@@ -74,6 +74,16 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdQuestion> DdQuestions { get; set; }
 
+    public virtual DbSet<DdReturn> DdReturns { get; set; }
+
+    public virtual DbSet<DdReturnAction> DdReturnActions { get; set; }
+
+    public virtual DbSet<DdReturnHistory> DdReturnHistories { get; set; }
+
+    public virtual DbSet<DdReturnReason> DdReturnReasons { get; set; }
+
+    public virtual DbSet<DdReturnStatus> DdReturnStatuses { get; set; }
+
     public virtual DbSet<DdSetting> DdSettings { get; set; }
 
     public virtual DbSet<DdSubscribe> DdSubscribes { get; set; }
@@ -884,6 +894,117 @@ public partial class ErpDbContext : DbContext
                 .HasMaxLength(32)
                 .HasDefaultValueSql("''")
                 .HasColumnName("telephone");
+        });
+
+        modelBuilder.Entity<DdReturn>(entity =>
+        {
+            entity.HasKey(e => e.ReturnId).HasName("PRIMARY");
+
+            entity.ToTable("dd_return");
+
+            entity.Property(e => e.ReturnId).HasColumnName("return_id");
+            entity.Property(e => e.Comment)
+                .HasColumnType("text")
+                .HasColumnName("comment");
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.DateModified)
+                .HasColumnType("datetime")
+                .HasColumnName("date_modified");
+            entity.Property(e => e.DateOrdered)
+                .HasDefaultValueSql("'0000-00-00'")
+                .HasColumnType("date")
+                .HasColumnName("date_ordered");
+            entity.Property(e => e.Email)
+                .HasMaxLength(96)
+                .HasColumnName("email");
+            entity.Property(e => e.Firstname)
+                .HasMaxLength(32)
+                .HasColumnName("firstname");
+            entity.Property(e => e.Lastname)
+                .HasMaxLength(32)
+                .HasColumnName("lastname");
+            entity.Property(e => e.Model)
+                .HasMaxLength(64)
+                .HasColumnName("model");
+            entity.Property(e => e.Opened).HasColumnName("opened");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.Product)
+                .HasMaxLength(255)
+                .HasColumnName("product");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.ReturnActionId).HasColumnName("return_action_id");
+            entity.Property(e => e.ReturnReasonId).HasColumnName("return_reason_id");
+            entity.Property(e => e.ReturnStatusId).HasColumnName("return_status_id");
+            entity.Property(e => e.Telephone)
+                .HasMaxLength(32)
+                .HasColumnName("telephone");
+        });
+
+        modelBuilder.Entity<DdReturnAction>(entity =>
+        {
+            entity.HasKey(e => new { e.ReturnActionId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_return_action");
+
+            entity.Property(e => e.ReturnActionId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("return_action_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdReturnHistory>(entity =>
+        {
+            entity.HasKey(e => e.ReturnHistoryId).HasName("PRIMARY");
+
+            entity.ToTable("dd_return_history");
+
+            entity.Property(e => e.ReturnHistoryId).HasColumnName("return_history_id");
+            entity.Property(e => e.Comment)
+                .HasColumnType("text")
+                .HasColumnName("comment");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.Notify).HasColumnName("notify");
+            entity.Property(e => e.ReturnId).HasColumnName("return_id");
+            entity.Property(e => e.ReturnStatusId).HasColumnName("return_status_id");
+        });
+
+        modelBuilder.Entity<DdReturnReason>(entity =>
+        {
+            entity.HasKey(e => new { e.ReturnReasonId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_return_reason");
+
+            entity.Property(e => e.ReturnReasonId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("return_reason_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(128)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdReturnStatus>(entity =>
+        {
+            entity.HasKey(e => new { e.ReturnStatusId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_return_status");
+
+            entity.Property(e => e.ReturnStatusId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("return_status_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(32)
+                .HasColumnName("name");
         });
 
         modelBuilder.Entity<DdSetting>(entity =>

@@ -64,6 +64,7 @@ app.MapPartnerEndpoints();
 app.MapProductSortEndpoints();
 app.MapPreOrderEndpoints();
 app.MapMarketingEndpoints();
+app.MapReturnEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.

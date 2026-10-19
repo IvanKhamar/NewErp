@@ -9,6 +9,7 @@ using NewErp.Application.Orders;
 using NewErp.Application.Partners;
 using NewErp.Application.Payments;
 using NewErp.Application.Production;
+using NewErp.Application.Returns;
 using NewErp.Application.Sms;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<OrderService>();
         services.AddScoped<NewOrderService>();
+        services.AddScoped<ReturnService>();
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
         services.AddScoped<ReorderService>();

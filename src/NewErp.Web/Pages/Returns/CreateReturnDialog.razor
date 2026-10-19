@@ -1,0 +1,87 @@
+@inject ReturnsApi Api
+
+@* Повернення товару із замовлення: клієнт береться із замовлення, тут лише товар, кількість, причина й статус. Повертає Ok(id). *@
+<MudDialog>
+    <DialogContent>
+        @if (_lookups is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudSelect T="int" @bind-Value="_productId" Label="Товар" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" data-test="product">
+                @foreach (var product in Products.DistinctBy(p => p.ProductId))
+                {
+                    <MudSelectItem T="int" Value="product.ProductId">@product.Name (@product.Model)</MudSelectItem>
+                }
+            </MudSelect>
+            <div class="d-flex gap-3">
+                <MudNumericField @bind-Value="_quantity" Label="Кількість" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" />
+                <MudCheckBox @bind-Value="_opened" Label="Розпакований" />
+            </div>
+            <MudSelect T="int" @bind-Value="_reasonId" Label="Причина" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                @foreach (var reason in _lookups.Reasons)
+                {
+                    <MudSelectItem T="int" Value="reason.Id">@reason.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="int" @bind-Value="_statusId" Label="Статус" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                @foreach (var status in _lookups.Statuses)
+                {
+                    <MudSelectItem T="int" Value="status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_comment" Label="Коментар" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_busy || _lookups is null)" data-test="save">Оформити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    [Parameter] public IReadOnlyList<OrderProductLine> Products { get; set; } = [];
+
+    private ReturnLookupsDto? _lookups;
+    private int _productId, _quantity = 1, _reasonId, _statusId;
+    private bool _opened;
+    private string _comment = "";
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _lookups = await Api.LookupsAsync();
+        _productId = Products.FirstOrDefault()?.ProductId ?? 0;
+        _reasonId = _lookups.Reasons.FirstOrDefault()?.Id ?? 0;
+        _statusId = _lookups.Statuses.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var id = await Api.CreateAsync(new CreateReturnRequest(OrderId, _productId, _quantity, _reasonId, _statusId, 0, _opened, _comment));
+            Dialog.Close(DialogResult.Ok(id));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,71 @@
+@page "/returns"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ReturnsApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Повернення — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Повернення</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">Повернення оформлюють із картки замовлення (кнопка «Повернення»). Сюди ж потрапляють заявки, які клієнти лишили на сайті.</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudTextField T="string" Value="_search" ValueChanged="v => SetAsync(() => _search = v)" Placeholder="Клієнт, телефон, товар"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Immediate="true"
+                  Style="min-width: 240px" />
+    <MudSelect T="int?" Value="_statusId" ValueChanged="v => SetAsync(() => _statusId = v)" Label="Статус" Clearable="true" Style="min-width: 200px">
+        @foreach (var status in _lookups?.Statuses ?? [])
+        {
+            <MudSelectItem T="int?" Value="status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+</MudPaper>
+
+<MudTable @ref="_table" T="ReturnListItem" ServerData="LoadAsync" Hover="true" Dense="true" RowStyle="cursor: pointer" RowsPerPage="20"
+          OnRowClick="row => Navigation.NavigateTo(ReturnRoutes.Return(row.Item!.Id))" data-test="returns">
+    <HeaderContent>
+        <MudTh>№</MudTh>
+        <MudTh>Дата</MudTh>
+        <MudTh>Замовлення</MudTh>
+        <MudTh>Клієнт</MudTh>
+        <MudTh>Товар</MudTh>
+        <MudTh Style="text-align: right">К-сть</MudTh>
+        <MudTh>Статус</MudTh>
+        <MudTh>Дія</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="№">@context.Id</MudTd>
+        <MudTd DataLabel="Дата">@Fmt.Date(context.DateAdded)</MudTd>
+        <MudTd DataLabel="Замовлення">#@context.OrderId</MudTd>
+        <MudTd DataLabel="Клієнт">@context.Customer<br /><MudText Typo="Typo.caption">@context.Telephone</MudText></MudTd>
+        <MudTd DataLabel="Товар">@context.Product<br /><MudText Typo="Typo.caption">@context.Model</MudText></MudTd>
+        <MudTd DataLabel="К-сть" Style="text-align: right">@context.Quantity</MudTd>
+        <MudTd DataLabel="Статус">@(context.StatusName ?? $"статус {context.StatusId}")</MudTd>
+        <MudTd DataLabel="Дія">@context.ActionName</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Повернень не знайдено.</MudText></NoRecordsContent>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="На сторінці:" InfoFormat="{first_item}–{last_item} з {all_items}" PageSizeOptions="new[] { 20, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<ReturnListItem>? _table;
+    private ReturnLookupsDto? _lookups;
+    private string? _search;
+    private int? _statusId;
+
+    protected override async Task OnInitializedAsync() => _lookups = await Api.LookupsAsync();
+
+    private async Task<TableData<ReturnListItem>> LoadAsync(TableState state, CancellationToken ct)
+    {
+        var page = await Api.ListAsync(new ReturnFilter(StatusId: _statusId, Search: _search, Page: state.Page + 1, PageSize: state.PageSize));
+        return new TableData<ReturnListItem> { Items = page.Items, TotalItems = page.TotalCount };
+    }
+
+    private async Task SetAsync(Action change)
+    {
+        change();
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+}

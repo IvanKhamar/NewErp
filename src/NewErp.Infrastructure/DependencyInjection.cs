@@ -11,6 +11,7 @@ using NewErp.Application.Orders;
 using NewErp.Application.Partners;
 using NewErp.Application.Payments;
 using NewErp.Application.Production;
+using NewErp.Application.Returns;
 using NewErp.Application.Sms;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
@@ -24,6 +25,7 @@ using NewErp.Infrastructure.Partners;
 using NewErp.Infrastructure.Payments;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Production;
+using NewErp.Infrastructure.Returns;
 using NewErp.Infrastructure.Sms;
 using NewErp.Infrastructure.Staff;
 using NewErp.Infrastructure.Stock;
@@ -46,6 +48,7 @@ public static class DependencyInjection
 
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IOrderStore, OrderStore>();
+        services.AddScoped<IReturnStore, ReturnStore>();
         services.AddScoped<INewOrderStore, NewOrderStore>();
         services.AddScoped<IBonusDataSource, BonusDataSource>();
         services.AddScoped<IStockRepository, StockRepository>();
