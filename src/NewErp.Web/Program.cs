@@ -32,6 +32,7 @@ builder.Services.AddScoped<PartnersApi>();
 builder.Services.AddScoped<ProductSortApi>();
 builder.Services.AddScoped<PreOrdersApi>();
 builder.Services.AddScoped<ReturnsApi>();
+builder.Services.AddScoped<CustomersApi>();
 builder.Services.AddScoped<MarketingApi>();
 builder.Services.AddScoped<Clipboard>();
 

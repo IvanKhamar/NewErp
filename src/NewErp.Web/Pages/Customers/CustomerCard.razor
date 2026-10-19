@@ -1,0 +1,114 @@
+@page "/customers/{Id:int}"
+@using NewErp.Web.Pages.Sales
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CustomersApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Покупець @Id — NewErp</PageTitle>
+
+@if (_customer is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudText Typo="Typo.h4" Class="mb-3">@_customer.Firstname @_customer.Lastname</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudAlert Severity="RiskSeverity(_customer.Stats.RiskLevel)" Dense="true" Class="mb-3" data-test="risk">@_customer.Stats.RiskMessage</MudAlert>
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudSimpleTable Dense="true" Elevation="0" data-test="details">
+                    <tbody>
+                        <tr><td>Телефон</td><td>@_customer.Telephone</td></tr>
+                        <tr><td>E-mail</td><td>@_customer.Email</td></tr>
+                        <tr><td>Група</td><td>@_customer.GroupName</td></tr>
+                        <tr><td>Стан</td><td>@(_customer.Status ? "увімкнений" : "вимкнений")@(_customer.Newsletter ? ", підписаний на розсилку" : "")</td></tr>
+                        <tr><td>Зареєстрований</td><td>@Fmt.Date(_customer.DateAdded)</td></tr>
+                        <tr><td>Замовлень</td><td data-test="stats">@_customer.Stats.OrderCount (скасовано @_customer.Stats.CancelledCount), куплено на @Fmt.Money(_customer.Stats.Spent)</td></tr>
+                        <tr><td>Останнє замовлення</td><td>@Fmt.Date(_customer.Stats.LastOrder)</td></tr>
+                        @foreach (var address in _customer.Addresses)
+                        {
+                            <tr><td>Адреса@(address.IsDefault ? " (основна)" : "")</td><td>@address.Name, @address.City, @address.Address1 @address.Address2</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Замовлення</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Outlined="true" data-test="orders">
+                <thead><tr><th>№</th><th>Дата</th><th>Статус</th><th style="text-align: right">Сума</th></tr></thead>
+                <tbody>
+                    @foreach (var order in _customer.Orders)
+                    {
+                        <tr>
+                            <td>
+                                <MudLink Href="@OrderRoutes.Order(order.Id)">#@order.Id</MudLink>
+                                @if (order.ByPhone)
+                                {
+                                    <MudTooltip Text="Оформлене без входу, знайдене за телефоном"><MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" /></MudTooltip>
+                                }
+                            </td>
+                            <td>@Fmt.Date(order.DateAdded)</td>
+                            <td>@(order.StatusName ?? $"статус {order.StatusId}")</td>
+                            <td style="text-align: right">@Fmt.Money(order.Total)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_customer.Orders.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">Замовлень немає.</MudText>
+            }
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Нотатки</MudText>
+                <MudTextField @bind-Value="_note" Label="Нова нотатка" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddNoteAsync" Disabled="_busy" data-test="add-note">Додати</MudButton>
+                @foreach (var note in _customer.Notes)
+                {
+                    <MudText Typo="Typo.caption" Class="d-block mt-3">@Fmt.Date(note.DateAdded)</MudText>
+                    <MudText Typo="Typo.body2" Style="white-space: pre-line">@note.Comment</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private CustomerDetails? _customer;
+    private string _note = "";
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => _customer = await Api.GetAsync(Id);
+
+    private async Task AddNoteAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.AddNoteAsync(Id, new AddCustomerNoteRequest(_note));
+            _note = "";
+            _customer = await Api.GetAsync(Id);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // Рівні ризику ті самі, що у формі нового замовлення.
+    private static Severity RiskSeverity(string level) => level switch
+    {
+        "Red" => Severity.Error,
+        "Yellow" => Severity.Warning,
+        "Green" => Severity.Success,
+        _ => Severity.Info,
+    };
+}

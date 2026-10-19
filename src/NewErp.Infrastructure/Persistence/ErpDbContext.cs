@@ -14,6 +14,8 @@ public partial class ErpDbContext : DbContext
     {
     }
 
+    public virtual DbSet<DdAddress> DdAddresses { get; set; }
+
     public virtual DbSet<DdCategory> DdCategories { get; set; }
 
     public virtual DbSet<DdCategoryDescription> DdCategoryDescriptions { get; set; }
@@ -23,6 +25,12 @@ public partial class ErpDbContext : DbContext
     public virtual DbSet<DdCrosssellItem> DdCrosssellItems { get; set; }
 
     public virtual DbSet<DdCrosssellSort> DdCrosssellSorts { get; set; }
+
+    public virtual DbSet<DdCustomer> DdCustomers { get; set; }
+
+    public virtual DbSet<DdCustomerGroupDescription> DdCustomerGroupDescriptions { get; set; }
+
+    public virtual DbSet<DdCustomerHistory> DdCustomerHistories { get; set; }
 
     public virtual DbSet<DdFilter> DdFilters { get; set; }
 
@@ -94,6 +102,44 @@ public partial class ErpDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DdAddress>(entity =>
+        {
+            entity.HasKey(e => e.AddressId).HasName("PRIMARY");
+
+            entity.ToTable("dd_address");
+
+            entity.HasIndex(e => e.CustomerId, "customer_id");
+
+            entity.Property(e => e.AddressId).HasColumnName("address_id");
+            entity.Property(e => e.Address1)
+                .HasMaxLength(128)
+                .HasColumnName("address_1");
+            entity.Property(e => e.Address2)
+                .HasMaxLength(128)
+                .HasColumnName("address_2");
+            entity.Property(e => e.City)
+                .HasMaxLength(128)
+                .HasColumnName("city");
+            entity.Property(e => e.Company)
+                .HasMaxLength(40)
+                .HasColumnName("company");
+            entity.Property(e => e.CountryId).HasColumnName("country_id");
+            entity.Property(e => e.CustomField)
+                .HasColumnType("text")
+                .HasColumnName("custom_field");
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+            entity.Property(e => e.Firstname)
+                .HasMaxLength(32)
+                .HasColumnName("firstname");
+            entity.Property(e => e.Lastname)
+                .HasMaxLength(32)
+                .HasColumnName("lastname");
+            entity.Property(e => e.Postcode)
+                .HasMaxLength(10)
+                .HasColumnName("postcode");
+            entity.Property(e => e.ZoneId).HasColumnName("zone_id");
+        });
+
         modelBuilder.Entity<DdCategory>(entity =>
         {
             entity.HasKey(e => e.CategoryId).HasName("PRIMARY");
@@ -212,6 +258,96 @@ public partial class ErpDbContext : DbContext
 
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+        });
+
+        modelBuilder.Entity<DdCustomer>(entity =>
+        {
+            entity.HasKey(e => e.CustomerId).HasName("PRIMARY");
+
+            entity.ToTable("dd_customer");
+
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+            entity.Property(e => e.AddressId).HasColumnName("address_id");
+            entity.Property(e => e.Cart)
+                .HasColumnType("text")
+                .HasColumnName("cart");
+            entity.Property(e => e.Code)
+                .HasMaxLength(40)
+                .HasColumnName("code");
+            entity.Property(e => e.CustomField)
+                .HasColumnType("text")
+                .HasColumnName("custom_field");
+            entity.Property(e => e.CustomerGroupId).HasColumnName("customer_group_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.Email)
+                .HasMaxLength(96)
+                .HasColumnName("email");
+            entity.Property(e => e.Fax)
+                .HasMaxLength(32)
+                .HasColumnName("fax");
+            entity.Property(e => e.Firstname)
+                .HasMaxLength(32)
+                .HasColumnName("firstname");
+            entity.Property(e => e.Ip)
+                .HasMaxLength(40)
+                .HasColumnName("ip");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Lastname)
+                .HasMaxLength(32)
+                .HasColumnName("lastname");
+            entity.Property(e => e.Newsletter).HasColumnName("newsletter");
+            entity.Property(e => e.Password)
+                .HasMaxLength(40)
+                .HasColumnName("password");
+            entity.Property(e => e.Safe).HasColumnName("safe");
+            entity.Property(e => e.Salt)
+                .HasMaxLength(9)
+                .HasColumnName("salt");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.StoreId).HasColumnName("store_id");
+            entity.Property(e => e.Telephone)
+                .HasMaxLength(32)
+                .HasColumnName("telephone");
+            entity.Property(e => e.Token)
+                .HasColumnType("text")
+                .HasColumnName("token");
+            entity.Property(e => e.Wishlist)
+                .HasColumnType("text")
+                .HasColumnName("wishlist");
+        });
+
+        modelBuilder.Entity<DdCustomerGroupDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.CustomerGroupId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_customer_group_description");
+
+            entity.Property(e => e.CustomerGroupId).HasColumnName("customer_group_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Description)
+                .HasColumnType("text")
+                .HasColumnName("description");
+            entity.Property(e => e.Name)
+                .HasMaxLength(32)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<DdCustomerHistory>(entity =>
+        {
+            entity.HasKey(e => e.CustomerHistoryId).HasName("PRIMARY");
+
+            entity.ToTable("dd_customer_history");
+
+            entity.Property(e => e.CustomerHistoryId).HasColumnName("customer_history_id");
+            entity.Property(e => e.Comment)
+                .HasColumnType("text")
+                .HasColumnName("comment");
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
         });
 
         modelBuilder.Entity<DdFilter>(entity =>
