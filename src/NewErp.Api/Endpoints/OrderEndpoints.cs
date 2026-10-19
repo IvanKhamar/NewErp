@@ -54,6 +54,14 @@ public static class OrderEndpoints
             service.ChangeStatusAsync(id, request, user.GetUserId(), ct))
         .WithSummary("Змінити статус (із записом у журнал). warnings — попередження від інших модулів");
 
+        orders.MapGet("/{id:int}/composition", (int id, NewOrderService service, CancellationToken ct) => service.GetCompositionAsync(id, ct))
+            .WithSummary("Склад замовлення для редагування: товари з розмірами, доставка, знижка, завдаток");
+
+        orders.MapPut("/{id:int}/composition", (int id, UpdateOrderCompositionRequest request, ClaimsPrincipal user, NewOrderService service, CancellationToken ct) =>
+            service.UpdateCompositionAsync(id, request, user.GetUserId(), ct))
+        .WithSummary("Замінити склад замовлення (товари, розміри, кількість, ціни, доставка, знижка, завдаток). "
+            + "Пошиті вироби перераховуються за новим складом; warnings — нестача");
+
         orders.MapPut("/{id:int}/manager", async (int id, AssignManagerRequest request, ClaimsPrincipal user, OrderService service, CancellationToken ct) =>
         {
             await service.AssignManagerAsync(id, request, user.GetUserId(), ct);

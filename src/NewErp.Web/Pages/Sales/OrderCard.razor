@@ -47,7 +47,12 @@ else
                 </MudSimpleTable>
             </MudPaper>
 
-            <MudText Typo="Typo.h6" Class="mb-2">Товари</MudText>
+            <div class="d-flex align-center mb-2">
+                <MudText Typo="Typo.h6">Товари</MudText>
+                <MudSpacer />
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditCompositionAsync"
+                           Disabled="_busy" data-test="edit-composition">Змінити склад</MudButton>
+            </div>
             <MudSimpleTable Dense="true" Outlined="true" Elevation="0" Class="mb-4">
                 <thead>
                     <tr><th>Товар</th><th>Артикул</th><th style="text-align: right">К-сть</th><th style="text-align: right">Ціна</th><th style="text-align: right">Сума</th></tr>
@@ -333,6 +338,19 @@ else
             return;
         _shipment = shipment;
         Snackbar.Add($"ТТН {shipment.Number} створено.", Severity.Success);
+    }
+
+    private async Task EditCompositionAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<EditCompositionDialog>("Склад замовлення",
+            new DialogParameters<EditCompositionDialog> { { d => d.OrderId, Id } },
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        if (await dialog.Result is not { Canceled: false, Data: UpdateOrderCompositionResult result })
+            return;
+        Snackbar.Add($"Склад змінено. Сума: {Fmt.Money(result.Total)}.", Severity.Success);
+        foreach (var warning in result.Warnings)
+            Snackbar.Add(warning, Severity.Warning);
+        await LoadAsync();
     }
 
     private async Task DeleteShipmentAsync()

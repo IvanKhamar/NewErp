@@ -41,16 +41,25 @@ public sealed class OrderDraft
     {
         if (string.IsNullOrWhiteSpace(firstname) && string.IsNullOrWhiteSpace(telephone))
             throw new DomainException("Вкажіть ім'я або телефон клієнта.");
+        if (string.IsNullOrWhiteSpace(shippingMethod))
+            throw new DomainException("Необхідний спосіб доставки.");
+        if (string.IsNullOrWhiteSpace(paymentMethod))
+            throw new DomainException("Необхідний спосіб оплати.");
+        return ForLines(lines, shippingCost, discount, prepayment);
+    }
+
+    /// <summary>
+    /// Лише склад і суми: для нового замовлення (через <see cref="Create"/>) і для зміни складу наявного,
+    /// де клієнт і способи доставки вже записані.
+    /// </summary>
+    public static OrderDraft ForLines(IReadOnlyList<OrderDraftLine> lines, decimal shippingCost, decimal discount, decimal prepayment)
+    {
         if (lines.Count == 0)
             throw new DomainException("Кошик не може бути порожнім.");
         if (lines.Any(l => l.Quantity <= 0))
             throw new DomainException("Кількість товару має бути більшою за нуль.");
         if (lines.Any(l => l.Price < 0))
             throw new DomainException("Ціна товару не може бути від'ємною.");
-        if (string.IsNullOrWhiteSpace(shippingMethod))
-            throw new DomainException("Необхідний спосіб доставки.");
-        if (string.IsNullOrWhiteSpace(paymentMethod))
-            throw new DomainException("Необхідний спосіб оплати.");
         if (shippingCost < 0 || discount < 0 || prepayment < 0)
             throw new DomainException("Доставка, знижка й завдаток не можуть бути від'ємними.");
 

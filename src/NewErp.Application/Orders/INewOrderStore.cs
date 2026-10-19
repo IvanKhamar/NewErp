@@ -1,3 +1,5 @@
+using NewErp.Domain.Orders;
+
 namespace NewErp.Application.Orders;
 
 /// <summary>Те, що потрібно для створення замовлення вручну: товари, клієнти, способи доставки й оплати.</summary>
@@ -26,4 +28,10 @@ public interface INewOrderStore
     /// <summary>Записує замовлення без статусу (order_status_id = 0), його товари, опції й підсумки.</summary>
     /// <returns>Id нового замовлення.</returns>
     Task<int> CreateAsync(NewOrderRecord order, CancellationToken ct);
+
+    /// <summary>Склад замовлення або null, якщо замовлення немає.</summary>
+    Task<OrderCompositionDto?> GetCompositionAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Замінює товари, опції й підсумки замовлення, оновлює суму й завдаток.</summary>
+    Task ReplaceLinesAsync(int orderId, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, DateTime now, CancellationToken ct);
 }

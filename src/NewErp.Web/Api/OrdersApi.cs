@@ -78,6 +78,11 @@ public sealed class OrdersApi(HttpClient http)
     public async Task<CreateOrderResult> CreateAsync(CreateOrderRequest request) =>
         await ReadAsync<CreateOrderResult>(await http.PostAsJsonAsync("/orders", request));
 
+    public Task<OrderCompositionDto> CompositionAsync(int id) => GetAsync<OrderCompositionDto>($"/orders/{id}/composition");
+
+    public async Task<UpdateOrderCompositionResult> UpdateCompositionAsync(int id, UpdateOrderCompositionRequest request) =>
+        await ReadAsync<UpdateOrderCompositionResult>(await http.PutAsJsonAsync($"/orders/{id}/composition", request));
+
     public Task<OrderMethodsDto> MethodsAsync() => GetAsync<OrderMethodsDto>("/orders/new/methods");
 
     public Task<List<ProductPickDto>> ProductsAsync(string search) =>
