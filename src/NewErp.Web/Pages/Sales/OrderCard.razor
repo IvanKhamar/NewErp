@@ -219,6 +219,7 @@ else
                         <MudText Typo="Typo.body2" data-test="payment">@Fmt.Date(payment.Timestamp) · <b>@Fmt.Money(payment.Amount)</b> · @payment.Payer</MudText>
                     }
                 </MudPaper>
+                <LiqPayPanel OrderId="Id" Total="_order.Total" />
             </AuthorizeView>
 
             <MudPaper Class="pa-4" Outlined="true">

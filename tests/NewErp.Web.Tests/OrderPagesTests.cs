@@ -167,6 +167,26 @@ public class OrderPagesTests : WebTestContext
         Assert.Contains("Відкрити чек", page.Find("[data-test=cheque]").TextContent);
     }
 
+    [Fact]
+    public void Card_CreatesLiqPayLink_AndChecksPayment()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/291/liqpay-link", HttpStatusCode.OK,
+            new NewErp.Application.Payments.PaymentLinkDto("https://www.liqpay.ua/api/3/checkout?data=x&signature=y", 13200, "UAH", true), HttpMethod.Post);
+        Api.Respond("/orders/291/liqpay-status", HttpStatusCode.OK,
+            new NewErp.Application.Payments.LiqPayStatusDto(NewErp.Domain.Payments.LiqPayState.Paid, "Оплачено", 13200, new DateTime(2026, 10, 20, 9, 30, 0), true));
+
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForElement("[data-test=liqpay-create]").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("відкрити сторінку оплати", page.Find("[data-test=liqpay-link]").TextContent));
+        Assert.Contains("посилання тестове", page.Find("[data-test=liqpay]").TextContent);
+        Assert.Contains("\"amount\":13200", Api.Bodies["/orders/291/liqpay-link"]); // типово вся сума замовлення
+
+        page.Find("[data-test=liqpay-check]").Click();
+        page.WaitForAssertion(() => Assert.Contains("Оплачено", page.Find("[data-test=liqpay-status]").TextContent));
+    }
+
     private static OrderDetails Order(int statusId) => new(
         291, DateTime.Now, "Немира Скиба", "+380678708466", "", "Нова Пошта", "Конотоп", "", "Monobank", "",
         13200, "UAH", statusId, statusId == 24 ? "1) Уточнюємо" : "2) Прийнято", 1, "Сайт", null, null,

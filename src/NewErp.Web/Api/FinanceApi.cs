@@ -106,6 +106,11 @@ public sealed class FinanceApi(HttpClient http)
 
     public Task<List<BankPaymentDto>> OrderPaymentsAsync(int orderId) => GetAsync<List<BankPaymentDto>>($"/orders/{orderId}/payments");
 
+    public async Task<PaymentLinkDto> LiqPayLinkAsync(int orderId, decimal? amount) =>
+        await ReadAsync<PaymentLinkDto>(await http.PostAsJsonAsync($"/orders/{orderId}/liqpay-link", new CreatePaymentLinkRequest(amount)));
+
+    public Task<LiqPayStatusDto> LiqPayStatusAsync(int orderId) => GetAsync<LiqPayStatusDto>($"/orders/{orderId}/liqpay-status");
+
     private static string Day(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));

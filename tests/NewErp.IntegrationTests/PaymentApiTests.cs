@@ -45,4 +45,22 @@ public class PaymentApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(new BankImportResult(false, 0, 0, 0), result);
     }
+
+    [MySqlFact]
+    public async Task LiqPay_WithoutKeys_GivesTestLink_AndNotPaid()
+    {
+        var client = await factory.LoginAsync(ApiFactory.Manager);
+
+        var link = await (await client.PostAsJsonAsync("/orders/2/liqpay-link", new CreatePaymentLinkRequest(500m))).Content.ReadFromJsonAsync<PaymentLinkDto>();
+        Assert.Equal((500m, "UAH", true), (link!.Amount, link.Currency, link.IsTest));
+        Assert.StartsWith("https://www.liqpay.ua/api/3/checkout?data=", link.Url);
+
+        var status = await client.GetFromJsonAsync<LiqPayStatusDto>("/orders/2/liqpay-status");
+        Assert.Equal(LiqPayState.NotFound, status!.State);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/orders/2/liqpay-link", new CreatePaymentLinkRequest(2000.01m))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/orders/999/liqpay-link", new CreatePaymentLinkRequest(null))).StatusCode);
+        var storekeeper = await factory.LoginAsync(ApiFactory.Storekeeper);
+        Assert.Equal(HttpStatusCode.Forbidden, (await storekeeper.GetAsync("/orders/2/liqpay-status")).StatusCode);
+    }
 }

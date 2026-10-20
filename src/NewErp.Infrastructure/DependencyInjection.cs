@@ -95,6 +95,11 @@ public static class DependencyInjection
             services.AddSingleton<IBankStatementClient>(_ => new PrivatBankClient(new HttpClient { Timeout = TimeSpan.FromSeconds(60) }, privatBank));
         else
             services.AddSingleton<IBankStatementClient, StubBankStatementClient>();
+        var liqPay = configuration.GetSection(LiqPayOptions.SectionName).Get<LiqPayOptions>() ?? new LiqPayOptions();
+        if (liqPay.IsConfigured)
+            services.AddSingleton<ILiqPayGateway>(_ => new LiqPayGateway(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, liqPay));
+        else
+            services.AddSingleton<ILiqPayGateway, StubLiqPayGateway>();
         // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).
         services.AddSingleton<ISmsSender, StubSmsSender>();
         services.AddScoped<IUserLoginStore, UserLoginStore>();
