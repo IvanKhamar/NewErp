@@ -192,9 +192,10 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         var birthdays = await SeedMarketingAsync();
         var customers = await SeedCustomersAsync();
         var returns = await SeedReturnsAsync();
+        var locations = await SeedLocationsAsync();
         var models = await SeedProductionAsync();
         var warnings = await SeedProductionOperationsAsync(storekeeper.UserId, storekeeper.Username);
-        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), {customers} зареєстрованих покупців, {returns} повернень, " +
+        return $"{users.Count + 2} користувачів, {orders.Count} замовлень, {lines} рядків товарів, {shipments} ТТН, {payments} надходжень на рахунок, {warehouses.Count} відділень у довіднику, {stockItems} позицій складу, 1 партнер з фідом, 2 мітки товарів, 2 розміри на передзамовленні, {birthdays} клієнтів з днем народження (кілька — сьогодні й цього тижня), {customers} зареєстрованих покупців, {returns} повернень, {locations} склади й пункти видачі, " +
                $"{models} моделей виробництва (крій і пошив: {warnings} попереджень про нестачу).";
     }
 
@@ -515,6 +516,25 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         }
         await db.SaveChangesAsync();
         return count;
+    }
+
+    /// <summary>Довідник «Склади й пункти видачі»: склад і два пункти видачі з вигаданими адресами й телефонами.</summary>
+    private async Task<int> SeedLocationsAsync()
+    {
+        (string Name, string Type, string City, string Address, string Contact, string Phone)[] items =
+        [
+            ("Склад і цех", "склад", "Київ", "вул. Вигадана, 10", "Комірник", "+38 (067) 000-00-01"),
+            ("Пункт видачі на Подолі", "пункт видачі", "Київ", "вул. Тестова, 5", "Адміністратор", "+38 (067) 000-00-02"),
+            ("Пункт видачі у Львові", "пункт видачі", "Львів", "пл. Прикладна, 3", "Адміністратор", "+38 (067) 000-00-03"),
+        ];
+        foreach (var x in items)
+            db.DdWarehouses.Add(new DdWarehouse
+            {
+                Name = x.Name, Type = x.Type, City = x.City, Address = x.Address, Contact = x.Contact, Telephone = x.Phone,
+                Description = "", Image = "",
+            });
+        await db.SaveChangesAsync();
+        return items.Length;
     }
 
     /// <summary>Довідники повернень (статуси, причини, дії) і кілька повернень з виконаних замовлень, як оформив би менеджер.</summary>

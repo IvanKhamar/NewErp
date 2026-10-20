@@ -1,0 +1,170 @@
+@page "/locations"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject LocationsApi Api
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Склади й пункти видачі — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Склади й пункти видачі</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">Довідник адрес і контактів магазину. Файл Excel має ті самі колонки, що й вивантаження старого сайту: рядок з наявним ID оновлює запис, решта додаються.</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Placeholder="Назва, місто, адреса, тип"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Immediate="true"
+                  Style="min-width: 240px" />
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Href="@LocationsApi.ExportUrl" Target="_blank" StartIcon="@Icons.Material.Filled.Download" data-test="export">Вивантажити в Excel</MudButton>
+    <MudFileUpload T="IBrowserFile" FilesChanged="ImportAsync" Accept=".xlsx" data-test="import">
+        <CustomContent>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_busy" OnClick="@context.OpenFilePickerAsync">Імпорт з Excel</MudButton>
+        </CustomContent>
+    </MudFileUpload>
+</MudPaper>
+
+@if (_importErrors.Count > 0)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3" data-test="import-errors">
+        Файл не імпортовано, нічого не змінено:
+        <ul>
+            @foreach (var error in _importErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </MudAlert>
+}
+
+<MudGrid>
+    <MudItem xs="12" lg="8">
+        <MudTable T="LocationDto" Items="_items" Dense="true" Hover="true" Outlined="true" Elevation="0" RowStyle="cursor: pointer"
+                  OnRowClick="row => Edit(row.Item!)" data-test="locations">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Назва</MudTh>
+                <MudTh>Тип</MudTh>
+                <MudTh>Місто й адреса</MudTh>
+                <MudTh>Контакт</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="ID">@context.Id</MudTd>
+                <MudTd DataLabel="Назва">@context.Name</MudTd>
+                <MudTd DataLabel="Тип">@context.Type</MudTd>
+                <MudTd DataLabel="Місто й адреса">@context.City@(context.Address.Length > 0 ? ", " + context.Address : "")</MudTd>
+                <MudTd DataLabel="Контакт">@context.Contact <MudText Typo="Typo.caption" Class="d-block">@context.Telephone</MudText></MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText>Записів немає.</MudText></NoRecordsContent>
+        </MudTable>
+    </MudItem>
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="pa-3" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-2">@(_editId is { } id ? $"Запис №{id}" : "Новий запис")</MudText>
+            <MudTextField @bind-Value="_form.Name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="64" Class="mb-2" data-test="name" />
+            <MudTextField @bind-Value="_form.Type" Label="Тип (склад, пункт видачі…)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="64" Class="mb-2" />
+            <MudTextField @bind-Value="_form.City" Label="Місто" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="128" Class="mb-2" />
+            <MudTextField @bind-Value="_form.Address" Label="Адреса" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" Class="mb-2" />
+            <MudTextField @bind-Value="_form.Contact" Label="Контактна особа" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="128" Class="mb-2" />
+            <MudTextField @bind-Value="_form.Telephone" Label="Телефон" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" Class="mb-2" />
+            <MudTextField @bind-Value="_form.Description" Label="Опис" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy" data-test="save">Зберегти</MudButton>
+                @if (_editId is not null)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="New">Новий</MudButton>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="DeleteAsync" Disabled="_busy" data-test="delete">Видалити</MudButton>
+                }
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<LocationDto> _items = [];
+    private List<string> _importErrors = [];
+    private string? _search;
+    private int? _editId;
+    private Form _form = new();
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _items = await Api.ListAsync(_search);
+
+    private async Task SearchAsync(string? value)
+    {
+        _search = value;
+        await LoadAsync();
+    }
+
+    private void Edit(LocationDto x)
+    {
+        _editId = x.Id;
+        _form = new Form { Name = x.Name, Description = x.Description, Contact = x.Contact, Telephone = x.Telephone, City = x.City, Address = x.Address, Type = x.Type };
+    }
+
+    private void New()
+    {
+        _editId = null;
+        _form = new();
+    }
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        var request = new SaveLocationRequest(_form.Name, _form.Description, _form.Contact, _form.Telephone, _form.City, _form.Address, _form.Type);
+        if (_editId is { } id)
+            await Api.UpdateAsync(id, request);
+        else
+            _editId = await Api.CreateAsync(request);
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private async Task DeleteAsync()
+    {
+        if (_editId is not { } id || await Dialogs.ShowMessageBoxAsync("Видалити запис?", $"«{_form.Name}» буде видалено з довідника.", yesText: "Видалити", cancelText: "Скасувати") != true)
+            return;
+        await RunAsync(async () =>
+        {
+            await Api.DeleteAsync(id);
+            New();
+        });
+    }
+
+    private Task ImportAsync(IBrowserFile? file) => file is null ? Task.CompletedTask : RunAsync(async () =>
+    {
+        await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        var result = await Api.ImportAsync(stream);
+        _importErrors = result.Errors.ToList();
+        if (_importErrors.Count == 0)
+            Snackbar.Add($"Імпортовано: додано {result.Added}, оновлено {result.Updated}.", Severity.Success);
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (Exception e) when (e is ApiException or IOException)
+        {
+            Snackbar.Add(e is IOException ? "Файл більший за 5 МБ." : e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed class Form
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Contact { get; set; } = "";
+        public string Telephone { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+}

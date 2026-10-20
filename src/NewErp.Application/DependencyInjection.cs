@@ -5,6 +5,7 @@ using NewErp.Application.Cashbox;
 using NewErp.Application.Catalog;
 using NewErp.Application.Customers;
 using NewErp.Application.Delivery;
+using NewErp.Application.Locations;
 using NewErp.Application.Marketing;
 using NewErp.Application.Orders;
 using NewErp.Application.Partners;
@@ -28,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ReturnService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<LocationService>();
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
         services.AddScoped<ReorderService>();

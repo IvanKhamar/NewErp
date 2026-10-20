@@ -98,6 +98,8 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdUser> DdUsers { get; set; }
 
+    public virtual DbSet<DdWarehouse> DdWarehouses { get; set; }
+
     public virtual DbSet<ErpOrderManager> ErpOrderManagers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1217,6 +1219,45 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(20)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<DdWarehouse>(entity =>
+        {
+            entity.HasKey(e => e.WarehouseId).HasName("PRIMARY");
+
+            entity.ToTable("dd_warehouse");
+
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.Address)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("''")
+                .HasColumnName("address");
+            entity.Property(e => e.City)
+                .HasMaxLength(128)
+                .HasDefaultValueSql("''")
+                .HasColumnName("city");
+            entity.Property(e => e.Contact)
+                .HasMaxLength(128)
+                .HasDefaultValueSql("''")
+                .HasColumnName("contact");
+            entity.Property(e => e.Description)
+                .HasColumnType("text")
+                .HasColumnName("description");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("''")
+                .HasColumnName("image");
+            entity.Property(e => e.Name)
+                .HasMaxLength(64)
+                .HasColumnName("name");
+            entity.Property(e => e.Telephone)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("''")
+                .HasColumnName("telephone");
+            entity.Property(e => e.Type)
+                .HasMaxLength(64)
+                .HasDefaultValueSql("''")
+                .HasColumnName("type");
         });
 
         modelBuilder.Entity<ErpOrderManager>(entity =>
