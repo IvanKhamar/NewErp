@@ -67,6 +67,7 @@ app.MapMarketingEndpoints();
 app.MapReturnEndpoints();
 app.MapCustomerEndpoints();
 app.MapReportEndpoints();
+app.MapLocationEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.

@@ -548,3 +548,19 @@ CREATE TABLE `dd_subscribe` (
 -- за замовчуванням вгадані, звірити.
 ALTER TABLE `dd_category`
   ADD COLUMN `production_period` int(11) NOT NULL DEFAULT '0';
+
+-- ═══ Склади й пункти видачі ═══
+-- Довідник «Каталог → Склади» старої адмінки. Відновлено з admin/model/catalog/warehouse.php і warehouse_form.twig
+-- (назва до 64 символів — з перевірки форми). Решта довжин, типи й рушій вгадані, звірити.
+CREATE TABLE `dd_warehouse` (
+  `warehouse_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) NOT NULL,
+  `description` text NOT NULL,
+  `contact` varchar(128) NOT NULL DEFAULT '',
+  `telephone` varchar(255) NOT NULL DEFAULT '',
+  `city` varchar(128) NOT NULL DEFAULT '',
+  `address` varchar(255) NOT NULL DEFAULT '',
+  `type` varchar(64) NOT NULL DEFAULT '',
+  `image` varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`warehouse_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
