@@ -1,0 +1,124 @@
+@page "/reports"
+@attribute [Authorize(Roles = Access.Orders)]
+@using NewErp.Domain.Reports
+@inject ReportsApi Api
+@inject OrdersApi Orders
+@inject ISnackbar Snackbar
+
+<PageTitle>Звіти — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Звіти</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">Без вибраного статусу враховуються всі оформлені замовлення, крім скасованих.</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudDatePicker @bind-Date="_from" Label="З" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+    <MudDatePicker @bind-Date="_to" Label="По" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+    <MudSelect T="int?" @bind-Value="_statusId" Label="Статус" Clearable="true" Style="min-width: 200px">
+        @foreach (var status in _statuses)
+        {
+            <MudSelectItem T="int?" Value="status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="ReportGrouping" @bind-Value="_group" Label="Групувати" Style="min-width: 140px">
+        <MudSelectItem T="ReportGrouping" Value="ReportGrouping.Day">за днями</MudSelectItem>
+        <MudSelectItem T="ReportGrouping" Value="ReportGrouping.Week">за тижнями</MudSelectItem>
+        <MudSelectItem T="ReportGrouping" Value="ReportGrouping.Month">за місяцями</MudSelectItem>
+        <MudSelectItem T="ReportGrouping" Value="ReportGrouping.Year">за роками</MudSelectItem>
+    </MudSelect>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync" Disabled="_busy" data-test="show">Показати</MudButton>
+</MudPaper>
+
+<MudTabs Elevation="0" Outlined="true" Rounded="true" TabPanelsClass="pa-3">
+    <MudTabPanel Text="Продажі">
+        @if (_sales is not null)
+        {
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="sales">
+                <thead><tr><th>Період</th><th style="text-align: right">Замовлень</th><th style="text-align: right">Товарів, шт.</th><th style="text-align: right">Сума</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _sales.Rows)
+                    {
+                        <tr>
+                            <td>@Period(row)</td>
+                            <td style="text-align: right">@row.Orders</td>
+                            <td style="text-align: right">@row.Products</td>
+                            <td style="text-align: right">@Fmt.Money(row.Total)</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td><b>Разом</b></td>
+                        <td style="text-align: right"><b>@_sales.Orders</b></td>
+                        <td style="text-align: right"><b>@_sales.Products</b></td>
+                        <td style="text-align: right"><b>@Fmt.Money(_sales.Total)</b></td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Товари">
+        @if (_products is not null)
+        {
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="products">
+                <thead><tr><th>Товар</th><th>Модель</th><th style="text-align: right">Продано, шт.</th><th style="text-align: right">Сума</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _products.Rows)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td>@row.Model</td>
+                            <td style="text-align: right">@row.Quantity</td>
+                            <td style="text-align: right">@Fmt.Money(row.Total)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_products.Rows.Count == 0)
+            {
+                <MudText Typo="Typo.body2">За цей період продажів немає.</MudText>
+            }
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<OrderStatusDto> _statuses = [];
+    private DateTime? _from;
+    private DateTime? _to;
+    private int? _statusId;
+    private ReportGrouping _group = ReportGrouping.Week;
+    private SalesReportDto? _sales;
+    private ProductSalesDto? _products;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _statuses = await Orders.StatusesAsync();
+        await LoadAsync();
+        // Сервер підставляє типовий період (поточний місяць), показуємо його у фільтрі.
+        (_from, _to) = (_sales?.From.ToDateTime(TimeOnly.MinValue), _sales?.To.ToDateTime(TimeOnly.MinValue));
+    }
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            var filter = new ReportFilter(
+                _from is { } f ? DateOnly.FromDateTime(f) : null, _to is { } t ? DateOnly.FromDateTime(t) : null, _statusId, _group);
+            _sales = await Api.SalesAsync(filter);
+            _products = await Api.ProductsAsync(filter);
+        }
+        catch (ApiException e)
+        {
+            _sales = null;
+            _products = null;
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Period(SalesReportRow row) =>
+        row.Start == row.End ? row.Start.ToString("dd.MM.yyyy") : $"{row.Start:dd.MM.yyyy} – {row.End:dd.MM.yyyy}";
+}
