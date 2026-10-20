@@ -39,6 +39,8 @@ public sealed class OrdersApi(HttpClient http)
 
     public Task<List<SmsDto>> SmsAsync(int id) => GetAsync<List<SmsDto>>($"/orders/{id}/sms");
 
+    public Task<SmsSettingsDto> SmsSettingsAsync() => GetAsync<SmsSettingsDto>("/sms/settings");
+
     /// <param name="force">Надіслати, навіть якщо номер ТТН у тексті належить іншому замовленню.</param>
     public async Task<SendSmsResultDto> SendSmsAsync(int id, string text, bool force = false) =>
         await ReadAsync<SendSmsResultDto>(await http.PostAsJsonAsync($"/orders/{id}/sms", new SendSmsRequest(text, force)));

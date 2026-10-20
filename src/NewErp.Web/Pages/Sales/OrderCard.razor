@@ -224,7 +224,10 @@ else
 
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">SMS клієнту</MudText>
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">Поки SMS не надсилаються по-справжньому: спроба лише записується в журнал.</MudAlert>
+                @if (_smsConfigured == false)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2" data-test="sms-stub">Токен SMSClub не задано: SMS не надсилаються, спроба лише записується в журнал.</MudAlert>
+                }
                 <MudTextField @bind-Value="_smsText" Label="Текст" Lines="3" Variant="Variant.Outlined" MaxLength="670" Counter="670" Immediate="true" />
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Sms" Class="mt-2" OnClick="SendSmsAsync"
                            Disabled="_busy || string.IsNullOrWhiteSpace(_smsText)" data-test="send-sms">Надіслати на @_order.Telephone</MudButton>
@@ -256,6 +259,7 @@ else
     private int _newStatusId;
     private int? _managerId;
     private string _smsText = "";
+    private bool? _smsConfigured;
     private List<string> _warnings = [];
     private string? _error;
     private bool _busy;
@@ -267,11 +271,25 @@ else
         {
             _statuses = await Api.StatusesAsync();
             _managers = await Api.ManagersAsync();
+            _smsConfigured = await SmsConfiguredAsync();
             await LoadAsync();
         }
         catch (ApiException e)
         {
             _error = e.Message;
+        }
+    }
+
+    // Підказку про заглушку показуємо лише коли сервер точно сказав, що SMS-сервіс не підключено.
+    private async Task<bool?> SmsConfiguredAsync()
+    {
+        try
+        {
+            return (await Api.SmsSettingsAsync()).IsConfigured;
+        }
+        catch (ApiException)
+        {
+            return null;
         }
     }
 
@@ -307,7 +325,7 @@ else
             result = await Api.SendSmsAsync(Id, _smsText, force: true);
         }
 
-        Snackbar.Add(result.Sent ? "SMS надіслано." : "SMS записано в журнал, але не надіслано: сервіс SMS ще не підключено.",
+        Snackbar.Add(result.Sent ? "SMS надіслано." : $"SMS записано в журнал, але не надіслано. Відповідь сервісу: {result.Message?.Response}",
             result.Sent ? Severity.Success : Severity.Warning);
         _smsText = "";
     });

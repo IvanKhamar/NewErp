@@ -100,8 +100,12 @@ public static class DependencyInjection
             services.AddSingleton<ILiqPayGateway>(_ => new LiqPayGateway(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, liqPay));
         else
             services.AddSingleton<ILiqPayGateway, StubLiqPayGateway>();
-        // Поки лише заглушка: справжній SMS-сервіс підключимо разом з новим токеном SMSClub (у user-secrets).
-        services.AddSingleton<ISmsSender, StubSmsSender>();
+        // SMSClub — лише з новим токеном у user-secrets (старий записаний у коді старого сайту, його треба перевипустити).
+        var smsClub = configuration.GetSection(SmsClubOptions.SectionName).Get<SmsClubOptions>() ?? new SmsClubOptions();
+        if (smsClub.IsConfigured)
+            services.AddSingleton<ISmsSender>(_ => new SmsClubSender(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, smsClub));
+        else
+            services.AddSingleton<ISmsSender, StubSmsSender>();
         services.AddScoped<IUserLoginStore, UserLoginStore>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         return services;

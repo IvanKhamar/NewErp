@@ -24,6 +24,14 @@ public class SmsApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [MySqlFact]
+    public async Task Settings_WithoutToken_NotConfigured()
+    {
+        var client = await factory.LoginAsync(ApiFactory.Manager);
+
+        Assert.False((await client.GetFromJsonAsync<SmsSettingsDto>("/sms/settings"))!.IsConfigured);
+    }
+
+    [MySqlFact]
     public async Task Send_EmptyText_BadRequest()
     {
         var client = await factory.LoginAsync(ApiFactory.Admin);

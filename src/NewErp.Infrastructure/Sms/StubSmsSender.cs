@@ -12,6 +12,8 @@ public sealed partial class StubSmsSender(ILogger<StubSmsSender> logger) : ISmsS
 {
     public const string Response = "НЕ НАДІСЛАНО: заглушка NewErp, справжній SMS-сервіс не підключено";
 
+    public bool IsConfigured => false;
+
     public Task<SmsSendResult> SendAsync(string phone, string text, CancellationToken ct)
     {
         LogStub(phone, text.Length);
