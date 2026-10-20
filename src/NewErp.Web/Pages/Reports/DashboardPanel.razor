@@ -1,0 +1,96 @@
+@inject ReportsApi Api
+
+@* Зведення продажів на головній, як плитки й графік на головній старої адмінки. *@
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@_error</MudAlert>
+}
+else if (_data is null)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-3" />
+}
+else
+{
+    <MudGrid Class="mb-2" data-test="tiles">
+        @Tile("Замовлень сьогодні", _data.OrdersToday, "вчора", money: false)
+        @Tile("Продажі сьогодні", _data.SalesToday, "вчора", money: true)
+        @Tile("Замовлень за місяць", _data.OrdersMonth, "ті самі дні минулого місяця", money: false)
+        @Tile("Продажі за місяць", _data.SalesMonth, "ті самі дні минулого місяця", money: true)
+        @Tile("Середній чек за місяць", _data.AverageCheckMonth, "минулий місяць", money: true)
+        @Tile("Нових покупців за місяць", _data.NewCustomersMonth, "минулий місяць", money: false)
+    </MudGrid>
+
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Продажі за 30 днів</MudText>
+                @{ var max = Math.Max(1, _data.Last30Days.Max(d => d.Total)); }
+                <div style="display: flex; align-items: flex-end; gap: 2px; height: 160px" data-test="chart">
+                    @foreach (var day in _data.Last30Days)
+                    {
+                        <MudTooltip Text="@($"{day.Start:dd.MM}: {day.Orders} зам., {Fmt.Money(day.Total)}")" Style="flex: 1; height: 100%; display: flex; align-items: flex-end">
+                            <div style="width: 100%; height: @(Percent(day.Total, max))%; min-height: 2px; background: var(--mud-palette-primary); border-radius: 2px 2px 0 0"></div>
+                        </MudTooltip>
+                    }
+                </div>
+                <div class="d-flex justify-space-between mt-1">
+                    <MudText Typo="Typo.caption">@_data.Last30Days[0].Start.ToString("dd.MM")</MudText>
+                    <MudText Typo="Typo.caption">@_data.Last30Days[^1].Start.ToString("dd.MM")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Топ товарів за 30 днів</MudText>
+                <MudSimpleTable Dense="true" Elevation="0" data-test="top">
+                    <tbody>
+                        @foreach (var product in _data.TopProducts30Days)
+                        {
+                            <tr><td>@product.Name</td><td style="text-align: right">@product.Quantity шт.</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                <MudLink Href="@ReportRoutes.List" Class="d-block mt-2">Усі звіти</MudLink>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardDto? _data;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _data = await Api.DashboardAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private static string Percent(decimal value, decimal max) => (value * 100 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static RenderFragment Tile(string title, DashboardTile tile, string previousLabel, bool money) => __builder =>
+    {
+        var value = money ? Fmt.Money(tile.Current) : Fmt.Qty(tile.Current);
+        var previous = money ? Fmt.Money(tile.Previous) : Fmt.Qty(tile.Previous);
+        <MudItem xs="12" sm="6" md="4" lg="2">
+            <MudPaper Class="pa-3" Outlined="true" Style="height: 100%">
+                <MudText Typo="Typo.caption">@title</MudText>
+                <MudText Typo="Typo.h6">@value</MudText>
+                @if (tile.ChangePercent is { } change)
+                {
+                    <MudText Typo="Typo.caption" Color="@(change >= 0 ? Color.Success : Color.Error)">@(change > 0 ? "+" : "")@change% проти @previousLabel</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">@previousLabel: @previous</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    };
+}

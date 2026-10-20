@@ -10,6 +10,7 @@ using NewErp.Application.Orders;
 using NewErp.Application.Partners;
 using NewErp.Application.Payments;
 using NewErp.Application.Production;
+using NewErp.Application.Reports;
 using NewErp.Application.Returns;
 using NewErp.Application.Sms;
 using NewErp.Application.Staff;
@@ -26,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<NewOrderService>();
         services.AddScoped<ReturnService>();
         services.AddScoped<CustomerService>();
+        services.AddScoped<ReportService>();
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();
         services.AddScoped<ReorderService>();

@@ -7,6 +7,10 @@
     <MudText Typo="Typo.h4" GutterBottom="true">Вітаємо, @context.User.Identity?.Name!</MudText>
 </AuthorizeView>
 
+<AuthorizeView Roles="@Access.Orders">
+    <DashboardPanel />
+</AuthorizeView>
+
 <MudGrid>
     <AuthorizeView Roles="@Access.Stock">
         <MudItem xs="12" sm="6" md="4">
