@@ -1,0 +1,80 @@
+@inject FinanceApi Finance
+@inject ISnackbar Snackbar
+@inject Clipboard Clipboard
+
+@* Оплата карткою: менеджер створює посилання LiqPay, надсилає його клієнту й потім перевіряє, чи оплачено. *@
+<MudPaper Class="pa-4 mb-4" Outlined="true" data-test="liqpay">
+    <MudText Typo="Typo.h6" Class="mb-2">Оплата карткою (LiqPay)</MudText>
+    <div class="d-flex align-center flex-wrap gap-2">
+        <MudNumericField @bind-Value="_amount" Label="Сума, грн" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="Total"
+                         Format="0.##" Style="max-width: 160px" data-test="liqpay-amount" />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Link" OnClick="CreateLinkAsync" Disabled="_busy"
+                   data-test="liqpay-create">Створити посилання</MudButton>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CheckAsync" Disabled="_busy"
+                   data-test="liqpay-check">Перевірити оплату</MudButton>
+    </div>
+    @if (_link is not null)
+    {
+        @if (_link.IsTest)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">Ключів LiqPay не налаштовано: посилання тестове, оплатити за ним не можна.</MudAlert>
+        }
+        <div class="d-flex align-center gap-2 mt-2" data-test="liqpay-link">
+            <MudText Typo="Typo.body2" Style="word-break: break-all">@Fmt.Money(_link.Amount) · <MudLink Href="@_link.Url" Target="_blank">відкрити сторінку оплати</MudLink></MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="CopyAsync" aria-label="Скопіювати посилання" />
+        </div>
+    }
+    @if (_status is not null)
+    {
+        <MudChip T="string" Size="Size.Small" Class="mt-2" Color="@(_status.State == LiqPayState.Paid ? Color.Success : Color.Default)" data-test="liqpay-status">
+            @_status.Label@(_status.Amount is { } paid ? $" · {Fmt.Money(paid)}" : "")@(_status.PaidAt is { } at ? $" · {Fmt.Date(at)}" : "")
+        </MudChip>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public int OrderId { get; set; }
+
+    [Parameter, EditorRequired] public decimal Total { get; set; }
+
+    private decimal _amount;
+    private PaymentLinkDto? _link;
+    private LiqPayStatusDto? _status;
+    private bool _busy;
+
+    private decimal _shownTotal = -1;
+
+    // Картка перемальовується після кожної дії; суму, яку ввів менеджер, скидаємо лише коли змінилася сума замовлення.
+    protected override void OnParametersSet()
+    {
+        if (Total != _shownTotal)
+            (_amount, _shownTotal) = (Total, Total);
+    }
+
+    private Task CreateLinkAsync() => RunAsync(async () => _link = await Finance.LiqPayLinkAsync(OrderId, _amount));
+
+    private Task CheckAsync() => RunAsync(async () => _status = await Finance.LiqPayStatusAsync(OrderId));
+
+    private async Task CopyAsync()
+    {
+        await Clipboard.CopyAsync(_link!.Url);
+        Snackbar.Add("Посилання скопійовано.", Severity.Info);
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
