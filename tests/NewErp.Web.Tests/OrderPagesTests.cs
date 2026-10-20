@@ -187,6 +187,20 @@ public class OrderPagesTests : WebTestContext
         page.WaitForAssertion(() => Assert.Contains("Оплачено", page.Find("[data-test=liqpay-status]").TextContent));
     }
 
+    [Fact]
+    public void Card_ShowsSmsStubHint_OnlyWithoutSmsService()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/sms/settings", HttpStatusCode.OK, new SmsSettingsDto(false));
+        var stub = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        stub.WaitForElement("[data-test=sms-stub]");
+
+        Api.Respond("/sms/settings", HttpStatusCode.OK, new SmsSettingsDto(true));
+        var real = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        real.WaitForElement("[data-test=send-sms]");
+        Assert.Empty(real.FindAll("[data-test=sms-stub]"));
+    }
+
     private static OrderDetails Order(int statusId) => new(
         291, DateTime.Now, "Немира Скиба", "+380678708466", "", "Нова Пошта", "Конотоп", "", "Monobank", "",
         13200, "UAH", statusId, statusId == 24 ? "1) Уточнюємо" : "2) Прийнято", 1, "Сайт", null, null,

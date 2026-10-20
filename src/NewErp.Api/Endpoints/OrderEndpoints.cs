@@ -71,7 +71,11 @@ public static class OrderEndpoints
 
         orders.MapPost("/{id:int}/sms", (int id, SendSmsRequest request, SmsService service, CancellationToken ct) =>
             service.SendToOrderAsync(id, request, ct))
-        .WithSummary("Надіслати SMS клієнту замовлення (зараз заглушка: нічого не надсилає, sent = false, але пише в журнал)");
+        .WithSummary("Надіслати SMS клієнту замовлення (через SMSClub; без токена заглушка: нічого не надсилає, sent = false, але пише в журнал)");
+
+        app.MapGet("/sms/settings", (ISmsSender sender) => new SmsSettingsDto(sender.IsConfigured))
+            .WithTags("Замовлення").RequireAuthorization(Policies.Orders)
+            .WithSummary("Чи підключено справжній SMS-сервіс (isConfigured = false — працює заглушка)");
 
         orders.MapGet("/{id:int}/sms", (int id, ISmsLog log, CancellationToken ct) => log.ListForOrderAsync(id, ct))
         .WithSummary("SMS, надіслані клієнту цього замовлення");

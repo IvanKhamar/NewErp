@@ -16,3 +16,6 @@ public sealed record SendSmsResultDto(bool Sent, SmsDto? Message, TtnMismatchDto
 
 /// <summary>Результат від SMS-сервісу. Response — сирий текст відповіді, він зберігається в журналі.</summary>
 public sealed record SmsSendResult(bool Sent, string Response);
+
+/// <summary>IsConfigured = false: SMS-сервіс не підключено, повідомлення лише записуються в журнал.</summary>
+public sealed record SmsSettingsDto(bool IsConfigured);
