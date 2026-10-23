@@ -71,3 +71,32 @@ CREATE TABLE `erp_shipment_sender` (
   `created_at` datetime NOT NULL,
   PRIMARY KEY (`shipment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Залишок розхідника на окремому складі (склади — довідник dd_warehouse старої адмінки).
+-- dd_stock_items.stock лишається загальним залишком: з ним працюють старий сайт, замовлення, виробництво й інвентаризація.
+-- Основний склад — це решта: загальний залишок мінус усе, що лежить на складах цієї таблиці, тому окремого рядка не має.
+CREATE TABLE `erp_stock_location` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `item_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_erp_stock_location_item_warehouse` (`item_id`, `warehouse_id`),
+  KEY `ix_erp_stock_location_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Переміщення розхідника між складами. NULL у from/to — основний склад. Загальний залишок не змінюється,
+-- тому переміщення не пишуться в dd_stock_log.
+CREATE TABLE `erp_stock_transfer` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `item_id` int NOT NULL,
+  `from_warehouse_id` int NULL,
+  `to_warehouse_id` int NULL,
+  `quantity` decimal(12,3) NOT NULL,
+  `comment` varchar(255) NOT NULL DEFAULT '',
+  `user_id` int NOT NULL,
+  `username` varchar(20) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_erp_stock_transfer_item` (`item_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
