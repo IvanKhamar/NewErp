@@ -100,3 +100,32 @@ CREATE TABLE `erp_stock_transfer` (
   PRIMARY KEY (`id`),
   KEY `ix_erp_stock_transfer_item` (`item_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Пошиті вироби розміру на окремому складі. Як і з розхідниками: dd_stock_production_sizes.sewn_stock лишається загальним
+-- (з ним працюють старий сайт, замовлення й вітрина), а основний склад — це решта, окремого рядка не має.
+CREATE TABLE `erp_production_location` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `size_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_erp_production_location_size_warehouse` (`size_id`, `warehouse_id`),
+  KEY `ix_erp_production_location_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Переміщення пошитих виробів розміру між складами. NULL у from/to — основний склад. Пошитий залишок не змінюється,
+-- тому переміщення не пишуться в dd_stock_production_log.
+CREATE TABLE `erp_production_transfer` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `production_id` int NOT NULL,
+  `size_id` int NOT NULL,
+  `from_warehouse_id` int NULL,
+  `to_warehouse_id` int NULL,
+  `quantity` decimal(12,3) NOT NULL,
+  `comment` varchar(255) NOT NULL DEFAULT '',
+  `user_id` int NOT NULL,
+  `username` varchar(20) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_erp_production_transfer_model` (`production_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
