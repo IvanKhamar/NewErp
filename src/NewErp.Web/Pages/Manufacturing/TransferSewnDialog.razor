@@ -1,0 +1,80 @@
+@inject ProductionApi Api
+@inject ISnackbar Snackbar
+
+@* Переміщення пошитих виробів одного розміру між складами; пошитий залишок не змінюється. *@
+<MudDialog>
+    <DialogContent>
+        <MudSelect T="int" @bind-Value="_sizeId" Label="Розмір" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
+            @foreach (var size in Places)
+            {
+                <MudSelectItem T="int" Value="size.SizeId">@size.SizeName</MudSelectItem>
+            }
+        </MudSelect>
+        <WarehouseSelect @bind-Value="_from" Warehouses="Warehouses" Label="Звідки" Class="mb-1" />
+        <MudText Typo="Typo.caption" Class="mb-3 d-block">Там пошито: @Fmt.Qty(Available)</MudText>
+        <WarehouseSelect @bind-Value="_to" Warehouses="Warehouses" Label="Куди" Class="mb-3" />
+        <MudNumericField T="decimal" @bind-Value="_quantity" Format="0.###" Label="Кількість" Min="0" Step="1"
+                         Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" />
+        <MudTextField @bind-Value="_comment" Label="Коментар" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Перемістити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    [Parameter, EditorRequired] public required IReadOnlyList<SizePlacesDto> Places { get; set; }
+
+    [Parameter, EditorRequired] public required IReadOnlyList<LookupItem> Warehouses { get; set; }
+
+    private int _sizeId;
+    private int? _from;
+    private int? _to;
+    private decimal _quantity;
+    private string _comment = "";
+    private string? _error;
+    private bool _busy;
+
+    private decimal Available =>
+        Places.FirstOrDefault(s => s.SizeId == _sizeId)?.Places.FirstOrDefault(p => p.WarehouseId == _from)?.Quantity ?? 0;
+
+    protected override void OnInitialized()
+    {
+        _sizeId = Places.FirstOrDefault()?.SizeId ?? 0;
+        _to = Warehouses.FirstOrDefault()?.Id;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_quantity <= 0)
+        {
+            _error = "Вкажіть кількість, більшу за нуль.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Api.TransferAsync(Model.Id, new TransferSewnRequest(_sizeId, _from, _to, _quantity, _comment));
+            Snackbar.Add($"{Model.Name}: переміщено {Fmt.Qty(_quantity)}.", Severity.Success);
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

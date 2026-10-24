@@ -1,4 +1,5 @@
 using NewErp.Application.Common;
+using NewErp.Application.Production;
 using NewErp.Application.Stock;
 using NewErp.Domain.Common;
 using NewErp.Domain.Locations;
@@ -6,7 +7,8 @@ using NewErp.Domain.Locations;
 namespace NewErp.Application.Locations;
 
 /// <summary>Довідник складів і пунктів видачі (dd_warehouse) з імпортом і вивантаженням Excel, як «Каталог → Склади» старої адмінки.</summary>
-public sealed class LocationService(ILocationStore store, ILocationSpreadsheet spreadsheet, IStockLocationRepository stock)
+public sealed class LocationService(
+    ILocationStore store, ILocationSpreadsheet spreadsheet, IStockLocationRepository stock, ISewnLocationRepository sewn)
 {
     public const int MaxImportBytes = 5 * 1024 * 1024;
 
@@ -26,7 +28,7 @@ public sealed class LocationService(ILocationStore store, ILocationSpreadsheet s
     /// <summary>Склад, де ще щось лежить, видалити не можна: залишки непомітно перейшли б на основний склад.</summary>
     public async Task DeleteAsync(int id, CancellationToken ct)
     {
-        if (await stock.HoldsStockAsync(id, ct))
+        if (await stock.HoldsStockAsync(id, ct) || await sewn.HoldsStockAsync(id, ct))
             throw new DomainException("На цьому складі ще є розхідники або пошиті вироби. Спершу перемістіть їх на інший склад.");
         if (!await store.DeleteAsync(id, ct))
             throw new NotFoundException($"Склад {id} не знайдено.");

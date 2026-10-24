@@ -43,6 +43,10 @@
     </MudSimpleTable>
 
     <div class="d-flex align-center flex-wrap gap-3 mt-2">
+        @if (TakesWarehouse)
+        {
+            <WarehouseSelect @bind-Value="_warehouseId" Warehouses="Warehouses" Label="@(_operation == ProductionOperation.Ship ? "Звідки" : "Куди")" />
+        }
         <MudTextField @bind-Value="_comment" Label="Коментар (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" Style="min-width: 260px" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy" data-test="submit">
             @ProductionUi.OperationLabel(_operation, Model.Type)
@@ -69,11 +73,17 @@
     /// <summary>Викликається після успішної операції, щоб сторінка перечитала залишки.</summary>
     [Parameter] public EventCallback OnDone { get; set; }
 
+    /// <summary>Склади для «пошито» й «відвантажено»; порожньо — лише основний склад.</summary>
+    [Parameter] public IReadOnlyList<LookupItem> Warehouses { get; set; } = [];
+
     private ProductionOperation _operation;
     private readonly Dictionary<int, decimal> _quantities = [];
     private string? _comment;
     private List<string> _warnings = [];
     private bool _busy;
+    private int? _warehouseId;
+
+    private bool TakesWarehouse => Warehouses.Count > 0 && _operation is (ProductionOperation.Sewn or ProductionOperation.Ship);
 
     private string Hint => _operation switch
     {
@@ -102,7 +112,7 @@
         _busy = true;
         try
         {
-            var result = await Api.RecordAsync(Model.Id, _operation, new ProductionOperationRequest(quantities, _comment));
+            var result = await Api.RecordAsync(Model.Id, _operation, new ProductionOperationRequest(quantities, _comment, TakesWarehouse ? _warehouseId : null));
             _warnings = result.Warnings.ToList();
             _quantities.Clear();
             _comment = null;

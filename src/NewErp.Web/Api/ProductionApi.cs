@@ -35,6 +35,15 @@ public sealed class ProductionApi(HttpClient http)
     public async Task<ProductionOperationResult> RecordAsync(int modelId, ProductionOperation operation, ProductionOperationRequest request) =>
         await ReadAsync<ProductionOperationResult>(await http.PostAsJsonAsync($"/production/models/{modelId}/{OperationRoute(operation)}", request));
 
+    public Task<SewnByWarehouseDto> ByWarehouseAsync() => GetAsync<SewnByWarehouseDto>("/production/by-warehouse");
+
+    public Task<List<SizePlacesDto>> PlacesAsync(int modelId) => GetAsync<List<SizePlacesDto>>($"/production/models/{modelId}/places");
+
+    public async Task<List<SizePlacesDto>> TransferAsync(int modelId, TransferSewnRequest request) =>
+        await ReadAsync<List<SizePlacesDto>>(await http.PostAsJsonAsync($"/production/models/{modelId}/transfers", request));
+
+    public Task<List<SewnTransferDto>> TransfersAsync(int modelId) => GetAsync<List<SewnTransferDto>>($"/production/models/{modelId}/transfers");
+
     public Task<SewingPlanDto> PlanAsync(bool onlyToSew) => GetAsync<SewingPlanDto>($"/production/plan?onlyToSew={(onlyToSew ? "true" : "false")}");
 
     public Task<List<ProductionLogDto>> LogAsync(int? modelId = null, int limit = 200) =>

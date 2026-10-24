@@ -14,6 +14,7 @@ using NewErp.Domain.Stock;
 using NewErp.Infrastructure;
 using NewErp.Infrastructure.Auth;
 using NewErp.Infrastructure.Catalog;
+using NewErp.Infrastructure.Locations;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
 using NewErp.Infrastructure.Production;
@@ -292,7 +293,9 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     private async Task<int> SeedProductionOperationsAsync(int userId, string username)
     {
         var erpOptions = Options.Create(new ErpOptions { LanguageId = LanguageId });
-        var service = new ProductionService(new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions, new PreOrderStore(db, erpOptions)), TimeProvider.System);
+        var service = new ProductionService(
+            new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions, new PreOrderStore(db, erpOptions)),
+            new SewnLocationRepository(db), new LocationStore(db), TimeProvider.System);
         var warnings = 0;
         foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
         {

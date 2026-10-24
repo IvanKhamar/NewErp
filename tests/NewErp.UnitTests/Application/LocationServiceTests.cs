@@ -13,7 +13,7 @@ public class LocationServiceTests
 
     public LocationServiceTests()
     {
-        _service = new LocationService(_store, _sheet, _stock);
+        _service = new LocationService(_store, _sheet, _stock, new FakeSewnLocationRepository());
         _store.Items[3] = new ShopLocationData("Старий склад", "", "", "", "Київ", "", "");
     }
 

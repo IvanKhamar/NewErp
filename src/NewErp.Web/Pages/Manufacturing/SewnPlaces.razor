@@ -1,0 +1,107 @@
+@inject ProductionApi Api
+@inject IDialogService Dialogs
+
+@* Де лежать пошиті вироби моделі: розміри × місця, переміщення між складами й журнал переміщень. *@
+@if (_places is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.body2">Основний склад — це решта пошитого: усе, що не лежить на інших складах.</MudText>
+        <MudSpacer />
+        @if (Warehouses.Count > 0)
+        {
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="TransferAsync">Перемістити</MudButton>
+        }
+    </div>
+    <MudSimpleTable Dense="true" Elevation="0" Outlined="true" data-test="sewn-places">
+        <thead>
+            <tr>
+                <th>Розмір</th>
+                <th style="text-align: right">Пошито</th>
+                @foreach (var place in Columns)
+                {
+                    <th style="text-align: right">@place.Name</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var size in _places)
+            {
+                <tr>
+                    <td>@size.SizeName</td>
+                    <td style="text-align: right">@Fmt.Qty(size.Sewn)</td>
+                    @foreach (var place in Columns)
+                    {
+                        var quantity = size.Places.FirstOrDefault(p => p.WarehouseId == place.WarehouseId)?.Quantity ?? 0;
+                        <td style="text-align: right">@(quantity == 0 ? "—" : Fmt.Qty(quantity))</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+
+    @if (_transfers.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">Переміщення</MudText>
+        <MudTable T="SewnTransferDto" Items="_transfers" Dense="true" Hover="true" Outlined="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Коли</MudTh>
+                <MudTh>Розмір</MudTh>
+                <MudTh>Звідки</MudTh>
+                <MudTh>Куди</MudTh>
+                <MudTh Style="text-align: right">Кількість</MudTh>
+                <MudTh>Коментар</MudTh>
+                <MudTh>Хто</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Коли">@Fmt.Date(context.CreatedAt)</MudTd>
+                <MudTd DataLabel="Розмір">@context.SizeName</MudTd>
+                <MudTd DataLabel="Звідки">@context.From</MudTd>
+                <MudTd DataLabel="Куди">@context.To</MudTd>
+                <MudTd DataLabel="Кількість" Style="text-align: right">@Fmt.Qty(context.Quantity)</MudTd>
+                <MudTd DataLabel="Коментар">@context.Comment</MudTd>
+                <MudTd DataLabel="Хто">@context.Username</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    [Parameter] public IReadOnlyList<LookupItem> Warehouses { get; set; } = [];
+
+    /// <summary>Викликається після переміщення.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<SizePlacesDto>? _places;
+    private List<SewnTransferDto> _transfers = [];
+
+    // Стовпчики: основний склад і кожен склад, де лежить хоч один розмір.
+    private IEnumerable<PlaceDto> Columns => (_places ?? []).SelectMany(s => s.Places).DistinctBy(p => p.WarehouseId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _places = await Api.PlacesAsync(Model.Id);
+            _transfers = await Api.TransfersAsync(Model.Id);
+        }
+        catch (ApiException)
+        {
+            _places = [];
+        }
+    }
+
+    private async Task TransferAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<TransferSewnDialog>(
+            $"Перемістити: {Model.Name}",
+            new DialogParameters<TransferSewnDialog> { { d => d.Model, Model }, { d => d.Places, _places! }, { d => d.Warehouses, Warehouses } });
+        if (await dialog.Result is { Canceled: false })
+            await OnChanged.InvokeAsync();
+    }
+}

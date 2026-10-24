@@ -79,7 +79,8 @@ public enum ProductionOperation
 
 public sealed record SizeQuantity(int SizeId, decimal Quantity);
 
-public sealed record ProductionOperationRequest(IReadOnlyList<SizeQuantity> Quantities, string? Comment = null);
+/// <summary>WarehouseId — лише для «пошито» й «відвантажено»: куди прийшли чи звідки пішли вироби; null — основний склад.</summary>
+public sealed record ProductionOperationRequest(IReadOnlyList<SizeQuantity> Quantities, string? Comment = null, int? WarehouseId = null);
 
 public sealed record SizeChangeDto(int SizeId, string SizeName, decimal Before, decimal After);
 

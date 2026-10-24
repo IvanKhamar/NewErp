@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IStockRepository, StockRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IStockLocationRepository, StockLocationRepository>();
+        services.AddScoped<ISewnLocationRepository, SewnLocationRepository>();
         services.AddScoped<ProductionRepository>();
         services.AddScoped<IProductionRepository>(sp => sp.GetRequiredService<ProductionRepository>());
         services.AddScoped<ISewingPlanSource>(sp => sp.GetRequiredService<ProductionRepository>());

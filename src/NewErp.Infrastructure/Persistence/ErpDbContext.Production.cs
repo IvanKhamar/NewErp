@@ -107,6 +107,31 @@ public partial class ErpDbContext
             e.Property(x => x.QtyPerUnit).HasColumnName("qty_per_unit").HasPrecision(12, 4);
         });
 
+        // Пошиті вироби на окремих складах — наші таблиці erp_production_location і erp_production_transfer.
+        modelBuilder.Entity<SewnBalance>(e =>
+        {
+            e.ToTable("erp_production_location");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SizeId).HasColumnName("size_id");
+            e.Property(x => x.WarehouseId).HasColumnName("warehouse_id");
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<SewnTransfer>(e =>
+        {
+            e.ToTable("erp_production_transfer");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ProductionId).HasColumnName("production_id");
+            e.Property(x => x.SizeId).HasColumnName("size_id");
+            e.Property(x => x.FromWarehouseId).HasColumnName("from_warehouse_id");
+            e.Property(x => x.ToWarehouseId).HasColumnName("to_warehouse_id");
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3);
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(255);
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(20);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<ProductionLogEntry>(e =>
         {
             e.ToTable("dd_stock_production_log");

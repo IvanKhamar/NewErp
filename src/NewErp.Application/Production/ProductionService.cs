@@ -1,4 +1,5 @@
 using NewErp.Application.Common;
+using NewErp.Application.Locations;
 using NewErp.Domain.Common;
 using NewErp.Domain.Production;
 using NewErp.Domain.Stock;
@@ -9,7 +10,8 @@ namespace NewErp.Application.Production;
 /// Сценарії виробництва (на основі модуля StockTrack старого сайту): моделі, розміри, деталі крою, специфікації,
 /// операції крою й пошиву зі списанням розхідників.
 /// </summary>
-public sealed class ProductionService(IProductionRepository repository, IStorefrontStock storefront, TimeProvider clock)
+public sealed class ProductionService(
+    IProductionRepository repository, IStorefrontStock storefront, ISewnLocationRepository locations, ILocationStore warehouses, TimeProvider clock)
 {
     /// <summary>
     /// Виконує операцію для кількох розмірів одразу. Крій і пошив списують розхідники та деталі за специфікаціями:
@@ -25,6 +27,18 @@ public sealed class ProductionService(IProductionRepository repository, IStorefr
         if (rows.GroupBy(r => r.SizeId).FirstOrDefault(g => g.Count() > 1) is { } dup)
             throw new DomainException($"Розмір {dup.Key} указано двічі.");
 
+        if (request.WarehouseId is { } warehouseId)
+        {
+            if (operation is not (ProductionOperation.Sewn or ProductionOperation.Ship))
+                throw new DomainException("Склад вказують лише для пошитого й відвантаженого: крій живе на основному складі.");
+            if (await warehouses.GetAsync(warehouseId, ct) is null)
+                throw new NotFoundException($"Склад {warehouseId} не знайдено.");
+        }
+        // Пошиті вироби мають місця: відвантаження з основного складу не бере того, що лежить на інших.
+        var placement = operation is ProductionOperation.Sewn or ProductionOperation.Ship
+            ? new SewnPlacement(model, await locations.FindBalancesAsync(productionId, ct))
+            : null;
+
         var now = clock.GetLocalNow().DateTime;
         var consumption = operation is ProductionOperation.Cut or ProductionOperation.Sewn
             ? await LoadConsumptionAsync(model, ct)
@@ -37,8 +51,8 @@ public sealed class ProductionService(IProductionRepository repository, IStorefr
             {
                 ProductionOperation.Cut => model.RecordCut(sizeId, quantity, request.Comment, userId, username, now),
                 ProductionOperation.SendToSewing => model.SendToSewing(sizeId, quantity, request.Comment, userId, username, now),
-                ProductionOperation.Sewn => model.RecordSewn(sizeId, quantity, request.Comment, userId, username, now),
-                ProductionOperation.Ship => model.Ship(sizeId, quantity, request.Comment, userId, username, now),
+                ProductionOperation.Sewn => placement!.SewnAt(sizeId, request.WarehouseId, quantity, request.Comment, userId, username, now),
+                ProductionOperation.Ship => placement!.ShipFrom(sizeId, request.WarehouseId, quantity, request.Comment, userId, username, now),
                 _ => throw new DomainException($"Невідома операція {operation}."),
             };
             repository.Add(entry);
@@ -50,6 +64,8 @@ public sealed class ProductionService(IProductionRepository repository, IStorefr
                 consumption!.ForSewing(entry.SizeName, sizeId, quantity, userId, username, now);
         }
 
+        foreach (var balance in placement?.Created ?? [])
+            locations.Add(balance);
         await repository.SaveChangesAsync(ct);
         // Як у старому модулі: після зміни пошитого залишку він одразу йде на вітрину.
         if (operation is ProductionOperation.Sewn or ProductionOperation.Ship)

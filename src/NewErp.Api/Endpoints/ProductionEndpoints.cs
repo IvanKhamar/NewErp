@@ -66,6 +66,25 @@ public static class ProductionEndpoints
         MapOperation(production, "ship", ProductionOperation.Ship,
             "Відвантажено не через замовлення (більше, ніж пошито, не можна)");
 
+        // Пошиті вироби за складами: warehouseId у «пошито» й «відвантажено» вибирає місце.
+        production.MapGet("/by-warehouse", (ProductionLocationService service, CancellationToken ct) => service.ByWarehouseAsync(ct))
+            .WithSummary("Пошиті вироби кожного розміру активних моделей за місцями: основний склад і склади, де щось лежить")
+            .WithTags("Виробництво: за складами");
+
+        production.MapGet("/models/{id:int}/places", (int id, ProductionLocationService service, CancellationToken ct) => service.GetAsync(id, ct))
+            .WithSummary("Де лежать пошиті вироби кожного розміру моделі (warehouseId = null — основний склад)")
+            .WithTags("Виробництво: за складами");
+
+        production.MapPost("/models/{id:int}/transfers",
+            (int id, TransferSewnRequest request, ClaimsPrincipal user, ProductionLocationService service, CancellationToken ct) =>
+                service.TransferAsync(id, request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary("Перемістити пошиті вироби розміру між складами; пошитий залишок і вітрина не змінюються")
+            .WithTags("Виробництво: за складами");
+
+        production.MapGet("/models/{id:int}/transfers", (int id, ProductionLocationService service, CancellationToken ct) => service.TransfersAsync(id, ct))
+            .WithSummary("Журнал переміщень пошитих виробів моделі")
+            .WithTags("Виробництво: за складами");
+
         production.MapGet("/plan", (bool? onlyToSew, SewingPlanService service, CancellationToken ct) =>
             service.GetAsync(onlyToSew ?? true, ct))
             .WithSummary("План пошиву: скільки кожного розміру пошити й розкроїти для активних замовлень (Production:PlanStatusIds); "
