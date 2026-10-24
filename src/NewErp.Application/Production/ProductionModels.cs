@@ -87,6 +87,21 @@ public sealed record SizeChangeDto(int SizeId, string SizeName, decimal Before, 
 /// <summary>Warnings: чого не вистачило при списанні (списано те, що було).</summary>
 public sealed record ProductionOperationResult(IReadOnlyList<SizeChangeDto> Sizes, IReadOnlyList<string> Warnings);
 
+/// <summary>Пораховане (не різниця) одного розміру; null — цей залишок не рахували.</summary>
+public sealed record SizeCountRequest(int SizeId, decimal? Cut = null, decimal? Sewn = null);
+
+public sealed record ComponentCountRequest(int ComponentId, int SizeId, decimal Actual);
+
+/// <summary>
+/// Пораховані залишки розмірів і деталей крою моделі. WarehouseId — склад, де рахували лише пошите;
+/// null — основний склад, де рахують усе.
+/// </summary>
+public sealed record ProductionStocktakingRequest(
+    IReadOnlyList<SizeCountRequest>? Sizes, IReadOnlyList<ComponentCountRequest>? Components = null, string? Comment = null, int? WarehouseId = null);
+
+/// <summary>Cut і Sewn — розміри, чий залишок змінився; Components — скільки запасів деталей змінилося.</summary>
+public sealed record ProductionStocktakingResult(IReadOnlyList<SizeChangeDto> Cut, IReadOnlyList<SizeChangeDto> Sewn, int Components);
+
 public sealed record ProductionLogDto(
     int Id, int ProductionId, string? ProductionName, int SizeId, string SizeName, string Stage, string Direction,
     decimal Quantity, decimal StockBefore, decimal StockAfter, string Comment, int UserId, string Username, DateTime CreatedAt);

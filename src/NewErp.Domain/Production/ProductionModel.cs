@@ -198,6 +198,26 @@ public class ProductionModel
         return Change(size, ProductionLogEntry.Sewn, -quantity, comment, userId, username, now);
     }
 
+    /// <summary>
+    /// Інвентаризація: залишок крою (<see cref="ProductionLogEntry.Cut"/>) чи пошиття (<see cref="ProductionLogEntry.Sewn"/>)
+    /// розміру стає порахованим, різниця йде в журнал. Повертає null, якщо збіглося.
+    /// </summary>
+    public ProductionLogEntry? Recount(int sizeId, string stage, decimal actual, string? comment, int userId, string username, DateTime now)
+    {
+        if (stage != ProductionLogEntry.Cut && stage != ProductionLogEntry.Sewn)
+            throw new DomainException($"Етап має бути {ProductionLogEntry.Cut} або {ProductionLogEntry.Sewn}.");
+        var size = RequireSize(sizeId);
+        RequireCount(size, actual);
+        var delta = actual - (stage == ProductionLogEntry.Cut ? size.CutStock : size.SewnStock);
+        return delta == 0 ? null : Change(size, stage, delta, comment, userId, username, now);
+    }
+
+    internal static void RequireCount(ProductionSize size, decimal actual)
+    {
+        if (actual < 0 || decimal.Round(actual, 3) != actual)
+            throw new DomainException($"Розмір {size.Name}: кількість має бути від 0, не більше 3 знаків після коми.");
+    }
+
     /// <summary>Коментар журналу, яким старий сайт позначає списання пошитих виробів під замовлення.</summary>
     public static string OrderComment(int orderId) => $"Замовлення #{orderId}";
 

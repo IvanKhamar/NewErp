@@ -73,6 +73,84 @@ public sealed class ProductionService(
         return new ProductionOperationResult(changes, consumption?.Warnings ?? []);
     }
 
+    /// <summary>
+    /// Інвентаризація моделі: залишок крою й пошиття кожного порахованого розміру й запас кожної порахованої деталі стають
+    /// порахованими. Різниці розмірів ідуть у журнал виробництва з коментарем «Інвентаризація». Одним записом: неправильна
+    /// кількість не записує нічого.
+    /// </summary>
+    public async Task<ProductionStocktakingResult> RecountAsync(
+        int productionId, ProductionStocktakingRequest request, int userId, string username, CancellationToken ct)
+    {
+        var model = await RequireModelAsync(productionId, ct);
+        var sizes = request.Sizes ?? [];
+        var components = request.Components ?? [];
+        if (sizes.Count == 0 && components.Count == 0)
+            throw new DomainException("Немає жодної порахованої кількості.");
+        if (sizes.GroupBy(r => r.SizeId).FirstOrDefault(g => g.Count() > 1) is { } dupSize)
+            throw new DomainException($"Розмір {dupSize.Key} указано двічі.");
+        if (components.GroupBy(r => (r.ComponentId, r.SizeId)).FirstOrDefault(g => g.Count() > 1) is { } dupComponent)
+            throw new DomainException($"Деталь {dupComponent.Key.ComponentId} розміру {dupComponent.Key.SizeId} указано двічі.");
+        if (request.WarehouseId is { } warehouseId)
+        {
+            if (components.Count > 0 || sizes.Any(r => r.Cut is not null))
+                throw new DomainException("На складі рахують лише пошите: крій і деталі живуть на основному складі.");
+            if (await warehouses.GetAsync(warehouseId, ct) is null)
+                throw new NotFoundException($"Склад {warehouseId} не знайдено.");
+        }
+        var comment = Stocktaking.Comment(request.Comment);
+        var now = clock.GetLocalNow().DateTime;
+
+        var cut = new List<SizeChangeDto>();
+        var sewn = new List<SizeChangeDto>();
+        // Пошите рахують в одному місці (основний склад, якщо склад не вказано); решта місць не змінюються.
+        var placement = new SewnPlacement(model, await locations.FindBalancesAsync(productionId, ct));
+        foreach (var row in sizes)
+        {
+            if (row.Cut is { } actualCut && model.Recount(row.SizeId, ProductionLogEntry.Cut, actualCut, comment, userId, username, now) is { } cutEntry)
+            {
+                repository.Add(cutEntry);
+                cut.Add(new SizeChangeDto(row.SizeId, cutEntry.SizeName, cutEntry.StockBefore, cutEntry.StockAfter));
+            }
+            if (row.Sewn is { } actualSewn && placement.RecountAt(row.SizeId, request.WarehouseId, actualSewn, comment, userId, username, now) is { } sewnEntry)
+            {
+                repository.Add(sewnEntry);
+                sewn.Add(new SizeChangeDto(row.SizeId, sewnEntry.SizeName, sewnEntry.StockBefore, sewnEntry.StockAfter));
+            }
+        }
+        foreach (var balance in placement.Created)
+            locations.Add(balance);
+
+        var changedComponents = 0;
+        if (components.Count > 0)
+        {
+            var own = await repository.ComponentIdsAsync(productionId, ct);
+            var stocks = (await repository.FindComponentStocksAsync(own, ct)).ToDictionary(s => (s.ComponentId, s.SizeId));
+            foreach (var row in components)
+            {
+                if (!own.Contains(row.ComponentId))
+                    throw new DomainException($"Деталь {row.ComponentId} не належить моделі \"{model.Name}\".");
+                model.RequireSize(row.SizeId);
+                if (!stocks.TryGetValue((row.ComponentId, row.SizeId), out var stock))
+                {
+                    stock = new ComponentStock(row.ComponentId, row.SizeId);
+                    if (!stock.Recount(row.Actual))
+                        continue; // порахували 0 там, де запасу й не було
+                    repository.Add(stock);
+                    changedComponents++;
+                }
+                else if (stock.Recount(row.Actual))
+                {
+                    changedComponents++;
+                }
+            }
+        }
+
+        await repository.SaveChangesAsync(ct);
+        if (sewn.Count > 0)
+            await storefront.PushAsync([productionId], ct);
+        return new ProductionStocktakingResult(cut, sewn, changedComponents);
+    }
+
     private async Task<Consumption> LoadConsumptionAsync(ProductionModel model, CancellationToken ct)
     {
         var components = await repository.FindComponentsAsync(model.Id, ct);

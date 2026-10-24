@@ -1,7 +1,6 @@
 using ClosedXML.Excel;
 
 using NewErp.Application.Locations;
-using NewErp.Domain.Common;
 
 namespace NewErp.Infrastructure.Locations;
 
@@ -24,34 +23,8 @@ public sealed class LocationSpreadsheet : ILocationSpreadsheet
                 sheet.Cell(r + 2, c + 1).Value = values[c] is int id ? id : (string)values[c];
         }
         sheet.Columns().AdjustToContents(1, 100);
-
-        using var stream = new MemoryStream();
-        book.SaveAs(stream);
-        return stream.ToArray();
+        return Spreadsheets.Save(book);
     }
 
-    public IReadOnlyList<IReadOnlyList<string>> Read(Stream file)
-    {
-        XLWorkbook book;
-        try
-        {
-            book = new XLWorkbook(file);
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            throw new DomainException("Не вдалося прочитати файл. Потрібен файл Excel (.xlsx).");
-        }
-
-        using (book)
-        {
-            var sheet = book.Worksheets.First();
-            var used = sheet.RangeUsed();
-            if (used is null)
-                return [];
-            var lastColumn = used.LastColumn().ColumnNumber();
-            return sheet.Rows(1, used.LastRow().RowNumber())
-                .Select(row => (IReadOnlyList<string>)Enumerable.Range(1, lastColumn).Select(c => row.Cell(c).GetFormattedString()).ToList())
-                .ToList();
-        }
-    }
+    public IReadOnlyList<IReadOnlyList<string>> Read(Stream file) => Spreadsheets.ReadRows(file);
 }

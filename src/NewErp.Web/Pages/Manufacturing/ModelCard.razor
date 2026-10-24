@@ -25,6 +25,7 @@ else
         <MudText Typo="Typo.h4">@_model.Name</MudText>
         <MudChip T="string" Size="Size.Small">@ProductionUi.TypeLabel(_model.Type)</MudChip>
         <MudSpacer />
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FactCheck" OnClick="StocktakingAsync">Інвентаризація</MudButton>
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditAsync">Змінити</MudButton>
         <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="DeactivateAsync">Прибрати модель</MudButton>
     </div>
@@ -93,6 +94,16 @@ else
         {
             _error = e.Message;
         }
+    }
+
+    private async Task StocktakingAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<ModelStocktakingDialog>(
+            $"Інвентаризація: {_model!.Name}",
+            new DialogParameters<ModelStocktakingDialog> { { d => d.Model, _model }, { d => d.Warehouses, _warehouses } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
     }
 
     private async Task EditAsync()

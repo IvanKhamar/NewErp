@@ -65,6 +65,28 @@ public sealed class StockApi(HttpClient http)
             ? await ReadAsync<StockMovementDto>(await http.PostAsJsonAsync($"/stock/items/{itemId}/warehouses/{id}/adjustments", request))
             : await AdjustAsync(itemId, request);
 
+    /// <summary>Адреса аркуша інвентаризації для завантаження браузером.</summary>
+    public static string StocktakingSheetUrl(int? categoryId, int? warehouseId)
+    {
+        var query = new List<string>();
+        if (categoryId is { } category)
+            query.Add($"categoryId={category}");
+        if (warehouseId is { } warehouse)
+            query.Add($"warehouseId={warehouse}");
+        return "/stock/stocktaking/sheet.xlsx" + (query.Count > 0 ? "?" + string.Join('&', query) : "");
+    }
+
+    public async Task<StocktakingPreviewDto> PreviewStocktakingAsync(Stream file, int? warehouseId)
+    {
+        var content = new StreamContent(file);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+        return await ReadAsync<StocktakingPreviewDto>(
+            await http.PostAsync("/stock/stocktaking/preview" + (warehouseId is { } id ? $"?warehouseId={id}" : ""), content));
+    }
+
+    public async Task<StocktakingResult> ApplyStocktakingAsync(ApplyStocktakingRequest request) =>
+        await ReadAsync<StocktakingResult>(await http.PostAsJsonAsync("/stock/stocktaking", request));
+
     public Task<ReorderReportDto> ReorderAsync() => GetAsync<ReorderReportDto>("/stock/reorder");
 
     public Task<List<PurchaseOrderSummaryDto>> PurchaseOrdersAsync(string? status = null) =>

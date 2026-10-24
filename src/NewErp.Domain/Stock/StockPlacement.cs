@@ -65,6 +65,21 @@ public sealed class StockPlacement
         return movement;
     }
 
+    /// <summary>
+    /// Інвентаризація одного місця: там стає пораховане, а загальний залишок змінюється на ту саму різницю
+    /// (запис у журнал). Повертає null, якщо збіглося.
+    /// </summary>
+    public StockMovement? RecountAt(int? warehouseId, decimal actual, string comment, int userId, string username, DateTime now)
+    {
+        Stocktaking.RequireValid(actual);
+        var delta = actual - At(warehouseId);
+        if (delta == 0)
+            return null;
+        var movement = Item.Recount(Item.Quantity + delta, comment, userId, username, now);
+        Change(warehouseId, delta);
+        return movement;
+    }
+
     /// <summary>Прихід, що вже потрапив у загальний залишок (поставка), лежить на цьому складі, а не на основному.</summary>
     public void ReceivedAt(int warehouseId, decimal quantity)
     {

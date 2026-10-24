@@ -79,6 +79,14 @@ public class StockItem
         return amount > 0 ? Change(-amount, RequireText(comment, "Причина", 255), userId, username, now) : null;
     }
 
+    /// <summary>Інвентаризація: залишок стає порахованим, різниця йде в журнал. Повертає null, якщо збіглося з обліком.</summary>
+    public StockMovement? Recount(decimal actual, string comment, int userId, string username, DateTime now)
+    {
+        Stocktaking.RequireValid(actual);
+        var delta = actual - Quantity;
+        return delta == 0 ? null : Change(delta, RequireText(comment, "Причина", 255), userId, username, now);
+    }
+
     public void SetMinQuantity(decimal minQuantity)
     {
         if (minQuantity < 0)

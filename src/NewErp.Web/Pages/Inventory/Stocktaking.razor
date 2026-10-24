@@ -1,0 +1,135 @@
+@page "/stock/stocktaking"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+@inject ISnackbar Snackbar
+
+<PageTitle>Інвентаризація — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Інвентаризація розхідників</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Вивантажте аркуш, упишіть пораховане в стовпчик «Фактично» (порожній рядок — не рахували) і завантажте назад.
+    Перед записом видно різницю кожної позиції. Різниці йдуть у журнал руху з коментарем «Інвентаризація».
+</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex align-center flex-wrap gap-3" Outlined="true">
+    <WarehouseSelect Value="_warehouseId" ValueChanged="WarehouseChanged" Warehouses="_warehouses" Label="Де рахуємо" Class="mud-width-auto" />
+    <MudSelect T="int?" @bind-Value="_categoryId" Label="Категорія" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true" Class="mud-width-auto">
+        @foreach (var category in _categories)
+        {
+            <MudSelectItem T="int?" Value="category.Id">@category.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudButton Variant="Variant.Outlined" Href="@StockApi.StocktakingSheetUrl(_categoryId, _warehouseId)" Target="_blank"
+               StartIcon="@Icons.Material.Filled.Download" data-test="sheet">Вивантажити аркуш</MudButton>
+    <MudFileUpload T="IBrowserFile" FilesChanged="PreviewAsync" Accept=".xlsx" data-test="upload">
+        <CustomContent>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_busy" OnClick="@context.OpenFilePickerAsync">Завантажити пораховане</MudButton>
+        </CustomContent>
+    </MudFileUpload>
+</MudPaper>
+
+@if (_preview is not null)
+{
+    @if (_preview.Errors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3" data-test="errors">
+            Виправте аркуш і завантажте знову — з помилками нічого не записується:
+            <ul class="mt-1">
+                @foreach (var error in _preview.Errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </MudAlert>
+    }
+
+    <MudTable T="StocktakingLineDto" Items="_preview.Lines" Dense="true" Hover="true" Outlined="true" Elevation="0" Class="mb-3">
+        <HeaderContent>
+            <MudTh>Розхідник</MudTh>
+            <MudTh Style="text-align: right">За обліком</MudTh>
+            <MudTh Style="text-align: right">Фактично</MudTh>
+            <MudTh Style="text-align: right">Різниця</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Розхідник">@context.Name</MudTd>
+            <MudTd DataLabel="За обліком" Style="text-align: right">@Fmt.Qty(context.Booked) @context.Unit</MudTd>
+            <MudTd DataLabel="Фактично" Style="text-align: right">@Fmt.Qty(context.Actual) @context.Unit</MudTd>
+            <MudTd DataLabel="Різниця" Style="text-align: right">
+                <MudText Typo="Typo.body2" Color="@(context.Difference < 0 ? Color.Error : context.Difference > 0 ? Color.Success : Color.Default)">
+                    @(context.Difference > 0 ? "+" : context.Difference < 0 ? "−" : "")@Fmt.Qty(Math.Abs(context.Difference))
+                </MudText>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>В аркуші немає жодної порахованої позиції.</MudText></NoRecordsContent>
+    </MudTable>
+
+    <div class="d-flex align-center flex-wrap gap-3">
+        <MudTextField @bind-Value="_comment" Label="Примітка (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="200" Style="min-width: 260px" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyAsync" data-test="apply"
+                   Disabled="@(_busy || _preview.Errors.Count > 0 || _preview.Lines.Count == 0)">
+            Записати пораховане (@_preview.Lines.Count(l => l.Difference != 0) змін)
+        </MudButton>
+    </div>
+}
+
+@code {
+    private List<LookupItem> _warehouses = [];
+    private List<LookupItem> _categories = [];
+    private int? _warehouseId;
+    private int? _categoryId;
+    private StocktakingPreviewDto? _preview;
+    private string? _comment;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _categories = await Api.CategoriesAsync();
+            _warehouses = await Api.WarehousesAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    // Аркуш рахували в одному місці: інше місце — інший облік, тож старий перегляд уже не годиться.
+    private void WarehouseChanged(int? warehouseId)
+    {
+        _warehouseId = warehouseId;
+        _preview = null;
+    }
+
+    private Task PreviewAsync(IBrowserFile? file) => file is null ? Task.CompletedTask : RunAsync(async () =>
+    {
+        await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        _preview = await Api.PreviewStocktakingAsync(stream, _warehouseId);
+    });
+
+    private Task ApplyAsync() => RunAsync(async () =>
+    {
+        var counts = _preview!.Lines.Select(l => new StocktakingCountRequest(l.ItemId, l.Actual)).ToList();
+        var result = await Api.ApplyStocktakingAsync(new ApplyStocktakingRequest(counts, _comment, _warehouseId));
+        Snackbar.Add($"Пораховано {result.Counted}, змінилося {result.Changed}, різниця {Fmt.Money(result.Value)}.", Severity.Success);
+        _preview = null;
+        _comment = null;
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

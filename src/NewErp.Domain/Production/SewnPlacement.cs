@@ -71,6 +71,22 @@ public sealed class SewnPlacement
         return entry;
     }
 
+    /// <summary>
+    /// Інвентаризація пошитого розміру в одному місці: там стає пораховане, а пошитий залишок змінюється на ту саму
+    /// різницю (запис у журнал). Повертає null, якщо збіглося.
+    /// </summary>
+    public ProductionLogEntry? RecountAt(int sizeId, int? warehouseId, decimal actual, string? comment, int userId, string username, DateTime now)
+    {
+        var size = Model.RequireSize(sizeId);
+        ProductionModel.RequireCount(size, actual);
+        var delta = actual - At(sizeId, warehouseId);
+        if (delta == 0)
+            return null;
+        var entry = Model.Recount(sizeId, ProductionLogEntry.Sewn, Math.Max(size.SewnStock + delta, 0), comment, userId, username, now);
+        Change(sizeId, warehouseId, delta);
+        return entry;
+    }
+
     private void Change(int sizeId, int? warehouseId, decimal delta)
     {
         if (warehouseId is not { } id)

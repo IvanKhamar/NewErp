@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IReportStore, ReportStore>();
         services.AddScoped<ILocationStore, LocationStore>();
         services.AddSingleton<ILocationSpreadsheet, LocationSpreadsheet>();
+        services.AddSingleton<IStocktakingSheet, StocktakingSheet>();
         services.AddScoped<INewOrderStore, NewOrderStore>();
         services.AddScoped<IBonusDataSource, BonusDataSource>();
         services.AddScoped<IStockRepository, StockRepository>();

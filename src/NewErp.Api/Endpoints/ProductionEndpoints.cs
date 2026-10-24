@@ -66,6 +66,12 @@ public static class ProductionEndpoints
         MapOperation(production, "ship", ProductionOperation.Ship,
             "Відвантажено не через замовлення (більше, ніж пошито, не можна)");
 
+        production.MapPost("/models/{id:int}/stocktaking",
+            (int id, ProductionStocktakingRequest request, ClaimsPrincipal user, ProductionService service, CancellationToken ct) =>
+                service.RecountAsync(id, request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary("Інвентаризація моделі: пораховані крій і пошите розмірів і запас деталей; різниці — у журнал «Інвентаризація». "
+                + "З warehouseId рахують лише пошите на цьому складі");
+
         // Пошиті вироби за складами: warehouseId у «пошито» й «відвантажено» вибирає місце.
         production.MapGet("/by-warehouse", (ProductionLocationService service, CancellationToken ct) => service.ByWarehouseAsync(ct))
             .WithSummary("Пошиті вироби кожного розміру активних моделей за місцями: основний склад і склади, де щось лежить")

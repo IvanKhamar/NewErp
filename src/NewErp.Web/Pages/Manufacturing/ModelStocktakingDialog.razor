@@ -1,0 +1,174 @@
+@inject ProductionApi Api
+@inject ISnackbar Snackbar
+
+@*
+    Інвентаризація моделі: у полях одразу залишки за обліком, комірник змінює те, що порахував інакше.
+    На іншому складі рахують лише пошите. Повертає Ok, якщо щось змінилося.
+*@
+<MudDialog>
+    <DialogContent>
+        @if (Warehouses.Count > 0)
+        {
+            <WarehouseSelect Value="_warehouseId" ValueChanged="WarehouseChanged" Warehouses="Warehouses" Label="Де рахуємо" Class="mb-3" />
+        }
+        <MudSimpleTable Dense="true" Elevation="0" data-test="sizes">
+            <thead>
+                <tr>
+                    <th>Розмір</th>
+                    @if (CountsCut)
+                    {
+                        <th>Розкроєно</th>
+                    }
+                    <th>Пошито</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var size in Model.Sizes)
+                {
+                    <tr>
+                        <td>@size.Name</td>
+                        @if (CountsCut)
+                        {
+                            <td><MudNumericField T="decimal" @bind-Value="_cut[size.Id]" Format="0.###" Min="0" Margin="Margin.Dense" /></td>
+                        }
+                        <td><MudNumericField T="decimal" @bind-Value="_sewn[size.Id]" Format="0.###" Min="0" Margin="Margin.Dense" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+
+        @if (_warehouseId is null && Model.Components.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Запас розкроєних деталей</MudText>
+            <MudSimpleTable Dense="true" Elevation="0" data-test="components">
+                <thead>
+                    <tr>
+                        <th>Деталь</th>
+                        @foreach (var size in Model.Sizes)
+                        {
+                            <th>@size.Name</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var component in Model.Components)
+                    {
+                        <tr>
+                            <td>@component.Name</td>
+                            @foreach (var size in Model.Sizes)
+                            {
+                                var key = (component.Id, size.Id);
+                                <td><MudNumericField T="decimal" Value="_components[key]" ValueChanged="v => _components[key] = v" Format="0.###" Min="0" Margin="Margin.Dense" /></td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+
+        <MudTextField @bind-Value="_comment" Label="Примітка (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="200" Class="mt-3" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy" data-test="save">Записати</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required ProductionModelDto Model { get; set; }
+
+    [Parameter] public IReadOnlyList<LookupItem> Warehouses { get; set; } = [];
+
+    private int? _warehouseId;
+    private List<SizePlacesDto> _places = [];
+    private readonly Dictionary<int, decimal> _cut = [];
+    private readonly Dictionary<int, decimal> _sewn = [];
+    private readonly Dictionary<(int ComponentId, int SizeId), decimal> _components = [];
+    private string? _comment;
+    private string? _error;
+    private bool _busy;
+
+    private bool CountsCut => _warehouseId is null && Model.Type == Domain.Production.ProductionModel.Clothing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var size in Model.Sizes)
+            _cut[size.Id] = size.CutStock;
+        foreach (var component in Model.Components)
+            foreach (var size in Model.Sizes)
+                _components[(component.Id, size.Id)] = component.Stock.GetValueOrDefault(size.Id);
+        if (Warehouses.Count > 0)
+        {
+            try
+            {
+                _places = await Api.PlacesAsync(Model.Id);
+            }
+            catch (ApiException)
+            {
+                _places = [];
+            }
+        }
+        FillSewn();
+    }
+
+    private void WarehouseChanged(int? warehouseId)
+    {
+        _warehouseId = warehouseId;
+        FillSewn();
+    }
+
+    private void FillSewn()
+    {
+        foreach (var size in Model.Sizes)
+            _sewn[size.Id] = BookedSewn(size);
+    }
+
+    // Пошите за обліком саме в цьому місці: на основному складі — решта, якщо частина лежить на інших.
+    private decimal BookedSewn(ProductionSizeDto size) =>
+        _places.FirstOrDefault(p => p.SizeId == size.Id)?.Places.FirstOrDefault(p => p.WarehouseId == _warehouseId)?.Quantity
+        ?? (_warehouseId is null ? size.SewnStock : 0);
+
+    private async Task SaveAsync()
+    {
+        // Надсилаємо лише те, що відрізняється від обліку: збіг однаково нічого не змінює.
+        var sizes = Model.Sizes
+            .Select(s => new SizeCountRequest(
+                s.Id,
+                CountsCut && _cut[s.Id] != s.CutStock ? _cut[s.Id] : null,
+                _sewn[s.Id] != BookedSewn(s) ? _sewn[s.Id] : null))
+            .Where(r => r.Cut is not null || r.Sewn is not null)
+            .ToList();
+        List<ComponentCountRequest> components = _warehouseId is not null ? [] : Model.Components
+            .SelectMany(c => Model.Sizes.Select(s => (c, s)))
+            .Where(x => _components[(x.c.Id, x.s.Id)] != x.c.Stock.GetValueOrDefault(x.s.Id))
+            .Select(x => new ComponentCountRequest(x.c.Id, x.s.Id, _components[(x.c.Id, x.s.Id)]))
+            .ToList();
+        if (sizes.Count == 0 && components.Count == 0)
+        {
+            _error = "Усе збігається з обліком — записувати нічого.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await Api.RecountAsync(Model.Id, new ProductionStocktakingRequest(sizes, components, _comment, _warehouseId));
+            Snackbar.Add($"Інвентаризацію записано: крій {result.Cut.Count}, пошите {result.Sewn.Count}, деталі {result.Components}.", Severity.Success);
+            Dialog.Close(DialogResult.Ok(result));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

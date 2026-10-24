@@ -6,6 +6,7 @@ using MudBlazor;
 
 using NewErp.Application.Common;
 using NewErp.Application.Stock;
+using NewErp.Web.Api;
 using NewErp.Web.Pages.Inventory;
 
 namespace NewErp.Web.Tests;
@@ -100,6 +101,18 @@ public class StockPagesTests : WebTestContext
 
         page.WaitForAssertion(() => Assert.Contains("Склад на Подолі", page.Find("[data-test=places]").TextContent));
         Assert.Contains("Перемістити", page.Markup);
+    }
+
+    [Fact]
+    public void Stocktaking_SheetLinkFollowsChosenCategory()
+    {
+        Api.Respond("/stock/warehouses", HttpStatusCode.OK, new List<LookupItem>());
+
+        var page = Render<Stocktaking>();
+
+        page.WaitForAssertion(() => Assert.Equal("/stock/stocktaking/sheet.xlsx", page.Find("[data-test=sheet]").GetAttribute("href")));
+        Assert.Equal("/stock/stocktaking/sheet.xlsx?categoryId=1&warehouseId=7", StockApi.StocktakingSheetUrl(1, 7));
+        Assert.DoesNotContain("Записати пораховане", page.Markup); // без завантаженого аркуша записувати нічого
     }
 
     private static List<IElement> Rows(IRenderedComponent<Items> page) => page.FindAll("tbody tr").ToList();

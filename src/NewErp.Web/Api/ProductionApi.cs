@@ -35,6 +35,9 @@ public sealed class ProductionApi(HttpClient http)
     public async Task<ProductionOperationResult> RecordAsync(int modelId, ProductionOperation operation, ProductionOperationRequest request) =>
         await ReadAsync<ProductionOperationResult>(await http.PostAsJsonAsync($"/production/models/{modelId}/{OperationRoute(operation)}", request));
 
+    public async Task<ProductionStocktakingResult> RecountAsync(int modelId, ProductionStocktakingRequest request) =>
+        await ReadAsync<ProductionStocktakingResult>(await http.PostAsJsonAsync($"/production/models/{modelId}/stocktaking", request));
+
     public Task<SewnByWarehouseDto> ByWarehouseAsync() => GetAsync<SewnByWarehouseDto>("/production/by-warehouse");
 
     public Task<List<SizePlacesDto>> PlacesAsync(int modelId) => GetAsync<List<SizePlacesDto>>($"/production/models/{modelId}/places");

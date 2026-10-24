@@ -28,4 +28,14 @@ public class ComponentStock
         Stock -= taken;
         return taken;
     }
+
+    /// <summary>Інвентаризація: запас стає порахованим. Повертає, чи він змінився.</summary>
+    public bool Recount(decimal actual)
+    {
+        if (actual < 0 || decimal.Round(actual, 3) != actual)
+            throw new Common.DomainException("Кількість деталей має бути від 0, не більше 3 знаків після коми.");
+        var changed = actual != Stock;
+        Stock = actual;
+        return changed;
+    }
 }

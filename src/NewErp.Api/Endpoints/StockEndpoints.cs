@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using NewErp.Api.Auth;
 using NewErp.Application.Stock;
+using NewErp.Domain.Common;
 
 namespace NewErp.Api.Endpoints;
 
@@ -67,6 +68,35 @@ public static class StockEndpoints
             .WithSummary("Журнал руху позиції");
 
         MapLocations(stock);
+        MapStocktaking(stock.MapGroup("/stocktaking").WithTags("Склад: інвентаризація"));
+    }
+
+    private const string Xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    private static void MapStocktaking(RouteGroupBuilder stocktaking)
+    {
+        stocktaking.MapGet("/sheet.xlsx", async (int? categoryId, int? warehouseId, StocktakingService service, CancellationToken ct) =>
+                Results.File(await service.SheetAsync(categoryId, warehouseId, ct), Xlsx, $"inventaryzatsiia-{DateTime.Now:yyyy-MM-dd}.xlsx"))
+            .WithSummary("Аркуш для підрахунку: ID, Назва, Категорія, Од., За обліком (у вибраному місці), порожній стовпчик «Фактично»");
+
+        // Файл приходить сирим тілом запиту, як імпорт складів (див. LocationEndpoints).
+        stocktaking.MapPost("/preview", async (int? warehouseId, HttpRequest http, StocktakingService service, CancellationToken ct) =>
+        {
+            if (http.ContentLength is > StocktakingService.MaxFileBytes)
+                throw new DomainException("Файл більший за 5 МБ.");
+            using var buffer = new MemoryStream();
+            await http.Body.CopyToAsync(buffer, ct);
+            if (buffer.Length > StocktakingService.MaxFileBytes)
+                throw new DomainException("Файл більший за 5 МБ.");
+            buffer.Position = 0;
+            return await service.PreviewAsync(buffer, warehouseId, ct);
+        })
+            .Accepts<byte[]>("application/octet-stream")
+            .WithSummary("Що змінить заповнений аркуш: за обліком, фактично, різниця й помилки рядків; нічого не записує");
+
+        stocktaking.MapPost("/", (ApplyStocktakingRequest request, ClaimsPrincipal user, StocktakingService service, CancellationToken ct) =>
+            service.ApplyAsync(request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary("Застосувати пораховане одним записом; різниці — у журнал руху з коментарем «Інвентаризація»");
     }
 
     private static void MapLocations(RouteGroupBuilder stock)
