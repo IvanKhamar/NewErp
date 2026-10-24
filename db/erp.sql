@@ -129,3 +129,41 @@ CREATE TABLE `erp_production_transfer` (
   PRIMARY KEY (`id`),
   KEY `ix_erp_production_transfer_model` (`production_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Конкуренти, за цінами яких стежимо. site_url — головна сторінка: посилання на товари мають бути з того самого домену.
+-- price_regex — власний вираз для ціни (перша група), коли сторінка не має розмітки schema.org чи og-тегів.
+CREATE TABLE `erp_competitor` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `site_url` varchar(255) NOT NULL,
+  `price_regex` varchar(255) NOT NULL DEFAULT '',
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Сторінка товару в конкурента: наш товар (dd_product) і остання знайдена ціна. last_error — чому остання перевірка не вдалася.
+CREATE TABLE `erp_competitor_link` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `competitor_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `url` varchar(500) NOT NULL,
+  `last_price` decimal(15,2) NULL,
+  `last_checked_at` datetime NULL,
+  `last_error` varchar(255) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_erp_competitor_link_competitor_product` (`competitor_id`, `product_id`),
+  KEY `ix_erp_competitor_link_product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Історія цін конкурента: рядок, коли ціна змінилась (або вперше знайдена). source — auto (перевірка сторінки) чи manual (уписано).
+CREATE TABLE `erp_competitor_price` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `link_id` int NOT NULL,
+  `price` decimal(15,2) NOT NULL,
+  `source` varchar(10) NOT NULL DEFAULT 'auto',
+  `checked_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_erp_competitor_price_link` (`link_id`, `checked_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
