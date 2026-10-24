@@ -1,0 +1,25 @@
+@* Вибір місця: основний склад (null) або склад із довідника. Склади передає сторінка. *@
+<MudSelect T="int?" Value="Value" ValueChanged="ValueChanged" Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense"
+           Dense="true" Class="@Class" ToStringFunc="@(id => Name(id))">
+    <MudSelectItem T="int?" Value="null">@MainName</MudSelectItem>
+    @foreach (var w in Warehouses)
+    {
+        <MudSelectItem T="int?" Value="w.Id">@w.Name</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    public const string MainName = "Основний склад";
+
+    [Parameter] public int? Value { get; set; }
+
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+
+    [Parameter] public IReadOnlyList<LookupItem> Warehouses { get; set; } = [];
+
+    [Parameter] public string Label { get; set; } = "Склад";
+
+    [Parameter] public string? Class { get; set; }
+
+    private string Name(int? id) => id is null ? MainName : Warehouses.FirstOrDefault(w => w.Id == id)?.Name ?? $"Склад {id}";
+}

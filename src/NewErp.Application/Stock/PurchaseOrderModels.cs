@@ -8,7 +8,8 @@ public sealed record SetPurchaseOrderLinesRequest(IReadOnlyList<PurchaseOrderLin
 
 public sealed record ReceiptLineRequest(int LineId, decimal Quantity);
 
-public sealed record ReceivePurchaseOrderRequest(IReadOnlyList<ReceiptLineRequest> Lines);
+/// <summary>WarehouseId: куди прийшла поставка; null — основний склад.</summary>
+public sealed record ReceivePurchaseOrderRequest(IReadOnlyList<ReceiptLineRequest> Lines, int? WarehouseId = null);
 
 /// <summary>Status: draft, ordered, received, cancelled.</summary>
 public sealed record PurchaseOrderFilter(string? Status = null);

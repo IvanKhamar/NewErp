@@ -65,6 +65,38 @@ public static class StockEndpoints
         stock.MapGet("/items/{id:int}/movements", (int id, IStockRepository repo, CancellationToken ct) =>
             repo.ListMovementsAsync(id, ct))
             .WithSummary("Журнал руху позиції");
+
+        MapLocations(stock);
+    }
+
+    private static void MapLocations(RouteGroupBuilder stock)
+    {
+        stock.MapGet("/warehouses", (StockLocationService service, CancellationToken ct) => service.WarehousesAsync(ct))
+            .WithSummary("Склади для вибору місця (довідник «Склади й пункти видачі»), без основного")
+            .WithTags("Склад: за складами");
+
+        stock.MapGet("/by-warehouse", (StockLocationService service, CancellationToken ct) => service.ByWarehouseAsync(ct))
+            .WithSummary("Залишки за місцями: основний склад і склади, де щось лежить, з вартістю кожного")
+            .WithTags("Склад: за складами");
+
+        stock.MapGet("/items/{id:int}/places", (int id, StockLocationService service, CancellationToken ct) => service.GetAsync(id, ct))
+            .WithSummary("Де лежить позиція: основний склад (warehouseId = null) і склади")
+            .WithTags("Склад: за складами");
+
+        stock.MapPost("/items/{id:int}/transfers", (int id, TransferStockRequest request, ClaimsPrincipal user, StockLocationService service, CancellationToken ct) =>
+            service.TransferAsync(id, request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary("Перемістити між складами (null — основний); загальний залишок не змінюється")
+            .WithTags("Склад: за складами");
+
+        stock.MapGet("/items/{id:int}/transfers", (int id, StockLocationService service, CancellationToken ct) => service.TransfersAsync(id, ct))
+            .WithSummary("Журнал переміщень позиції")
+            .WithTags("Склад: за складами");
+
+        stock.MapPost("/items/{id:int}/warehouses/{warehouseId:int}/adjustments",
+            (int id, int warehouseId, AdjustStockRequest request, ClaimsPrincipal user, StockLocationService service, CancellationToken ct) =>
+                service.AdjustAsync(id, warehouseId, request, user.GetUserId(), user.GetUsername(), ct))
+            .WithSummary("Прихід (+) або витрата (-) на конкретному складі, з записом у журнал руху")
+            .WithTags("Склад: за складами");
     }
 
     private static void MapPurchaseOrders(RouteGroupBuilder orders)

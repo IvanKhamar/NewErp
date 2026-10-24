@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IBonusDataSource, BonusDataSource>();
         services.AddScoped<IStockRepository, StockRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<IStockLocationRepository, StockLocationRepository>();
         services.AddScoped<ProductionRepository>();
         services.AddScoped<IProductionRepository>(sp => sp.GetRequiredService<ProductionRepository>());
         services.AddScoped<ISewingPlanSource>(sp => sp.GetRequiredService<ProductionRepository>());

@@ -8,11 +8,12 @@ public class LocationServiceTests
 {
     private readonly FakeStore _store = new();
     private readonly FakeSpreadsheet _sheet = new();
+    private readonly FakeStockLocationRepository _stock = new();
     private readonly LocationService _service;
 
     public LocationServiceTests()
     {
-        _service = new LocationService(_store, _sheet);
+        _service = new LocationService(_store, _sheet, _stock);
         _store.Items[3] = new ShopLocationData("Старий склад", "", "", "", "Київ", "", "");
     }
 
@@ -45,6 +46,15 @@ public class LocationServiceTests
     {
         await Assert.ThrowsAsync<NotFoundException>(() => _service.UpdateAsync(8, new SaveLocationRequest("Х"), default));
         await Assert.ThrowsAsync<NotFoundException>(() => _service.DeleteAsync(8, default));
+    }
+
+    [Fact]
+    public async Task Delete_WarehouseThatHoldsStock_Rejected()
+    {
+        _stock.WarehousesWithStock.Add(3);
+
+        await Assert.ThrowsAsync<NewErp.Domain.Common.DomainException>(() => _service.DeleteAsync(3, default));
+        Assert.True(_store.Items.ContainsKey(3));
     }
 
     private sealed class FakeSpreadsheet : ILocationSpreadsheet

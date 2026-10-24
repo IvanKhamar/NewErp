@@ -86,6 +86,10 @@ else
         }
         @if (IsOrdered)
         {
+            @if (_warehouses.Count > 0)
+            {
+                <WarehouseSelect @bind-Value="_warehouseId" Warehouses="_warehouses" Label="Куди прийняти" Class="mud-width-auto" />
+            }
             <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.MoveToInbox" OnClick="ReceiveAsync" Disabled="_busy">
                 Прийняти на склад
             </MudButton>
@@ -116,6 +120,8 @@ else
     private List<LineRow> _rows = [];
     private List<BreadcrumbItem> _breadcrumbs = [];
     private bool _busy;
+    private List<LookupItem> _warehouses = [];
+    private int? _warehouseId;
 
     private bool IsDraft => _order?.Status == PurchaseOrder.Draft;
     private bool IsOrdered => _order?.Status == PurchaseOrder.Ordered;
@@ -128,6 +134,14 @@ else
         // У полі «приїхало зараз» одразу те, що ще чекаємо: найчастіше привозять усе.
         _rows = _order.Lines.Select(l => new LineRow(l) { Quantity = l.Quantity, Price = l.Price, Receive = l.Remaining }).ToList();
         _breadcrumbs = [new("Замовлення постачальникам", href: "stock/purchase-orders"), new($"№{Id}", href: null, disabled: true)];
+        try
+        {
+            _warehouses = await Api.WarehousesAsync();
+        }
+        catch (ApiException)
+        {
+            _warehouses = []; // без довідника складів приймаємо на основний склад
+        }
     }
 
     private Task SaveLinesAsync() => RunAsync("Зміни збережено.", () =>
@@ -150,7 +164,7 @@ else
             Snackbar.Add("Вкажіть, скільки приїхало.", Severity.Warning);
             return Task.CompletedTask;
         }
-        return RunAsync("Прийнято на склад.", () => Api.ReceiveAsync(Id, new ReceivePurchaseOrderRequest(receipts)));
+        return RunAsync("Прийнято на склад.", () => Api.ReceiveAsync(Id, new ReceivePurchaseOrderRequest(receipts, _warehouseId)));
     }
 
     private async Task CancelAsync()

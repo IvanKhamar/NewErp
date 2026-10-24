@@ -48,6 +48,23 @@ public sealed class StockApi(HttpClient http)
 
     public Task<List<StockMovementDto>> MovementsAsync(int itemId) => GetAsync<List<StockMovementDto>>($"/stock/items/{itemId}/movements");
 
+    public Task<List<LookupItem>> WarehousesAsync() => GetAsync<List<LookupItem>>("/stock/warehouses");
+
+    public Task<StockByWarehouseDto> ByWarehouseAsync() => GetAsync<StockByWarehouseDto>("/stock/by-warehouse");
+
+    public Task<ItemPlacementDto> PlacesAsync(int itemId) => GetAsync<ItemPlacementDto>($"/stock/items/{itemId}/places");
+
+    public async Task<ItemPlacementDto> TransferAsync(int itemId, TransferStockRequest request) =>
+        await ReadAsync<ItemPlacementDto>(await http.PostAsJsonAsync($"/stock/items/{itemId}/transfers", request));
+
+    public Task<List<StockTransferDto>> TransfersAsync(int itemId) => GetAsync<List<StockTransferDto>>($"/stock/items/{itemId}/transfers");
+
+    /// <summary>Прихід або витрата на складі; без складу — на основному (звичайне коригування).</summary>
+    public async Task<StockMovementDto> AdjustAtAsync(int itemId, int? warehouseId, AdjustStockRequest request) =>
+        warehouseId is { } id
+            ? await ReadAsync<StockMovementDto>(await http.PostAsJsonAsync($"/stock/items/{itemId}/warehouses/{id}/adjustments", request))
+            : await AdjustAsync(itemId, request);
+
     public Task<ReorderReportDto> ReorderAsync() => GetAsync<ReorderReportDto>("/stock/reorder");
 
     public Task<List<PurchaseOrderSummaryDto>> PurchaseOrdersAsync(string? status = null) =>

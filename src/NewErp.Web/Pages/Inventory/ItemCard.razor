@@ -51,6 +51,27 @@ else
                     <MudButton Variant="Variant.Outlined" Disabled="_minQuantity == _item.MinQuantity" OnClick="SaveMinimumAsync">Зберегти</MudButton>
                 </div>
             </MudPaper>
+            @if (_placement is not null)
+            {
+                <MudPaper Class="pa-4 mt-3" Outlined="true" data-test="places">
+                    <div class="d-flex align-center mb-1">
+                        <MudText Typo="Typo.overline">Де лежить</MudText>
+                        <MudSpacer />
+                        @if (_warehouses.Count > 0)
+                        {
+                            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="TransferAsync">Перемістити</MudButton>
+                        }
+                    </div>
+                    <MudSimpleTable Dense="true" Elevation="0">
+                        <tbody>
+                            @foreach (var place in _placement.Places)
+                            {
+                                <tr><td>@place.Name</td><td style="text-align: right">@Fmt.Qty(place.Quantity) @_item.Unit</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            }
         </MudItem>
         <MudItem xs="12" md="8">
             <MudText Typo="Typo.h6" Class="mb-2">Журнал руху</MudText>
@@ -75,6 +96,28 @@ else
                 </RowTemplate>
                 <NoRecordsContent><MudText>Руху ще не було.</MudText></NoRecordsContent>
             </MudTable>
+            @if (_transfers.Count > 0)
+            {
+                <MudText Typo="Typo.h6" Class="mt-4 mb-2">Переміщення</MudText>
+                <MudTable T="StockTransferDto" Items="_transfers" Dense="true" Hover="true" Outlined="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Коли</MudTh>
+                        <MudTh>Звідки</MudTh>
+                        <MudTh>Куди</MudTh>
+                        <MudTh Style="text-align: right">Кількість</MudTh>
+                        <MudTh>Коментар</MudTh>
+                        <MudTh>Хто</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Коли">@Fmt.Date(context.CreatedAt)</MudTd>
+                        <MudTd DataLabel="Звідки">@context.From</MudTd>
+                        <MudTd DataLabel="Куди">@context.To</MudTd>
+                        <MudTd DataLabel="Кількість" Style="text-align: right">@Fmt.Qty(context.Quantity)</MudTd>
+                        <MudTd DataLabel="Коментар">@context.Comment</MudTd>
+                        <MudTd DataLabel="Хто">@context.Username</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
         </MudItem>
     </MudGrid>
 }
@@ -84,6 +127,9 @@ else
 
     private StockItemDto? _item;
     private List<StockMovementDto> _movements = [];
+    private ItemPlacementDto? _placement;
+    private List<StockTransferDto> _transfers = [];
+    private List<LookupItem> _warehouses = [];
     private decimal _minQuantity;
     private string? _error;
     private List<BreadcrumbItem> _breadcrumbs = [];
@@ -103,14 +149,39 @@ else
         {
             _error = e.Message;
         }
+        await LoadPlacesAsync();
     }
 
     private async Task AdjustAsync()
     {
         var dialog = await Dialogs.ShowAsync<AdjustStockDialog>(
-            $"Прихід або витрата: {_item!.Name}", new DialogParameters<AdjustStockDialog> { { d => d.Item, _item } });
+            $"Прихід або витрата: {_item!.Name}", new DialogParameters<AdjustStockDialog> { { d => d.Item, _item }, { d => d.Warehouses, _warehouses } });
         if (await dialog.Result is { Canceled: false })
             await LoadAsync();
+    }
+
+    // Місця — доповнення до картки: якщо їх не вдалося прочитати, решта картки однаково працює.
+    private async Task LoadPlacesAsync()
+    {
+        try
+        {
+            _placement = await Api.PlacesAsync(Id);
+            _transfers = await Api.TransfersAsync(Id);
+            _warehouses = await Api.WarehousesAsync();
+        }
+        catch (ApiException)
+        {
+            _placement = null;
+        }
+    }
+
+    private async Task TransferAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<TransferStockDialog>(
+            $"Перемістити: {_item!.Name}",
+            new DialogParameters<TransferStockDialog> { { d => d.Placement, _placement! }, { d => d.Warehouses, _warehouses } });
+        if (await dialog.Result is { Canceled: false })
+            await LoadPlacesAsync();
     }
 
     private async Task EditAsync()

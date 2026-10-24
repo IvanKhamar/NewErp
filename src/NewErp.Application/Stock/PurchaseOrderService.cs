@@ -1,4 +1,5 @@
 using NewErp.Application.Common;
+using NewErp.Application.Locations;
 using NewErp.Domain.Common;
 using NewErp.Domain.Stock;
 
@@ -6,7 +7,8 @@ namespace NewErp.Application.Stock;
 
 /// <summary>Замовлення постачальникам: створення (вручну або зі звіту «що дозамовити»), надсилання, приймання.</summary>
 public sealed class PurchaseOrderService(
-    IPurchaseOrderRepository orders, IStockRepository stock, ReorderService reorder, TimeProvider clock)
+    IPurchaseOrderRepository orders, IStockRepository stock, ReorderService reorder,
+    IStockLocationRepository locations, ILocationStore warehouses, TimeProvider clock)
 {
     /// <summary>Чернетка для постачальника з тим, що пропонує звіт «що дозамовити» (кількість і ціна з позиції).</summary>
     public async Task<int> CreateFromReorderAsync(int supplierId, int userId, CancellationToken ct)
@@ -53,16 +55,33 @@ public sealed class PurchaseOrderService(
         await orders.SaveChangesAsync(ct);
     }
 
-    /// <summary>Приймання товару: залишки зростають, у журналі складу — приходи. Усе одним записом.</summary>
+    /// <summary>
+    /// Приймання товару: залишки зростають, у журналі складу — приходи. Усе одним записом.
+    /// Зі складом поставка лягає на нього, без складу — на основний.
+    /// </summary>
     public async Task ReceiveAsync(int id, ReceivePurchaseOrderRequest request, int userId, string username, CancellationToken ct)
     {
         var order = await RequireAsync(id, ct);
+        if (request.WarehouseId is { } warehouseId && await warehouses.GetAsync(warehouseId, ct) is null)
+            throw new NotFoundException($"Склад {warehouseId} не знайдено.");
         var items = (await orders.FindItemsAsync(order.Lines.Select(l => l.ItemId).ToList(), ct)).ToDictionary(i => i.Id);
 
         var movements = order.Receive(
             (request.Lines ?? []).Select(l => (l.LineId, l.Quantity)).ToList(), items, userId, username, Now());
         foreach (var movement in movements)
             orders.Add(movement);
+
+        if (request.WarehouseId is { } toWarehouse)
+        {
+            // Одна позиція може прийти кількома рядками: баланс кожної змінюємо один раз.
+            foreach (var received in movements.GroupBy(m => m.Item))
+            {
+                var placement = new StockPlacement(received.Key, await locations.FindBalancesAsync(received.Key.Id, ct));
+                placement.ReceivedAt(toWarehouse, received.Sum(m => m.Delta));
+                foreach (var balance in placement.Created)
+                    locations.Add(balance);
+            }
+        }
         await orders.SaveChangesAsync(ct);
     }
 

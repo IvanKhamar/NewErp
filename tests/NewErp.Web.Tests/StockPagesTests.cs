@@ -72,5 +72,35 @@ public class StockPagesTests : WebTestContext
         Api.Respond("/stock/purchase-orders/7/receive", HttpStatusCode.NoContent);
     }
 
+    [Fact]
+    public void ByWarehouse_ShowsColumnPerPlace_AndValues()
+    {
+        Api.Respond("/stock/by-warehouse", HttpStatusCode.OK, new StockByWarehouseDto(
+            [new(null, "Основний склад", 2000), new(7, "Склад на Подолі", 600)],
+            [new(1, "Льон", "м", "Тканини", 26, [20, 6])]));
+
+        var page = Render<StockByWarehouse>();
+
+        page.WaitForAssertion(() => Assert.Contains("Склад на Подолі", page.Find("thead").TextContent));
+        Assert.Equal(["Льон", "Тканини", "26 м", "20", "6"], page.FindAll("tbody td").Select(td => td.TextContent.Trim()));
+        Assert.Contains("600", page.Find("[data-test=values]").TextContent);
+    }
+
+    [Fact]
+    public void ItemCard_ShowsPlaces()
+    {
+        Api.Respond("/stock/items/1", HttpStatusCode.OK, Item(1, "Льон", 26, 0));
+        Api.Respond("/stock/items/1/movements", HttpStatusCode.OK, new List<StockMovementDto>());
+        Api.Respond("/stock/items/1/places", HttpStatusCode.OK,
+            new ItemPlacementDto(1, "Льон", "м", 26, [new(null, "Основний склад", 20), new(7, "Склад на Подолі", 6)]));
+        Api.Respond("/stock/items/1/transfers", HttpStatusCode.OK, new List<StockTransferDto>());
+        Api.Respond("/stock/warehouses", HttpStatusCode.OK, new List<LookupItem> { new(7, "Склад на Подолі") });
+
+        var page = Render<ItemCard>(p => p.Add(c => c.Id, 1));
+
+        page.WaitForAssertion(() => Assert.Contains("Склад на Подолі", page.Find("[data-test=places]").TextContent));
+        Assert.Contains("Перемістити", page.Markup);
+    }
+
     private static List<IElement> Rows(IRenderedComponent<Items> page) => page.FindAll("tbody tr").ToList();
 }

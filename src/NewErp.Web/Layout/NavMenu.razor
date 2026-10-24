@@ -4,6 +4,7 @@
     <AuthorizeView Roles="@Access.Stock">
         <MudNavGroup Title="Склад" Icon="@Icons.Material.Filled.Inventory2" Expanded="true">
             <MudNavLink Href="stock" Match="NavLinkMatch.All">Розхідники</MudNavLink>
+            <MudNavLink Href="stock/by-warehouse">За складами</MudNavLink>
             <MudNavLink Href="stock/reorder">Що дозамовити</MudNavLink>
             <MudNavLink Href="stock/purchase-orders">Замовлення постачальникам</MudNavLink>
             <MudNavLink Href="stock/suppliers">Постачальники й категорії</MudNavLink>

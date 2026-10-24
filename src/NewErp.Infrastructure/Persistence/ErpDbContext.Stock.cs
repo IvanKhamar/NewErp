@@ -95,6 +95,31 @@ public partial class ErpDbContext
             e.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
+        // Розхідники на окремих складах — наші таблиці erp_stock_location і erp_stock_transfer.
+        modelBuilder.Entity<StockBalance>(e =>
+        {
+            e.ToTable("erp_stock_location");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ItemId).HasColumnName("item_id");
+            e.Property(x => x.WarehouseId).HasColumnName("warehouse_id");
+            // Як і в dd_stock_items: два одночасні переміщення з одного складу не пройдуть обидва.
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<StockTransfer>(e =>
+        {
+            e.ToTable("erp_stock_transfer");
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ItemId).HasColumnName("item_id");
+            e.Property(x => x.FromWarehouseId).HasColumnName("from_warehouse_id");
+            e.Property(x => x.ToWarehouseId).HasColumnName("to_warehouse_id");
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3);
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(255);
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(20);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<PurchaseOrderLine>(e =>
         {
             e.ToTable("erp_purchase_order_line");

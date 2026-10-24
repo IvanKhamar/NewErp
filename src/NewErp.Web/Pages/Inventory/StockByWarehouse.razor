@@ -1,0 +1,75 @@
+@page "/stock/by-warehouse"
+@attribute [Authorize(Roles = Access.Stock)]
+@inject StockApi Api
+
+<PageTitle>Розхідники за складами — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Розхідники за складами</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Основний склад — це решта загального залишку: усе, що не лежить на інших складах. Переміщують на картці розхідника.
+</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_report is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudSimpleTable Dense="true" Hover="true" Outlined="true" Elevation="0" Style="overflow-x: auto">
+        <thead>
+            <tr>
+                <th>Розхідник</th>
+                <th>Категорія</th>
+                <th style="text-align: right">Усього</th>
+                @foreach (var place in _report.Places)
+                {
+                    <th style="text-align: right">@place.Name</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _report.Rows)
+            {
+                <tr>
+                    <td><MudLink Href="@StockRoutes.Item(row.ItemId)">@row.Name</MudLink></td>
+                    <td>@(row.CategoryName ?? "—")</td>
+                    <td style="text-align: right">@Fmt.Qty(row.Total) @row.Unit</td>
+                    @foreach (var quantity in row.Quantities)
+                    {
+                        <td style="text-align: right" class="@(quantity < 0 ? "mud-error-text" : null)">@(quantity == 0 ? "—" : Fmt.Qty(quantity))</td>
+                    }
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr data-test="values">
+                <td colspan="3"><b>Вартість</b></td>
+                @foreach (var place in _report.Places)
+                {
+                    <td style="text-align: right"><b>@Fmt.Money(place.Value)</b></td>
+                }
+            </tr>
+        </tfoot>
+    </MudSimpleTable>
+}
+
+@code {
+    private StockByWarehouseDto? _report;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _report = await Api.ByWarehouseAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+}

@@ -12,7 +12,7 @@ public class StockServiceTests
     private readonly FakeStockRepository _repo = new();
     private readonly StockService _service;
 
-    public StockServiceTests() => _service = new StockService(_repo, new FakeTimeProvider());
+    public StockServiceTests() => _service = new StockService(_repo, new FakeStockLocationRepository(), new FakeTimeProvider());
 
     [Fact]
     public async Task Adjust_ChangesQuantityAndRecordsMovement()

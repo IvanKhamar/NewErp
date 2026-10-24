@@ -1,10 +1,14 @@
 @inject StockApi Api
 @inject ISnackbar Snackbar
 
-@* Прихід або витрата розхідника. Повертає Ok, якщо залишок змінено. *@
+@* Прихід або витрата розхідника. З переданими складами можна вибрати місце. Повертає Ok, якщо залишок змінено. *@
 <MudDialog>
     <DialogContent>
         <MudText Typo="Typo.body2" Class="mb-3">Зараз на складі: <b>@Fmt.Qty(Item.Quantity) @Item.Unit</b></MudText>
+        @if (Warehouses.Count > 0)
+        {
+            <WarehouseSelect @bind-Value="_warehouseId" Warehouses="Warehouses" Label="Де" Class="mb-2" />
+        }
         <MudRadioGroup T="bool" @bind-Value="_income" Class="mb-2">
             <MudRadio T="bool" Value="true" Color="Color.Success">Прихід</MudRadio>
             <MudRadio T="bool" Value="false" Color="Color.Error">Витрата</MudRadio>
@@ -29,6 +33,9 @@
 
     [Parameter, EditorRequired] public required StockItemDto Item { get; set; }
 
+    [Parameter] public IReadOnlyList<LookupItem> Warehouses { get; set; } = [];
+
+    private int? _warehouseId;
     private bool _income = true;
     private decimal _quantity;
     private string _reason = "";
@@ -47,7 +54,7 @@
         try
         {
             var reason = string.IsNullOrWhiteSpace(_reason) ? (_income ? "Прихід" : "Витрата") : _reason;
-            var movement = await Api.AdjustAsync(Item.Id, new AdjustStockRequest(_income ? _quantity : -_quantity, reason));
+            var movement = await Api.AdjustAtAsync(Item.Id, _warehouseId, new AdjustStockRequest(_income ? _quantity : -_quantity, reason));
             Snackbar.Add($"{Item.Name}: тепер {Fmt.Qty(movement.QuantityAfter)} {Item.Unit}.", Severity.Success);
             Dialog.Close(DialogResult.Ok(movement));
         }

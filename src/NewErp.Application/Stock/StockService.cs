@@ -5,7 +5,7 @@ using NewErp.Domain.Stock;
 namespace NewErp.Application.Stock;
 
 /// <summary>Сценарії складу розхідників.</summary>
-public sealed class StockService(IStockRepository repository, TimeProvider clock)
+public sealed class StockService(IStockRepository repository, IStockLocationRepository locations, TimeProvider clock)
 {
     public async Task<int> CreateCategoryAsync(CreateStockCategoryRequest request, CancellationToken ct)
     {
@@ -60,7 +60,9 @@ public sealed class StockService(IStockRepository repository, TimeProvider clock
         var item = await repository.FindItemAsync(itemId, ct)
             ?? throw new NotFoundException($"Позицію складу {itemId} не знайдено.");
 
-        var m = item.Adjust(request.Delta, request.Reason, userId, username, clock.GetLocalNow().DateTime);
+        // Без складу — це основний склад: те, що лежить на інших складах, звідси не витрачається.
+        var m = new StockPlacement(item, await locations.FindBalancesAsync(itemId, ct))
+            .AdjustAt(null, request.Delta, request.Reason, userId, username, clock.GetLocalNow().DateTime);
         repository.Add(m);
         await repository.SaveChangesAsync(ct);
 
