@@ -1,0 +1,58 @@
+@inject CompetitorsApi Api
+
+@* Новий конкурент або зміна наявного. Повертає Ok, якщо збережено. *@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Назва" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Class="mb-3" AutoFocus="true" />
+        <MudTextField @bind-Value="_siteUrl" Label="Сайт" Placeholder="https://shop.ua" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255" Class="mb-3" />
+        <MudTextField @bind-Value="_priceRegex" Label="Вираз для ціни (необов'язково)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="255"
+                      HelperText="Потрібен, лише якщо сайт не має розмітки ціни. Перша група в дужках — ціна, наприклад class=&quot;price&quot;>([0-9 ]+)" Class="mb-3" />
+        <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Primary" Label="Стежити (щоденна перевірка й порівняння)" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public CompetitorDto? Competitor { get; set; }
+
+    private string _name = "";
+    private string _siteUrl = "";
+    private string _priceRegex = "";
+    private bool _isActive = true;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (Competitor is { } c)
+            (_name, _siteUrl, _priceRegex, _isActive) = (c.Name, c.SiteUrl, c.PriceRegex, c.IsActive);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var request = new SaveCompetitorRequest(_name, _siteUrl, _priceRegex, _isActive);
+            var saved = Competitor is null ? await Api.CreateAsync(request) : await Api.UpdateAsync(Competitor.Id, request);
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -36,6 +36,7 @@ builder.Services.AddScoped<CustomersApi>();
 builder.Services.AddScoped<ReportsApi>();
 builder.Services.AddScoped<LocationsApi>();
 builder.Services.AddScoped<MarketingApi>();
+builder.Services.AddScoped<CompetitorsApi>();
 builder.Services.AddScoped<Clipboard>();
 
 await builder.Build().RunAsync();

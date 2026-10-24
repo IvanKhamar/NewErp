@@ -1,0 +1,54 @@
+@inject CompetitorsApi Api
+
+@* Історія цін однієї сторінки конкурента. *@
+<MudDialog>
+    <DialogContent>
+        @if (_history is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Elevation="0">
+                <thead><tr><th>Коли</th><th style="text-align: right">Ціна</th><th>Звідки</th></tr></thead>
+                <tbody>
+                    @foreach (var price in _history)
+                    {
+                        <tr>
+                            <td>@Fmt.Date(price.CheckedAt)</td>
+                            <td style="text-align: right">@Fmt.Money(price.Price)</td>
+                            <td>@(price.Source == "manual" ? "вписано" : "зі сторінки")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_history.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">Ціну ще не знаходили.</MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Close()">Закрити</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required int LinkId { get; set; }
+
+    private List<CompetitorPriceDto>? _history;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _history = await Api.HistoryAsync(LinkId);
+        }
+        catch (ApiException)
+        {
+            _history = [];
+        }
+    }
+}

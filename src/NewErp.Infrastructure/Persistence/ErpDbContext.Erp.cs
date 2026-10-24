@@ -15,5 +15,6 @@ public partial class ErpDbContext
         ConfigureAuth(modelBuilder);
         ConfigureCashbox(modelBuilder);
         ConfigurePartners(modelBuilder);
+        ConfigureCompetitors(modelBuilder);
     }
 }

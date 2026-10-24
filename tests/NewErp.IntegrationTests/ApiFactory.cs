@@ -89,6 +89,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("NovaPoshta:FakeDocuments", "true"); // без ключа API: тестові ТТН заглушки
         builder.UseSetting("Checkbox:FakeReceipts", "true"); // без ключів касирів: тестові чеки заглушки
         builder.UseSetting("RevenueFeed:Token", FeedToken);
+        builder.UseSetting("Competitors:CheckTime", "-"); // тести не ходять на сайти конкурентів
     }
 
     private async Task SeedAsync()

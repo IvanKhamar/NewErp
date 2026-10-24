@@ -3,6 +3,7 @@ using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
 using NewErp.Application.Catalog;
+using NewErp.Application.Competitors;
 using NewErp.Application.Marketing;
 using NewErp.Application.Partners;
 using NewErp.Application.Production;
@@ -33,10 +34,12 @@ builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(Pre
 builder.Services.AddHostedService<PreOrderSettleWorker>();
 builder.Services.Configure<MarketingOptions>(builder.Configuration.GetSection(MarketingOptions.SectionName));
 builder.Services.Configure<RevenueFeedOptions>(builder.Configuration.GetSection(RevenueFeedOptions.SectionName));
+builder.Services.Configure<CompetitorOptions>(builder.Configuration.GetSection(CompetitorOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
 builder.Services.AddHostedService<CashboxAutoCloseWorker>();
+builder.Services.AddHostedService<CompetitorPriceWorker>();
 
 var app = builder.Build();
 
@@ -71,6 +74,7 @@ app.MapReturnEndpoints();
 app.MapCustomerEndpoints();
 app.MapReportEndpoints();
 app.MapLocationEndpoints();
+app.MapCompetitorEndpoints();
 
 // Веб-інтерфейс (NewErp.Web, Blazor WebAssembly) під /app/. Його файли й index.html доступні без входу,
 // інакше не відкрилася б сторінка входу; дані однаково захищає API.

@@ -1,0 +1,60 @@
+@inject CompetitorsApi Api
+@inject OrdersApi Orders
+
+@* Сторінка нашого товару на сайті конкурента. Повертає Ok, якщо додано. *@
+<MudDialog>
+    <DialogContent>
+        <MudSelect T="int" @bind-Value="_competitorId" Label="Конкурент" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
+            @foreach (var competitor in Competitors)
+            {
+                <MudSelectItem T="int" Value="competitor.Id">@competitor.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudAutocomplete T="ProductPickDto" @bind-Value="_product" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
+                         ToStringFunc="@(p => p is null ? null : $"{p.Name} ({p.Model})")" Label="Наш товар" Placeholder="Назва, модель чи №"
+                         Variant="Variant.Outlined" Margin="Margin.Dense" AdornmentIcon="@Icons.Material.Filled.Search" Class="mb-3" />
+        <MudTextField @bind-Value="_url" Label="Сторінка товару в конкурента" Placeholder="https://..." Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="500" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_busy || _product is null)">Додати</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter, EditorRequired] public required IReadOnlyList<CompetitorDto> Competitors { get; set; }
+
+    private int _competitorId;
+    private ProductPickDto? _product;
+    private string _url = "";
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized() => _competitorId = Competitors.FirstOrDefault()?.Id ?? 0;
+
+    private async Task<IEnumerable<ProductPickDto>> SearchProductsAsync(string text, CancellationToken ct) => await Orders.ProductsAsync(text);
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var link = await Api.AddLinkAsync(new AddCompetitorLinkRequest(_competitorId, _product!.Id, _url));
+            Dialog.Close(DialogResult.Ok(link));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

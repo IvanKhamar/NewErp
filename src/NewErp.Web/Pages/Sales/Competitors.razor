@@ -1,0 +1,241 @@
+@page "/competitors"
+@using System.Globalization
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CompetitorsApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Ціни конкурентів — NewErp</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Ціни конкурентів</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CheckAllAsync" Disabled="_busy" data-test="check-all">
+        Перевірити всі ціни
+    </MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Щоранку NewErp сам читає ціни зі сторінок активних конкурентів. Якщо сайт не дає прочитати ціну, її можна вписати вручну.
+</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_report is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTabs Elevation="0" Outlined="true" Rounded="true" TabPanelsClass="pa-3">
+        <MudTabPanel Text="Порівняння">
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0" Style="overflow-x: auto" data-test="report">
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th style="text-align: right">Наша ціна</th>
+                        @foreach (var competitor in _report.Competitors)
+                        {
+                            <th style="text-align: right">@competitor.Name</th>
+                        }
+                        <th style="text-align: right">Найнижча</th>
+                        <th style="text-align: right">Різниця</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _report.Rows)
+                    {
+                        <tr>
+                            <td>@row.ProductName</td>
+                            <td style="text-align: right">@Fmt.Money(row.OurPrice)</td>
+                            @foreach (var price in row.Prices)
+                            {
+                                <td style="text-align: right">@(price is { } p ? Fmt.Money(p) : "—")</td>
+                            }
+                            <td style="text-align: right">@(row.Lowest is { } low ? Fmt.Money(low) : "—")</td>
+                            <td style="text-align: right">
+                                @if (row.DifferencePercent is { } diff)
+                                {
+                                    <MudText Typo="Typo.body2" Color="@(diff > 0 ? Color.Error : Color.Success)">@(diff > 0 ? "+" : "")@diff.ToString("0.#", Uk)%</MudText>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_report.Rows.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">Додайте сторінки товарів у конкурентів на вкладці «Сторінки».</MudText>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Сторінки">
+            <div class="d-flex mb-2">
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddLinkAsync"
+                           Disabled="_competitors.Count == 0">Додати сторінку</MudButton>
+            </div>
+            <MudTable T="CompetitorLinkDto" Items="_links" Dense="true" Hover="true" Outlined="true" Elevation="0" data-test="links">
+                <HeaderContent>
+                    <MudTh>Товар</MudTh>
+                    <MudTh>Конкурент</MudTh>
+                    <MudTh Style="text-align: right">Ціна</MudTh>
+                    <MudTh>Перевірено</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Товар">@context.ProductName</MudTd>
+                    <MudTd DataLabel="Конкурент"><MudLink Href="@context.Url" Target="_blank">@context.CompetitorName</MudLink></MudTd>
+                    <MudTd DataLabel="Ціна" Style="text-align: right">@(context.LastPrice is { } p ? Fmt.Money(p) : "—")</MudTd>
+                    <MudTd DataLabel="Перевірено">
+                        @(context.LastCheckedAt is { } at ? Fmt.Date(at) : "ще ні")
+                        @if (!string.IsNullOrEmpty(context.LastError))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block">@context.LastError</MudText>
+                        }
+                    </MudTd>
+                    <MudTd Style="white-space: nowrap; text-align: right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" title="Перевірити зараз" OnClick="() => CheckAsync(context)" Disabled="_busy" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" title="Вписати ціну" OnClick="() => SetPriceAsync(context)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.History" Size="Size.Small" title="Історія цін" OnClick="() => HistoryAsync(context)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Видалити" OnClick="() => DeleteAsync(context)" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText>Сторінок ще немає.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Конкуренти">
+            <div class="d-flex mb-2">
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => EditCompetitorAsync(null)">Додати конкурента</MudButton>
+            </div>
+            <MudTable T="CompetitorDto" Items="_competitors" Dense="true" Hover="true" Outlined="true" Elevation="0" data-test="competitors">
+                <HeaderContent>
+                    <MudTh>Назва</MudTh>
+                    <MudTh>Сайт</MudTh>
+                    <MudTh Style="text-align: right">Сторінок</MudTh>
+                    <MudTh>Стан</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Назва">@context.Name</MudTd>
+                    <MudTd DataLabel="Сайт"><MudLink Href="@context.SiteUrl" Target="_blank">@context.SiteUrl</MudLink></MudTd>
+                    <MudTd DataLabel="Сторінок" Style="text-align: right">@context.Links</MudTd>
+                    <MudTd DataLabel="Стан">@(context.IsActive ? "стежимо" : "вимкнено")</MudTd>
+                    <MudTd Style="text-align: right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" title="Змінити" OnClick="() => EditCompetitorAsync(context)" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText>Конкурентів ще немає.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private static readonly CultureInfo Uk = CultureInfo.GetCultureInfo("uk-UA");
+
+    private CompetitorReportDto? _report;
+    private List<CompetitorLinkDto> _links = [];
+    private List<CompetitorDto> _competitors = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _report = await Api.ReportAsync();
+            _links = await Api.LinksAsync();
+            _competitors = await Api.CompetitorsAsync();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private Task CheckAllAsync() => RunAsync(async () =>
+    {
+        var result = await Api.CheckAllAsync();
+        Snackbar.Add($"Перевірено {result.Checked}, змінилося {result.Changed}, не вдалося {result.Failed}.",
+            result.Failed > 0 ? Severity.Warning : Severity.Success);
+    });
+
+    private Task CheckAsync(CompetitorLinkDto link) => RunAsync(async () =>
+    {
+        var checkedLink = await Api.CheckAsync(link.Id);
+        if (string.IsNullOrEmpty(checkedLink.LastError))
+            Snackbar.Add($"{checkedLink.CompetitorName}: {Fmt.Money(checkedLink.LastPrice ?? 0)}.", Severity.Success);
+        else
+            Snackbar.Add(checkedLink.LastError, Severity.Warning);
+    });
+
+    private async Task SetPriceAsync(CompetitorLinkDto link)
+    {
+        var dialog = await Dialogs.ShowAsync<TextPromptDialog>($"Ціна: {link.CompetitorName}",
+            new DialogParameters<TextPromptDialog> { { d => d.Label, "Ціна, грн" }, { d => d.Value, link.LastPrice?.ToString("0.##", Uk) ?? "" } });
+        if (await dialog.Result is not { Canceled: false, Data: string text })
+            return;
+        if (!decimal.TryParse(text.Replace(" ", "").Replace(".", ","), NumberStyles.Number, Uk, out var price))
+        {
+            Snackbar.Add($"«{text}» — не ціна.", Severity.Warning);
+            return;
+        }
+        await RunAsync(() => Api.SetPriceAsync(link.Id, price));
+    }
+
+    private Task HistoryAsync(CompetitorLinkDto link) =>
+        Dialogs.ShowAsync<CompetitorHistoryDialog>($"{link.ProductName} — {link.CompetitorName}",
+            new DialogParameters<CompetitorHistoryDialog> { { d => d.LinkId, link.Id } });
+
+    private async Task DeleteAsync(CompetitorLinkDto link)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Видалити сторінку?", $"{link.ProductName} у «{link.CompetitorName}» разом з історією цін.", yesText: "Видалити", cancelText: "Ні");
+        if (confirmed == true)
+            await RunAsync(() => Api.DeleteLinkAsync(link.Id));
+    }
+
+    private async Task AddLinkAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<AddCompetitorLinkDialog>("Нова сторінка",
+            new DialogParameters<AddCompetitorLinkDialog> { { d => d.Competitors, _competitors } });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task EditCompetitorAsync(CompetitorDto? competitor)
+    {
+        var dialog = await Dialogs.ShowAsync<CompetitorDialog>(competitor is null ? "Новий конкурент" : competitor.Name,
+            new DialogParameters<CompetitorDialog> { { d => d.Competitor, competitor } });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
