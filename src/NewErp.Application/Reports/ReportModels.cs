@@ -16,6 +16,35 @@ public sealed record ProductSalesDto(DateOnly From, DateOnly To, IReadOnlyList<P
 /// <summary>Показник «зараз проти раніше»: ChangePercent — null, якщо раніше було 0.</summary>
 public sealed record DashboardTile(decimal Current, decimal Previous, int? ChangePercent);
 
+/// <summary>
+/// Фід виручки для зовнішнього дашборда (розділ RevenueFeed). Токен — лише в user-secrets чи змінній середовища;
+/// без нього фід вимкнено.
+/// </summary>
+public sealed class RevenueFeedOptions
+{
+    public const string SectionName = "RevenueFeed";
+
+    /// <summary>Що дашборд надсилає в заголовку X-Feed-Token (або ?token=).</summary>
+    public string Token { get; set; } = "";
+
+    /// <summary>Найдовший денний ряд, який можна попросити одним запитом.</summary>
+    public int MaxDays { get; set; } = 366;
+
+    public bool Enabled => !string.IsNullOrWhiteSpace(Token);
+}
+
+public sealed record RevenueTotals(DateOnly From, DateOnly To, int Orders, decimal Revenue, decimal AverageCheck);
+
+public sealed record RevenueDay(DateOnly Date, int Orders, int Products, decimal Revenue);
+
+/// <summary>
+/// Виручка для зовнішнього дашборда: оформлені замовлення без скасованих, як на головній. PreviousMonth — ті самі дні
+/// попереднього місяця (1–24 вересня проти 1–24 жовтня). Days — від найстаршого дня до сьогодні.
+/// </summary>
+public sealed record RevenueFeedDto(
+    DateTime GeneratedAt, string Currency, RevenueTotals Today, RevenueTotals Yesterday, RevenueTotals Month,
+    RevenueTotals PreviousMonth, RevenueTotals Year, IReadOnlyList<RevenueDay> Days);
+
 public sealed record DashboardDto(
     DashboardTile OrdersToday,
     DashboardTile SalesToday,

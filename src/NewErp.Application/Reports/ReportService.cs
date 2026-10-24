@@ -39,12 +39,7 @@ public sealed class ReportService(IReportStore store, TimeProvider clock)
 
         var earliest = new[] { prevMonthStart, chartFrom }.Min();
         var facts = await store.SalesAsync(Start(earliest), Start(today.AddDays(1)), null, CustomerRisk.CancelledStatusId, ct);
-
-        (int Orders, decimal Total) Sum(DateOnly from, DateOnly to)
-        {
-            var list = facts.Where(f => DateOnly.FromDateTime(f.DateAdded) >= from && DateOnly.FromDateTime(f.DateAdded) <= to).ToList();
-            return (list.Count, list.Sum(f => f.Total));
-        }
+        (int Orders, decimal Total) Sum(DateOnly from, DateOnly to) => Totals(facts, from, to);
 
         var day = Sum(today, today);
         var yesterday = Sum(today.AddDays(-1), today.AddDays(-1));
@@ -63,6 +58,40 @@ public sealed class ReportService(IReportStore store, TimeProvider clock)
             Tile(customers, prevCustomers),
             SalesReport.Group(facts, ReportGrouping.Day, chartFrom, today, fillGaps: true).Select(ToRow).ToList(),
             top);
+    }
+
+    /// <summary>Фід виручки: сьогодні, вчора, місяць і рік дотепер і останні <paramref name="days"/> днів по одному.</summary>
+    public async Task<RevenueFeedDto> RevenueFeedAsync(int days, int maxDays, CancellationToken ct)
+    {
+        if (days < 1 || days > maxDays)
+            throw new DomainException($"Кількість днів — від 1 до {maxDays}.");
+        var today = Today();
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var prevMonthStart = monthStart.AddMonths(-1);
+        var prevMonthEnd = DateOnly.FromDayNumber(Math.Min(prevMonthStart.AddDays(today.Day - 1).DayNumber, monthStart.AddDays(-1).DayNumber));
+        var yearStart = new DateOnly(today.Year, 1, 1);
+        var seriesFrom = today.AddDays(1 - days);
+
+        var from = new[] { prevMonthStart, yearStart, seriesFrom }.Min();
+        var facts = await store.SalesAsync(Start(from), Start(today.AddDays(1)), null, CustomerRisk.CancelledStatusId, ct);
+        RevenueTotals Feed(DateOnly start, DateOnly end)
+        {
+            var sum = Totals(facts, start, end);
+            return new RevenueTotals(start, end, sum.Orders, sum.Total, Average(sum));
+        }
+
+        var series = SalesReport.Group(facts, ReportGrouping.Day, seriesFrom, today, fillGaps: true)
+            .Select(p => new RevenueDay(p.Start, p.Orders, p.Products, p.Total))
+            .ToList();
+        return new RevenueFeedDto(
+            clock.GetLocalNow().DateTime, "UAH", Feed(today, today), Feed(today.AddDays(-1), today.AddDays(-1)),
+            Feed(monthStart, today), Feed(prevMonthStart, prevMonthEnd), Feed(yearStart, today), series);
+    }
+
+    private static (int Orders, decimal Total) Totals(IReadOnlyList<SaleFact> facts, DateOnly from, DateOnly to)
+    {
+        var list = facts.Where(f => DateOnly.FromDateTime(f.DateAdded) >= from && DateOnly.FromDateTime(f.DateAdded) <= to).ToList();
+        return (list.Count, list.Sum(f => f.Total));
     }
 
     private (DateOnly From, DateOnly To) Range(ReportFilter filter)

@@ -49,6 +49,20 @@ public class ReportServiceTests
         await Assert.ThrowsAsync<DomainException>(() => _service.SalesAsync(new ReportFilter(new DateOnly(2020, 1, 1)), default));
     }
 
+    [Fact]
+    public async Task RevenueFeed_TotalsAndDailySeries_RejectsTooManyDays()
+    {
+        var feed = await _service.RevenueFeedAsync(days: 3, maxDays: 366, default);
+
+        Assert.Equal((1, 1500m, 1500m), (feed.Today.Orders, feed.Today.Revenue, feed.Today.AverageCheck));
+        Assert.Equal((new DateOnly(2026, 10, 1), 3000m), (feed.Month.From, feed.Month.Revenue));
+        Assert.Equal((new DateOnly(2026, 9, 20), 2000m), (feed.PreviousMonth.To, feed.PreviousMonth.Revenue));
+        Assert.Equal(14000m, feed.Year.Revenue);
+        Assert.Equal([0m, 1000m, 1500m], feed.Days.Select(d => d.Revenue));
+        Assert.Equal("UAH", feed.Currency);
+        await Assert.ThrowsAsync<DomainException>(() => _service.RevenueFeedAsync(400, 366, default));
+    }
+
     private sealed class FakeReportStore : IReportStore
     {
         public IReadOnlyList<SaleFact> Facts { get; set; } = [];

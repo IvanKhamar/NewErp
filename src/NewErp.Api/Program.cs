@@ -6,6 +6,7 @@ using NewErp.Application.Catalog;
 using NewErp.Application.Marketing;
 using NewErp.Application.Partners;
 using NewErp.Application.Production;
+using NewErp.Application.Reports;
 using NewErp.Application.Staff;
 using NewErp.Application.Stock;
 using NewErp.Infrastructure;
@@ -31,6 +32,7 @@ builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(PreOrderOptions.SectionName));
 builder.Services.AddHostedService<PreOrderSettleWorker>();
 builder.Services.Configure<MarketingOptions>(builder.Configuration.GetSection(MarketingOptions.SectionName));
+builder.Services.Configure<RevenueFeedOptions>(builder.Configuration.GetSection(RevenueFeedOptions.SectionName));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));

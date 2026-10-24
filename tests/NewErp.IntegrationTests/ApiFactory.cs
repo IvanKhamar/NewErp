@@ -62,6 +62,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     // Надходження на 2000 грн від клієнта замовлення 2 (сума й прізвище збігаються) — має бути першою підказкою.
     public const string BankAppCode = "tx-2000";
 
+    public const string FeedToken = "test-feed-token";
+
     public async Task InitializeAsync()
     {
         if (string.IsNullOrEmpty(TestDatabase.ServerConnectionString))
@@ -86,6 +88,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Bonus:CountedStatusIds:0", Completed.ToString());
         builder.UseSetting("NovaPoshta:FakeDocuments", "true"); // без ключа API: тестові ТТН заглушки
         builder.UseSetting("Checkbox:FakeReceipts", "true"); // без ключів касирів: тестові чеки заглушки
+        builder.UseSetting("RevenueFeed:Token", FeedToken);
     }
 
     private async Task SeedAsync()
