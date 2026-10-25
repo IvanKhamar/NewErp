@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<SmsService>();
         services.AddScoped<DeliveryService>();
         services.AddScoped<ShipmentService>();
+        services.AddScoped<InternationalShipmentService>();
         services.AddScoped<CashboxService>();
         services.AddScoped<BankPaymentService>();
         services.AddScoped<LiqPayService>();

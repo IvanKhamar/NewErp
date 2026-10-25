@@ -9,8 +9,10 @@ namespace NewErp.Application.Delivery;
 /// ТТН Нової Пошти: створення, видалення, друк і довідник відділень (на основі модуля старого сайту).
 /// Поки лише доставка на відділення чи в поштомат; адресна доставка кур'єром — окремим кроком.
 /// </summary>
+/// <param name="international">Видаляє міжнародні накладні (carrier = international). Null лише в тестах без них.</param>
 public sealed class ShipmentService(
-    IShipmentRepository repository, IWarehouseDirectory directory, INovaPoshtaClient client, TimeProvider clock)
+    IShipmentRepository repository, IWarehouseDirectory directory, INovaPoshtaClient client, TimeProvider clock,
+    INovaPostInternationalClient? international = null)
 {
     /// <summary>Скільки підказок показувати в автодоповненні міста чи відділення.</summary>
     public const int SuggestionLimit = 20;
@@ -63,7 +65,11 @@ public sealed class ShipmentService(
         if (stored.Document.IsFinal)
             throw new DomainException("Посилку вже отримано чи повернено, таку ТТН видалити не можна.");
 
-        await client.DeleteAsync(SenderOf(stored), stored.Document.Ref, ct);
+        if (stored.Document.Carrier == ShipmentDocument.International)
+            await (international ?? throw new InvalidOperationException("Клієнт Nova Post International не підключено."))
+                .DeleteAsync(stored.Document.Ref, ct);
+        else
+            await client.DeleteAsync(SenderOf(stored), stored.Document.Ref, ct);
         await repository.DeleteAsync(stored.Document.Id, ct);
     }
 
