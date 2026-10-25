@@ -64,6 +64,16 @@ public sealed class OrdersApi(HttpClient http)
     public async Task<ShipmentDto> CreateShipmentAsync(int id, CreateShipmentRequest request) =>
         await ReadAsync<ShipmentDto>(await http.PostAsJsonAsync($"/orders/{id}/shipment", request));
 
+    public Task<InternationalFormDto> InternationalFormAsync(int id) => GetAsync<InternationalFormDto>($"/orders/{id}/shipment/international/form");
+
+    public async Task<ShipmentDto> CreateInternationalShipmentAsync(int id, CreateInternationalShipmentRequest request) =>
+        await ReadAsync<ShipmentDto>(await http.PostAsJsonAsync($"/orders/{id}/shipment/international", request));
+
+    public Task<IReadOnlyList<CountryDto>> CountriesAsync() => GetAsync<IReadOnlyList<CountryDto>>("/delivery/international/countries");
+
+    public Task<IReadOnlyList<HsCodeDto>> HsCodesAsync(string search, string country) =>
+        GetAsync<IReadOnlyList<HsCodeDto>>($"/delivery/international/hs-codes?search={Uri.EscapeDataString(search)}&country={Uri.EscapeDataString(country)}");
+
     public async Task DeleteShipmentAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/orders/{id}/shipment"));
 
     /// <summary>Адреса PDF для друку: відкривається в новій вкладці, cookie входу браузер додасть сам.</summary>

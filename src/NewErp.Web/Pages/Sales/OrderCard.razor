@@ -139,6 +139,8 @@ else
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">ТТН ще не створено.</MudText>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LocalShipping"
                                OnClick="CreateShipmentAsync" Disabled="_busy" data-test="create-shipment">Створити ТТН</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Public" Class="ml-2"
+                               OnClick="CreateInternationalAsync" Disabled="_busy" data-test="create-international">Міжнародна накладна</MudButton>
                 }
                 else
                 {
@@ -170,11 +172,19 @@ else
                         </tbody>
                     </MudSimpleTable>
                     @* PDF відкривається в новій вкладці напряму з нашого API: ключ Нової Пошти браузер не бачить. *@
+                    @* Накладна за кордон не має PDF Нової Пошти: її друкують у кабінеті Nova Post. *@
+                    @if (_shipment.Carrier == ShipmentDocument.International)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2" data-test="carrier">Перевізник: Nova Post International</MudText>
+                    }
                     <div class="d-flex flex-wrap gap-2 mt-3">
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Print" Target="_blank"
-                                   Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Document)">Друк ТТН</MudButton>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.QrCode" Target="_blank"
-                                   Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Markings)">Маркування</MudButton>
+                        @if (_shipment.Carrier != ShipmentDocument.International)
+                        {
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Print" Target="_blank"
+                                       Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Document)">Друк ТТН</MudButton>
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.QrCode" Target="_blank"
+                                       Href="@OrdersApi.ShipmentPrintUrl(Id, ShipmentPrintKind.Markings)">Маркування</MudButton>
+                        }
                         <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
                                    OnClick="DeleteShipmentAsync" Disabled="@(_busy || _shipment.IsFinal)" data-test="delete-shipment">Видалити ТТН</MudButton>
                     </div>
@@ -360,6 +370,17 @@ else
             return;
         _shipment = shipment;
         Snackbar.Add($"ТТН {shipment.Number} створено.", Severity.Success);
+    }
+
+    private async Task CreateInternationalAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<CreateInternationalShipmentDialog>("Міжнародна накладна (Nova Post International)",
+            new DialogParameters<CreateInternationalShipmentDialog> { { d => d.OrderId, Id } },
+            new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true });
+        if (await dialog.Result is not { Canceled: false, Data: ShipmentDto shipment })
+            return;
+        _shipment = shipment;
+        Snackbar.Add($"Міжнародну накладну {shipment.Number} створено.", Severity.Success);
     }
 
     private async Task EditCompositionAsync()
