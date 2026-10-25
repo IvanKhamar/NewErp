@@ -20,6 +20,13 @@ public sealed class ProductsApi(HttpClient http)
 
     public Task<ProductCardDto> GetAsync(int id) => GetAsync<ProductCardDto>($"/catalog/products/{id}");
 
+    public async Task<ProductCardDto> UpdateAsync(int id, UpdateProductRequest request)
+    {
+        var response = await http.PatchAsJsonAsync($"/catalog/products/{id}", request);
+        await EnsureAsync(response);
+        return (await response.Content.ReadFromJsonAsync<ProductCardDto>())!;
+    }
+
     public Task<IReadOnlyList<LookupItem>> LabelsAsync() => GetAsync<IReadOnlyList<LookupItem>>("/catalog/products/labels");
 
     public Task<IReadOnlyList<LookupItem>> CategoriesAsync() => GetAsync<IReadOnlyList<LookupItem>>("/catalog/products/categories");

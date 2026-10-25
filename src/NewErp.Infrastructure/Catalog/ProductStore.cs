@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using NewErp.Application.Catalog;
 using NewErp.Application.Common;
 using NewErp.Infrastructure.Persistence;
+using NewErp.Infrastructure.Persistence.Legacy;
 
 namespace NewErp.Infrastructure.Catalog;
 
@@ -87,6 +88,35 @@ public sealed class ProductStore(ErpDbContext db, IOptions<ErpOptions> options) 
             .ToList();
         return new ProductCardDto(product.ProductId, product.Name, product.Model, product.Price, product.Status, product.Quantity, product.Image,
             product.DateModified, sizes, labels, categories);
+    }
+
+    // dd_product — MyISAM: ні транзакцій, ні блокування рядка. date_modified слугує версією: UPDATE зачіпає лише той рядок,
+    // який бачив користувач, а збереження в OpenCart теж ставить date_modified, тож зміну звідти теж помітно.
+    public async Task UpdateAsync(int productId, DateTime expected, decimal? price, bool? enabled, DateTime now, CancellationToken ct)
+    {
+        var rows = await db.DdProducts
+            .Where(p => p.ProductId == productId && p.DateModified == expected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Price, p => price ?? p.Price)
+                .SetProperty(p => p.Status, p => enabled ?? p.Status)
+                .SetProperty(p => p.DateModified, now), ct);
+        if (rows == 0)
+            throw new DbUpdateConcurrencyException(
+                $"Товар №{productId} змінили в OpenCart або в іншому вікні після того, як ви його відкрили. Оновіть сторінку й повторіть зміни.");
+    }
+
+    public async Task ReplaceLabelsAsync(int productId, IReadOnlyCollection<int> labelIds, CancellationToken ct)
+    {
+        await db.DdProductToLabels.Where(l => l.ProductId == productId).ExecuteDeleteAsync(ct);
+        db.DdProductToLabels.AddRange(labelIds.Select(id => new DdProductToLabel { ProductId = productId, LabelId = id }));
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task ReplaceCategoriesAsync(int productId, IReadOnlyCollection<int> categoryIds, CancellationToken ct)
+    {
+        await db.DdProductToCategories.Where(c => c.ProductId == productId).ExecuteDeleteAsync(ct);
+        db.DdProductToCategories.AddRange(categoryIds.Select(id => new DdProductToCategory { ProductId = productId, CategoryId = id }));
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<LookupItem>> LabelsAsync(CancellationToken ct) =>

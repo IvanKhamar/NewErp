@@ -19,7 +19,7 @@ public class ProductApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [MySqlFact]
     public async Task ListFiltersPages_CardAndLookups()
     {
-        await SeedAsync();
+        await SeedAsync(factory);
         var manager = await factory.LoginAsync(ApiFactory.Manager);
 
         async Task<int[]> Ids(string query) =>
@@ -53,7 +53,7 @@ public class ProductApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await storekeeper.GetAsync("/catalog/products")).StatusCode);
     }
 
-    private async Task SeedAsync()
+    internal static async Task SeedAsync(ApiFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ErpDbContext>();

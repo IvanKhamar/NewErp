@@ -18,3 +18,10 @@ public sealed record ProductSize(int OptionValueId, string Name, int Quantity);
 public sealed record ProductCardDto(
     int Id, string Name, string Model, decimal Price, bool Enabled, int Quantity, string? Image, DateTime DateModified,
     IReadOnlyList<ProductSize> Sizes, IReadOnlyList<LookupItem> Labels, IReadOnlyList<LookupItem> Categories);
+
+/// <summary>
+/// PATCH товару: null — без змін. DateModified — той, що був у картці, коли її відкрили; якщо товар відтоді змінили
+/// (в OpenCart чи в іншому вікні), зміну відхилено з 409.
+/// </summary>
+public sealed record UpdateProductRequest(
+    decimal? Price = null, bool? Enabled = null, IReadOnlyList<int>? LabelIds = null, IReadOnlyList<int>? CategoryIds = null, DateTime? DateModified = null);
