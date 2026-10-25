@@ -68,6 +68,7 @@ app.MapPaymentEndpoints();
 app.MapLiqPayEndpoints();
 app.MapPartnerEndpoints();
 app.MapProductSortEndpoints();
+app.MapProductEndpoints();
 app.MapPreOrderEndpoints();
 app.MapMarketingEndpoints();
 app.MapReturnEndpoints();

@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<LiqPayService>();
         services.AddScoped<PartnerService>();
         services.AddScoped<ProductSortService>();
+        services.AddScoped<ProductService>();
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();
         services.AddScoped<CompetitorService>();

@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IBankPaymentRepository, BankPaymentRepository>();
         services.AddScoped<IPartnerRepository, PartnerRepository>();
         services.AddScoped<IProductSortStore, ProductSortStore>();
+        services.AddScoped<IProductStore, ProductStore>();
         services.AddScoped<IPreOrderStore, PreOrderStore>();
         services.AddScoped<IMarketingStore, MarketingStore>();
         services.AddScoped<ICompetitorStore, CompetitorStore>();
