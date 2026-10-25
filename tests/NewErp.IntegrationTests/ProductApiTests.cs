@@ -36,7 +36,8 @@ public class ProductApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(new[] { 72 }, await Ids("?search=" + Uri.EscapeDataString("50%")));
         Assert.Equal(new[] { 71 }, await Ids("?search=71"));
         var second = (await manager.GetFromJsonAsync<PagedResult<ProductListItem>>("/catalog/products?page=2&pageSize=2"))!;
-        Assert.Equal((2, 2, [70, 72]), (second.Page, second.TotalPages, second.Items.Select(p => p.Id).ToArray()));
+        Assert.Equal((2, 2), (second.Page, second.TotalPages));
+        Assert.Equal([70, 72], second.Items.Select(p => p.Id)); // масив у кортежі порівнювався б за посиланням
 
         var card = (await manager.GetFromJsonAsync<ProductCardDto>("/catalog/products/70"))!;
         Assert.Equal(("Сукня лляна", "SL-01", new DateTime(2026, 10, 1, 10, 0, 0)), (card.Name, card.Model, card.DateModified));
