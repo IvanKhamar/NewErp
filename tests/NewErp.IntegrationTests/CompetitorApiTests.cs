@@ -22,19 +22,19 @@ public class CompetitorApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var competitor = (await created.Content.ReadFromJsonAsync<CompetitorDto>())!;
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PostAsJsonAsync("/competitors/links", new AddCompetitorLinkRequest(competitor.Id, ApiFactory.ProductId, "https://other.ua/x"))).StatusCode);
+            (await client.PostAsJsonAsync("/competitors/links", new AddCompetitorLinkRequest(competitor.Id, ApiFactory.CategoryProductId, "https://other.ua/x"))).StatusCode);
 
         var linkResponse = await client.PostAsJsonAsync("/competitors/links",
-            new AddCompetitorLinkRequest(competitor.Id, ApiFactory.ProductId, "https://shop-a.ua/dress"));
+            new AddCompetitorLinkRequest(competitor.Id, ApiFactory.CategoryProductId, "https://shop-a.ua/dress"));
         Assert.Equal(HttpStatusCode.Created, linkResponse.StatusCode);
         var link = (await linkResponse.Content.ReadFromJsonAsync<CompetitorLinkDto>())!;
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PostAsJsonAsync("/competitors/links", new AddCompetitorLinkRequest(competitor.Id, ApiFactory.ProductId, "https://shop-a.ua/dress-2"))).StatusCode);
+            (await client.PostAsJsonAsync("/competitors/links", new AddCompetitorLinkRequest(competitor.Id, ApiFactory.CategoryProductId, "https://shop-a.ua/dress-2"))).StatusCode);
 
         pages.Html = """<meta property="product:price:amount" content="800.00">""";
         var all = (await (await client.PostAsync("/competitors/check", null)).Content.ReadFromJsonAsync<CompetitorCheckResult>())!;
         Assert.True(all.Checked >= 1);
-        var checkedLink = (await client.GetFromJsonAsync<List<CompetitorLinkDto>>($"/competitors/links?productId={ApiFactory.ProductId}"))!
+        var checkedLink = (await client.GetFromJsonAsync<List<CompetitorLinkDto>>($"/competitors/links?productId={ApiFactory.CategoryProductId}"))!
             .Single(l => l.Id == link.Id);
         Assert.Equal((800m, ""), (checkedLink.LastPrice, checkedLink.LastError));
 
@@ -48,7 +48,7 @@ public class CompetitorApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var report = (await client.GetFromJsonAsync<CompetitorReportDto>("/competitors/report"))!;
         var column = report.Competitors.ToList().FindIndex(c => c.Id == competitor.Id);
-        var row = report.Rows.Single(r => r.ProductId == ApiFactory.ProductId);
+        var row = report.Rows.Single(r => r.ProductId == ApiFactory.CategoryProductId);
         Assert.Equal(750m, row.Prices[column]);
         Assert.NotNull(row.DifferencePercent);
 
