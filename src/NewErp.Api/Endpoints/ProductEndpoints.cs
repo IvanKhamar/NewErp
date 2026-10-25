@@ -16,7 +16,12 @@ public static class ProductEndpoints
         products.MapGet("/{id:int}", (int id, ProductService service, CancellationToken ct) => service.GetAsync(id, ct))
             .WithSummary("Картка товару: розміри із залишками (лише для читання), мітки й категорії");
 
-        products.MapGet("/labels", (ProductService service, CancellationToken ct) => service.LabelsAsync(ct))
+        products.MapPatch("/{id:int}", (int id, UpdateProductRequest request, ProductService service, CancellationToken ct) =>
+                service.UpdateAsync(id, request, ct))
+            .WithSummary("Змінити ціну, увімкнення, мітки або категорії (null — без змін); dateModified з картки обов'язковий, "
+                + "якщо товар змінили після цього — 409");
+
+        products.MapGet("/labels",(ProductService service, CancellationToken ct) => service.LabelsAsync(ct))
             .WithSummary("Усі мітки товарів");
 
         products.MapGet("/categories", (ProductService service, CancellationToken ct) => service.CategoriesAsync(ct))

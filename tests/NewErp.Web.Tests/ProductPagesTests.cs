@@ -35,6 +35,8 @@ public class ProductPagesTests : WebTestContext
         Services.AddScoped<ProductsApi>();
         Api.Respond("/catalog/products/70", HttpStatusCode.OK, new ProductCardDto(70, "Сукня лляна", "SL-01", 1500m, true, 6, null,
             new DateTime(2026, 10, 1, 10, 0, 0), [new(902, "S", 4), new(903, "L", 2)], [new(1, "Хіт")], [new(30, "Сукні")]));
+        Api.Respond("/catalog/products/labels", HttpStatusCode.OK, new List<LookupItem> { new(1, "Хіт") });
+        Api.Respond("/catalog/products/categories", HttpStatusCode.OK, new List<LookupItem> { new(30, "Сукні") });
 
         var card = Render<ProductCard>(p => p.Add(c => c.Id, 70));
         card.WaitForAssertion(() => Assert.Equal(2, card.FindAll("[data-test=sizes] tbody tr").Count));
@@ -44,5 +46,24 @@ public class ProductPagesTests : WebTestContext
         var missing = Render<ProductCard>(p => p.Add(c => c.Id, 999));
         missing.WaitForAssertion(() => Assert.Contains("Товар №999 не знайдено.", missing.Find("[data-test=not-found]").TextContent));
         Assert.Equal("—", ProductCard.Names([]));
+    }
+
+    [Fact]
+    public void Card_SaveSendsAPatchAndShowsTheNewCard()
+    {
+        Services.AddScoped<ProductsApi>();
+        var opened = new ProductCardDto(70, "Сукня лляна", "SL-01", 1500m, true, 6, null, new DateTime(2026, 10, 1, 10, 0, 0), [], [], [new(30, "Сукні")]);
+        Api.Respond("/catalog/products/70", HttpStatusCode.OK, opened);
+        Api.Respond("/catalog/products/labels", HttpStatusCode.OK, new List<LookupItem> { new(1, "Хіт") });
+        Api.Respond("/catalog/products/categories", HttpStatusCode.OK, new List<LookupItem> { new(30, "Сукні") });
+        Api.Respond("/catalog/products/70", HttpStatusCode.OK, opened with { Price = 1399.5m, DateModified = new DateTime(2026, 10, 25, 12, 0, 0) },
+            HttpMethod.Patch);
+
+        var card = Render<ProductCard>(p => p.Add(c => c.Id, 70));
+        card.WaitForAssertion(() => Assert.NotNull(card.Find("button[data-test=save]")));
+        card.Find("button[data-test=save]").Click();
+
+        card.WaitForAssertion(() => Assert.Contains("1 399,50", card.Markup.Replace(' ', ' ')));
+        Assert.Equal(2, Api.Requests.Count(r => r == "/catalog/products/70")); // GET, потім PATCH
     }
 }

@@ -14,4 +14,14 @@ public interface IProductStore
 
     /// <summary>Увімкнені категорії за назвою.</summary>
     Task<IReadOnlyList<LookupItem>> CategoriesAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Ставить ціну й стан (null — як є) і date_modified = now, лише якщо date_modified досі дорівнює expected.
+    /// Інакше (товар змінили чи видалили) — виняток конкурентного доступу (409).
+    /// </summary>
+    Task UpdateAsync(int productId, DateTime expected, decimal? price, bool? enabled, DateTime now, CancellationToken ct);
+
+    Task ReplaceLabelsAsync(int productId, IReadOnlyCollection<int> labelIds, CancellationToken ct);
+
+    Task ReplaceCategoriesAsync(int productId, IReadOnlyCollection<int> categoryIds, CancellationToken ct);
 }
