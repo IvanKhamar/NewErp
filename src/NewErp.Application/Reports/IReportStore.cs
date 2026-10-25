@@ -11,4 +11,10 @@ public interface IReportStore
     Task<IReadOnlyList<ProductSalesRow>> ProductsAsync(DateTime from, DateTime toExclusive, int? statusId, int excludedStatusId, int limit, CancellationToken ct);
 
     Task<int> NewCustomersAsync(DateTime from, DateTime toExclusive, CancellationToken ct);
+
+    /// <summary>Оформлені замовлення з датою в [from; toExclusive) за статусами, скасовані теж.</summary>
+    Task<IReadOnlyList<OrderStatusReportRow>> OrdersByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct);
+
+    /// <summary>Повернення, додані в [from; toExclusive), за статусами.</summary>
+    Task<IReadOnlyList<ReturnStatusReportRow>> ReturnsByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct);
 }

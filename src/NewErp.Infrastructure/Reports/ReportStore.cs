@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 using NewErp.Application.Reports;
 using NewErp.Domain.Reports;
@@ -7,8 +8,39 @@ using NewErp.Infrastructure.Persistence.Legacy;
 
 namespace NewErp.Infrastructure.Reports;
 
-public sealed class ReportStore(ErpDbContext db) : IReportStore
+public sealed class ReportStore(ErpDbContext db, IOptions<ErpOptions> options) : IReportStore
 {
+    private readonly int _languageId = options.Value.LanguageId;
+
+    public async Task<IReadOnlyList<OrderStatusReportRow>> OrdersByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct)
+    {
+        var groups = await db.DdOrders.AsNoTracking()
+            .Where(o => o.DateAdded >= from && o.DateAdded < toExclusive && o.OrderStatusId > 0)
+            .GroupBy(o => o.OrderStatusId)
+            .Select(g => new { StatusId = g.Key, Orders = g.Count(), Total = g.Sum(o => o.Total) })
+            .ToListAsync(ct);
+        // Статус, якого немає в довіднику, все одно показуємо — його номером.
+        var names = await db.DdOrderStatuses.AsNoTracking().Where(s => s.LanguageId == _languageId)
+            .ToDictionaryAsync(s => s.OrderStatusId, s => s.Name, ct);
+        return groups.OrderBy(g => g.StatusId)
+            .Select(g => new OrderStatusReportRow(g.StatusId, names.GetValueOrDefault(g.StatusId) ?? $"#{g.StatusId}", g.Orders, g.Total))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ReturnStatusReportRow>> ReturnsByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct)
+    {
+        var groups = await db.DdReturns.AsNoTracking()
+            .Where(r => r.DateAdded >= from && r.DateAdded < toExclusive)
+            .GroupBy(r => r.ReturnStatusId)
+            .Select(g => new { StatusId = g.Key, Returns = g.Count(), Quantity = g.Sum(r => r.Quantity) })
+            .ToListAsync(ct);
+        var names = await db.DdReturnStatuses.AsNoTracking().Where(s => s.LanguageId == _languageId)
+            .ToDictionaryAsync(s => s.ReturnStatusId, s => s.Name, ct);
+        return groups.OrderBy(g => g.StatusId)
+            .Select(g => new ReturnStatusReportRow(g.StatusId, names.GetValueOrDefault(g.StatusId) ?? $"#{g.StatusId}", g.Returns, g.Quantity))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<SaleFact>> SalesAsync(DateTime from, DateTime toExclusive, int? statusId, int excludedStatusId, CancellationToken ct)
     {
         var orders = Orders(from, toExclusive, statusId, excludedStatusId);

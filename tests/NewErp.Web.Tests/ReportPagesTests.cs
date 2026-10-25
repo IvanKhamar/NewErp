@@ -43,11 +43,14 @@ public class ReportPagesTests : WebTestContext
             3, 4, 3400m));
         Api.Respond("/reports/products", HttpStatusCode.OK, new ProductSalesDto(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 20),
             [new(101, "Сукня лляна", "SK-01", 3, 4500m)]));
+        Api.Respond("/reports/statuses", HttpStatusCode.OK, new StatusReportDto(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 20),
+            [new(22, "5) Відправлено", 3, 3400m)], 3, 3400m, [], 0));
 
         var page = Render<Reports>();
 
         page.WaitForAssertion(() => Assert.Contains("01.10.2026 – 04.10.2026", page.Find("[data-test=sales]").TextContent));
         Assert.Contains("Разом", page.Find("[data-test=sales]").TextContent);
         Assert.Contains("/reports/products", Api.Requests);
+        Assert.Contains("/reports/statuses", Api.Requests);
     }
 }

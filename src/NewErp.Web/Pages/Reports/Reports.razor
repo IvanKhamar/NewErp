@@ -77,6 +77,47 @@
             }
         }
     </MudTabPanel>
+    <MudTabPanel Text="Статуси">
+        @if (_byStatus is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">Тут кожен статус окремо, скасовані теж; фільтри «Статус» і «Групувати» не діють.</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="order-statuses">
+                <thead><tr><th>Статус замовлення</th><th style="text-align: right">Замовлень</th><th style="text-align: right">Сума</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _byStatus.Orders)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td style="text-align: right">@row.Orders</td>
+                            <td style="text-align: right">@Fmt.Money(row.Total)</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td><b>Разом</b></td>
+                        <td style="text-align: right"><b>@_byStatus.OrderCount</b></td>
+                        <td style="text-align: right"><b>@Fmt.Money(_byStatus.Total)</b></td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0" Class="mt-3" data-test="return-statuses">
+                <thead><tr><th>Статус повернення</th><th style="text-align: right">Повернень</th><th style="text-align: right">Товарів, шт.</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _byStatus.Returns)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td style="text-align: right">@row.Returns</td>
+                            <td style="text-align: right">@row.Quantity</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            @if (_byStatus.Returns.Count == 0)
+            {
+                <MudText Typo="Typo.body2">За цей період повернень немає.</MudText>
+            }
+        }
+    </MudTabPanel>
 </MudTabs>
 
 @code {
@@ -87,6 +128,7 @@
     private ReportGrouping _group = ReportGrouping.Week;
     private SalesReportDto? _sales;
     private ProductSalesDto? _products;
+    private StatusReportDto? _byStatus;
     private bool _busy;
 
     protected override async Task OnInitializedAsync()
@@ -106,11 +148,13 @@
                 _from is { } f ? DateOnly.FromDateTime(f) : null, _to is { } t ? DateOnly.FromDateTime(t) : null, _statusId, _group);
             _sales = await Api.SalesAsync(filter);
             _products = await Api.ProductsAsync(filter);
+            _byStatus = await Api.StatusesAsync(filter);
         }
         catch (ApiException e)
         {
             _sales = null;
             _products = null;
+            _byStatus = null;
             Snackbar.Add(e.Message, Severity.Error);
         }
         finally

@@ -14,6 +14,10 @@ public sealed class ReportsApi(HttpClient http)
 
     public Task<ProductSalesDto> ProductsAsync(ReportFilter filter) => GetAsync<ProductSalesDto>("/reports/products?" + Query(filter, withGroup: false));
 
+    /// <summary>Статус і групування фільтра тут не діють: звіт показує кожен статус окремо.</summary>
+    public Task<StatusReportDto> StatusesAsync(ReportFilter filter) =>
+        GetAsync<StatusReportDto>("/reports/statuses?" + Query(filter with { StatusId = null }, withGroup: false));
+
     private static string Query(ReportFilter filter, bool withGroup)
     {
         var query = new List<string>();

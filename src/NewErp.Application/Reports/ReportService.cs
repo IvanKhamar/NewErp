@@ -28,6 +28,15 @@ public sealed class ReportService(IReportStore store, TimeProvider clock)
         return new ProductSalesDto(from, to, rows);
     }
 
+    /// <summary>Замовлення й повернення за статусами; StatusId і Group фільтра тут не діють.</summary>
+    public async Task<StatusReportDto> StatusesAsync(ReportFilter filter, CancellationToken ct)
+    {
+        var (from, to) = Range(filter);
+        var orders = await store.OrdersByStatusAsync(Start(from), Start(to.AddDays(1)), ct);
+        var returns = await store.ReturnsByStatusAsync(Start(from), Start(to.AddDays(1)), ct);
+        return new StatusReportDto(from, to, orders, orders.Sum(r => r.Orders), orders.Sum(r => r.Total), returns, returns.Sum(r => r.Returns));
+    }
+
     public async Task<DashboardDto> DashboardAsync(CancellationToken ct)
     {
         var today = Today();
