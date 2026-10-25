@@ -63,6 +63,20 @@ public class ReportServiceTests
         await Assert.ThrowsAsync<DomainException>(() => _service.RevenueFeedAsync(400, 366, default));
     }
 
+    [Fact]
+    public async Task Statuses_SumTheRows_ForTheCurrentMonthByDefault()
+    {
+        _store.ByStatus = [new(24, "1) Уточнюємо", 3, 3600m), new(19, "Відмінено", 1, 700m)];
+        _store.ReturnsByStatus = [new(1, "Очікує", 2, 3)];
+
+        var report = await _service.StatusesAsync(new ReportFilter(), default);
+
+        Assert.Equal((new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 20)), (report.From, report.To));
+        Assert.Equal((new DateTime(2026, 10, 1), new DateTime(2026, 10, 21)), _store.LastRange);
+        Assert.Equal((4, 4300m, 2), (report.OrderCount, report.Total, report.ReturnCount));
+        await Assert.ThrowsAsync<DomainException>(() => _service.StatusesAsync(new ReportFilter(new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 1)), default));
+    }
+
     private sealed class FakeReportStore : IReportStore
     {
         public IReadOnlyList<SaleFact> Facts { get; set; } = [];
@@ -79,5 +93,17 @@ public class ReportServiceTests
             Task.FromResult<IReadOnlyList<ProductSalesRow>>([]);
 
         public Task<int> NewCustomersAsync(DateTime from, DateTime toExclusive, CancellationToken ct) => Task.FromResult(0);
+
+        public IReadOnlyList<OrderStatusReportRow> ByStatus { get; set; } = [];
+        public IReadOnlyList<ReturnStatusReportRow> ReturnsByStatus { get; set; } = [];
+
+        public Task<IReadOnlyList<OrderStatusReportRow>> OrdersByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct)
+        {
+            LastRange = (from, toExclusive);
+            return Task.FromResult(ByStatus);
+        }
+
+        public Task<IReadOnlyList<ReturnStatusReportRow>> ReturnsByStatusAsync(DateTime from, DateTime toExclusive, CancellationToken ct) =>
+            Task.FromResult(ReturnsByStatus);
     }
 }

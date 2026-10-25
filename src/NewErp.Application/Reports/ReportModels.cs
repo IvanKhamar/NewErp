@@ -13,6 +13,20 @@ public sealed record ProductSalesRow(int ProductId, string Name, string Model, i
 
 public sealed record ProductSalesDto(DateOnly From, DateOnly To, IReadOnlyList<ProductSalesRow> Rows);
 
+/// <summary>Замовлення одного статусу за період: кількість і сума.</summary>
+public sealed record OrderStatusReportRow(int StatusId, string Name, int Orders, decimal Total);
+
+/// <summary>Повернення одного статусу за період: скільки повернень і скільки одиниць товару.</summary>
+public sealed record ReturnStatusReportRow(int StatusId, string Name, int Returns, int Quantity);
+
+/// <summary>
+/// Замовлення й повернення за статусами, як «Статистика» старого сайту. Тут кожен статус окремим рядком, тож скасовані
+/// замовлення теж лічаться; незавершені (статус 0) — ні.
+/// </summary>
+public sealed record StatusReportDto(
+    DateOnly From, DateOnly To, IReadOnlyList<OrderStatusReportRow> Orders, int OrderCount, decimal Total,
+    IReadOnlyList<ReturnStatusReportRow> Returns, int ReturnCount);
+
 /// <summary>Показник «зараз проти раніше»: ChangePercent — null, якщо раніше було 0.</summary>
 public sealed record DashboardTile(decimal Current, decimal Previous, int? ChangePercent);
 

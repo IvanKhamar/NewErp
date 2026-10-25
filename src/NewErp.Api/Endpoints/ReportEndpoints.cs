@@ -23,6 +23,9 @@ public static class ReportEndpoints
         reports.MapGet("/products", ([AsParameters] ReportFilter filter, ReportService service, CancellationToken ct) => service.ProductsAsync(filter, ct))
             .WithSummary("Продані товари за кількістю (до 200); типово — поточний місяць без скасованих замовлень");
 
+        reports.MapGet("/statuses", ([AsParameters] ReportFilter filter, ReportService service, CancellationToken ct) => service.StatusesAsync(filter, ct))
+            .WithSummary("Замовлення (кількість і сума) та повернення за статусами, скасовані теж; типово — поточний місяць");
+
         // Фід забирає зовнішній дашборд, тож він без входу, але з токеном. Без токена в налаштуваннях — 404, з чужим — 401.
         app.MapGet("/feeds/revenue.json", async (
                 [Microsoft.AspNetCore.Mvc.FromHeader(Name = "X-Feed-Token")] string? header, string? token, int? days,
