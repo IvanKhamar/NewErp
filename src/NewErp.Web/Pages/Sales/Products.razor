@@ -1,0 +1,85 @@
+@page "/catalog/products"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ProductsApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Товари — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Товари</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudTextField T="string" Value="_search" ValueChanged="v => SetAsync(() => _search = v)" Placeholder="Назва, модель або №"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Immediate="true"
+                  Style="min-width: 240px" />
+    <MudSelect T="int?" Value="_categoryId" ValueChanged="v => SetAsync(() => _categoryId = v)" Label="Категорія" Clearable="true" Style="min-width: 180px">
+        @foreach (var category in _categories)
+        {
+            <MudSelectItem T="int?" Value="category.Id">@category.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="int?" Value="_labelId" ValueChanged="v => SetAsync(() => _labelId = v)" Label="Мітка" Clearable="true" Style="min-width: 160px">
+        @foreach (var label in _labels)
+        {
+            <MudSelectItem T="int?" Value="label.Id">@label.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="bool?" Value="_enabled" ValueChanged="v => SetAsync(() => _enabled = v)" Label="Стан" Clearable="true" Style="min-width: 160px">
+        <MudSelectItem T="bool?" Value="true">Увімкнені</MudSelectItem>
+        <MudSelectItem T="bool?" Value="false">Вимкнені</MudSelectItem>
+    </MudSelect>
+</MudPaper>
+
+<MudTable @ref="_table" T="ProductListItem" ServerData="LoadAsync" Hover="true" Dense="true" RowStyle="cursor: pointer" RowsPerPage="50"
+          OnRowClick="row => Navigation.NavigateTo(ProductRoutes.Product(row.Item!.Id))" data-test="products">
+    <HeaderContent>
+        <MudTh>№</MudTh>
+        <MudTh>Назва</MudTh>
+        <MudTh>Модель</MudTh>
+        <MudTh Style="text-align: right">Ціна</MudTh>
+        <MudTh Style="text-align: right">Залишок</MudTh>
+        <MudTh>Стан</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="№">@context.Id</MudTd>
+        <MudTd DataLabel="Назва">@context.Name</MudTd>
+        <MudTd DataLabel="Модель">@context.Model</MudTd>
+        <MudTd DataLabel="Ціна" Style="text-align: right">@Fmt.Money(context.Price)</MudTd>
+        <MudTd DataLabel="Залишок" Style="text-align: right">@context.Quantity</MudTd>
+        <MudTd DataLabel="Стан">
+            <MudChip T="string" Size="Size.Small" Color="@(context.Enabled ? Color.Success : Color.Default)">@(context.Enabled ? "увімкнено" : "вимкнено")</MudChip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Товарів не знайдено.</MudText></NoRecordsContent>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="На сторінці:" InfoFormat="{first_item}–{last_item} з {all_items}" PageSizeOptions="new[] { 20, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<ProductListItem>? _table;
+    private IReadOnlyList<LookupItem> _categories = [];
+    private IReadOnlyList<LookupItem> _labels = [];
+    private string? _search;
+    private int? _categoryId;
+    private int? _labelId;
+    private bool? _enabled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categories = await Api.CategoriesAsync();
+        _labels = await Api.LabelsAsync();
+    }
+
+    private async Task<TableData<ProductListItem>> LoadAsync(TableState state, CancellationToken ct)
+    {
+        var page = await Api.ListAsync(new ProductFilter(_search, _categoryId, _labelId, _enabled, state.Page + 1, state.PageSize));
+        return new TableData<ProductListItem> { Items = page.Items, TotalItems = page.TotalCount };
+    }
+
+    private async Task SetAsync(Action change)
+    {
+        change();
+        if (_table is not null)
+            await _table.ReloadServerData();
+    }
+}

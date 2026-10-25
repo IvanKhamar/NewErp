@@ -1,0 +1,86 @@
+@page "/catalog/products/{Id:int}"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ProductsApi Api
+
+<PageTitle>@(_product?.Name ?? $"Товар {Id}") — NewErp</PageTitle>
+
+<MudLink Href="@ProductRoutes.List" Typo="Typo.body2">← Товари</MudLink>
+
+@if (_notFound)
+{
+    <MudText Class="mt-3" data-test="not-found">Товар №@Id не знайдено.</MudText>
+}
+else if (_product is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <div class="d-flex align-center gap-3 mb-3">
+        <MudText Typo="Typo.h4">@(string.IsNullOrWhiteSpace(_product.Name) ? $"Товар №{_product.Id}" : _product.Name)</MudText>
+        <MudChip T="string" Size="Size.Small" Color="@(_product.Enabled ? Color.Success : Color.Default)">@(_product.Enabled ? "увімкнено" : "вимкнено")</MudChip>
+        <MudSpacer />
+        <MudText Typo="Typo.h5">@Fmt.Money(_product.Price)</MudText>
+    </div>
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudSimpleTable Dense="true" Elevation="0" data-test="details">
+                    <tbody>
+                        <tr><td>№</td><td>@_product.Id</td></tr>
+                        <tr><td>Модель</td><td>@_product.Model</td></tr>
+                        <tr><td>Категорії</td><td>@Names(_product.Categories)</td></tr>
+                        <tr><td>Мітки</td><td>@Names(_product.Labels)</td></tr>
+                        <tr><td>Залишок усього</td><td>@_product.Quantity</td></tr>
+                        <tr><td>Змінено</td><td>@Fmt.Date(_product.DateModified)</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Залишки за розмірами оновлює виробництво з пошитого складу; опис, фото й нові товари — в адмінці OpenCart.
+                </MudText>
+                @if (_product.Sizes.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">У товару немає розмірів.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Elevation="0" data-test="sizes">
+                        <thead><tr><th>Розмір</th><th style="text-align: right">Залишок</th></tr></thead>
+                        <tbody>
+                            @foreach (var size in _product.Sizes)
+                            {
+                                <tr><td>@size.Name</td><td style="text-align: right">@size.Quantity</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProductCardDto? _product;
+    private bool _notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _notFound = false;
+            _product = await Api.GetAsync(Id);
+        }
+        catch (ApiException)
+        {
+            _notFound = true;
+        }
+    }
+
+    public static string Names(IReadOnlyList<LookupItem> items) => items.Count == 0 ? "—" : string.Join(", ", items.Select(i => i.Name));
+}
