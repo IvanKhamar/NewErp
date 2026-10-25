@@ -449,3 +449,60 @@ CREATE TABLE `dd_customer_history` (
   PRIMARY KEY (`customer_history_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
+
+-- Подарункові сертифікати (стандартні таблиці OpenCart з install/opencart.sql): магазин списує їх на оформленні,
+-- ERP створює й погашає в ручних замовленнях. Залишок = amount + SUM(dd_voucher_history.amount) (списання з мінусом).
+
+CREATE TABLE `dd_order_voucher` (
+  `order_voucher_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `voucher_id` int(11) NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `code` varchar(10) NOT NULL,
+  `from_name` varchar(64) NOT NULL,
+  `from_email` varchar(96) NOT NULL,
+  `to_name` varchar(64) NOT NULL,
+  `to_email` varchar(96) NOT NULL,
+  `voucher_theme_id` int(11) NOT NULL,
+  `message` text NOT NULL,
+  `amount` decimal(15,4) NOT NULL,
+  PRIMARY KEY (`order_voucher_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_voucher` (
+  `voucher_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `code` varchar(10) NOT NULL,
+  `from_name` varchar(64) NOT NULL,
+  `from_email` varchar(96) NOT NULL,
+  `to_name` varchar(64) NOT NULL,
+  `to_email` varchar(96) NOT NULL,
+  `voucher_theme_id` int(11) NOT NULL,
+  `message` text NOT NULL,
+  `amount` decimal(15,4) NOT NULL,
+  `status` tinyint(1) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`voucher_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_voucher_history` (
+  `voucher_history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `voucher_id` int(11) NOT NULL,
+  `order_id` int(11) NOT NULL,
+  `amount` decimal(15,4) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`voucher_history_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_voucher_theme` (
+  `voucher_theme_id` int(11) NOT NULL AUTO_INCREMENT,
+  `image` varchar(255) NOT NULL,
+  PRIMARY KEY (`voucher_theme_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_voucher_theme_description` (
+  `voucher_theme_id` int(11) NOT NULL,
+  `language_id` int(11) NOT NULL,
+  `name` varchar(32) NOT NULL,
+  PRIMARY KEY (`voucher_theme_id`,`language_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
