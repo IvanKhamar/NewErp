@@ -1,0 +1,194 @@
+@inject MarketingApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+@* Новий сертифікат або наявний з історією списань, SMS отримувачу й видаленням. Повертає Ok, якщо щось змінилося. *@
+<MudDialog>
+    <DialogContent>
+        @if (Id is not null && _voucher is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_code" Label="Код" MaxLength="10" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  HelperText="@(Id is null ? "Порожній — згенерується" : "")" data-test="code" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?" @bind-Value="_amount" Label="Сума, грн" Min="0" HideSpinButtons="true" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" data-test="amount" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_toName" Label="Кому" MaxLength="64" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_toEmail" Label="Email отримувача" MaxLength="96" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_fromName" Label="Від кого" MaxLength="64" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_fromEmail" Label="Email відправника" MaxLength="96" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_themeId" Label="Тема" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem T="int" Value="0">Без теми</MudSelectItem>
+                        @foreach (var theme in _themes)
+                        {
+                            <MudSelectItem T="int" Value="theme.Id">@theme.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex align-center">
+                    <MudSwitch T="bool" @bind-Value="_active" Color="Color.Primary" Label="Діє" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_message" Label="Побажання" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+
+            @if (_voucher is { } v)
+            {
+                <MudText Typo="Typo.h6" Class="mt-4">Залишок і списання</MudText>
+                <MudText Class="mb-2" data-test="balance">
+                    Залишок: @Fmt.Money(v.Balance)@(v.Usable ? "" : v.Active ? " (замовлення, в якому його купили, ще не оплачено)" : " (вимкнено)")
+                </MudText>
+                <MudSimpleTable Dense="true" Elevation="0" Outlined="true" data-test="history">
+                    <thead><tr><th>Замовлення</th><th>Покупець</th><th style="text-align: right">Сума</th><th>Коли</th></tr></thead>
+                    <tbody>
+                        @foreach (var h in v.History)
+                        {
+                            <tr>
+                                <td>@(h.OrderId == 0 ? "" : $"№{h.OrderId}")</td>
+                                <td>@h.Customer</td>
+                                <td style="text-align: right">@Fmt.Money(h.Amount)</td>
+                                <td>@Fmt.Date(h.Date)</td>
+                            </tr>
+                        }
+                        @if (v.History.Count == 0)
+                        {
+                            <tr><td colspan="4">Ще не використовували.</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                <MudText Typo="Typo.h6" Class="mt-4">SMS з кодом</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudTextField @bind-Value="_phone" Label="Телефон отримувача" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 260px"
+                                  data-test="phone" />
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Sms" OnClick="SendSmsAsync"
+                               Disabled="@(_busy || string.IsNullOrWhiteSpace(_phone))" data-test="send-sms">Надіслати SMS</MudButton>
+                </div>
+            }
+
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_voucher is { } voucher)
+        {
+            @* Сертифікат, яким уже платили, не видаляємо: лишається історія грошей. Його вимикають. *@
+            <MudButton Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="DeleteAsync" Disabled="@(_busy || voucher.History.Count > 0)"
+                       data-test="delete">Видалити</MudButton>
+            <MudSpacer />
+        }
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_busy" data-test="save">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    /// <summary>null — новий сертифікат.</summary>
+    [Parameter] public int? Id { get; set; }
+
+    private VoucherCardDto? _voucher;
+    private List<LookupItem> _themes = [];
+    private string _code = "";
+    private decimal? _amount;
+    private string _toName = "";
+    private string _toEmail = "";
+    private string _fromName = "";
+    private string _fromEmail = "";
+    private int _themeId;
+    private string _message = "";
+    private bool _active = true;
+    private string _phone = "";
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _themes = await Api.VoucherThemesAsync();
+            if (Id is { } id)
+            {
+                var v = await Api.VoucherAsync(id);
+                (_code, _amount, _toName, _toEmail, _fromName, _fromEmail, _themeId, _message, _active) =
+                    (v.Code, v.Amount, v.ToName, v.ToEmail, v.FromName, v.FromEmail, v.ThemeId, v.Message, v.Active);
+                _voucher = v;
+                await Dialog.SetTitleAsync($"Сертифікат {v.Code}");
+            }
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task SaveAsync() => await RunAsync(async () =>
+    {
+        var request = new SaveVoucherRequest(_code, _fromName, _fromEmail, _toName, _toEmail, _themeId, _message, _amount, _active);
+        var saved = Id is { } id ? await Api.UpdateVoucherAsync(id, request) : await Api.CreateVoucherAsync(request);
+        Snackbar.Add($"Сертифікат {saved.Code} збережено.", Severity.Success);
+        Dialog.Close(DialogResult.Ok(saved));
+    });
+
+    private async Task SendSmsAsync() => await RunAsync(async () =>
+    {
+        var result = await Api.SendVoucherSmsAsync(Id!.Value, _phone);
+        if (result.Sent)
+            Snackbar.Add("SMS надіслано.", Severity.Success);
+        else
+            Snackbar.Add($"SMS не надіслано: {result.Response}", Severity.Error);
+    });
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Видалити сертифікат?",
+            $"Сертифікат {_voucher!.Code} буде видалено, сайт його більше не прийме.", yesText: "Видалити", cancelText: "Залишити");
+        if (confirmed != true)
+            return;
+        await RunAsync(async () =>
+        {
+            await Api.DeleteVoucherAsync(Id!.Value);
+            Snackbar.Add("Сертифікат видалено.", Severity.Success);
+            Dialog.Close(DialogResult.Ok(true));
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

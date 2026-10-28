@@ -1,0 +1,87 @@
+@page "/marketing/vouchers"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject MarketingApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Подарункові сертифікати — NewErp</PageTitle>
+
+@* Як «Подарункові сертифікати» старого сайту: список із залишками; клік відкриває сертифікат. *@
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Подарункові сертифікати</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => OpenAsync(null)" data-test="add">
+        Новий сертифікат
+    </MudButton>
+</div>
+
+<MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Placeholder="Код або ім'я" Adornment="Adornment.Start"
+              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Variant="Variant.Outlined" Margin="Margin.Dense"
+              Class="mb-3" Style="max-width: 360px" />
+
+<MudTable T="VoucherCardDto" Items="_vouchers" Dense="true" Hover="true" Striped="true" Loading="_vouchers is null"
+          OnRowClick="row => OpenAsync(row.Item!.Id)" RowStyle="cursor: pointer" data-test="vouchers">
+    <HeaderContent>
+        <MudTh>Код</MudTh>
+        <MudTh>Кому</MudTh>
+        <MudTh>Від кого</MudTh>
+        <MudTh Style="text-align: right">Сума</MudTh>
+        <MudTh Style="text-align: right">Залишок</MudTh>
+        <MudTh>Стан</MudTh>
+        <MudTh>Створено</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Код">@context.Code</MudTd>
+        <MudTd DataLabel="Кому">@context.ToName</MudTd>
+        <MudTd DataLabel="Від кого">@context.FromName</MudTd>
+        <MudTd DataLabel="Сума" Style="text-align: right">@Fmt.Money(context.Amount)</MudTd>
+        <MudTd DataLabel="Залишок" Style="text-align: right">@Fmt.Money(context.Balance)</MudTd>
+        <MudTd DataLabel="Стан">
+            @{ var (name, color) = State(context); }
+            <StatusChip Name="@name" Color="@color" />
+        </MudTd>
+        <MudTd DataLabel="Створено">@Fmt.Date(context.CreatedAt)</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Сертифікатів немає.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<VoucherCardDto>? _vouchers;
+    private string _search = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>Стан сертифіката словом і кольором, як у Java-версії.</summary>
+    public static (string Name, string Color) State(VoucherCardDto v) =>
+        !v.Active ? ("вимкнено", "#9e9e9e")
+        : !v.Usable ? ("не оплачено", "#ff9800")
+        : v.Balance > 0 ? ("діє", "#4caf50")
+        : ("витрачено", "#9e9e9e");
+
+    private async Task SearchAsync(string? search)
+    {
+        _search = search ?? "";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _vouchers = await Api.VouchersAsync(_search);
+        }
+        catch (ApiException e)
+        {
+            _vouchers = [];
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task OpenAsync(int? id)
+    {
+        var dialog = await Dialogs.ShowAsync<VoucherDialog>(id is null ? "Новий подарунковий сертифікат" : "Сертифікат",
+            new DialogParameters<VoucherDialog> { { d => d.Id, id } }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+}

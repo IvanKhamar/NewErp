@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Net.Http.Json;
 
+using NewErp.Application.Common;
 using NewErp.Application.Marketing;
+using NewErp.Application.Sms;
 using NewErp.Domain.Marketing;
 
 namespace NewErp.Web.Api;
@@ -33,6 +35,29 @@ public sealed class MarketingApi(HttpClient http)
             query += "&to=" + t.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return "/marketing/contacts.csv?" + query;
     }
+
+    public Task<List<VoucherCardDto>> VouchersAsync(string search) =>
+        GetAsync<List<VoucherCardDto>>($"/marketing/vouchers?search={Uri.EscapeDataString(search)}");
+
+    public Task<VoucherCardDto> VoucherAsync(int id) => GetAsync<VoucherCardDto>($"/marketing/vouchers/{id}");
+
+    public Task<List<LookupItem>> VoucherThemesAsync() => GetAsync<List<LookupItem>>("/marketing/vouchers/themes");
+
+    public async Task<VoucherCardDto> CreateVoucherAsync(SaveVoucherRequest request) =>
+        await ReadAsync<VoucherCardDto>(await http.PostAsJsonAsync("/marketing/vouchers", request));
+
+    public async Task<VoucherCardDto> UpdateVoucherAsync(int id, SaveVoucherRequest request) =>
+        await ReadAsync<VoucherCardDto>(await http.PutAsJsonAsync($"/marketing/vouchers/{id}", request));
+
+    public async Task DeleteVoucherAsync(int id)
+    {
+        var response = await http.DeleteAsync($"/marketing/vouchers/{id}");
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(await ApiErrors.ReadAsync(response));
+    }
+
+    public async Task<SmsSendResult> SendVoucherSmsAsync(int id, string phone) =>
+        await ReadAsync<SmsSendResult>(await http.PostAsJsonAsync($"/marketing/vouchers/{id}/sms", new SendVoucherSmsRequest(phone)));
 
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
