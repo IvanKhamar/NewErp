@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 
 using NewErp.Application.Common;
 using NewErp.Domain.Common;
@@ -11,7 +10,7 @@ namespace NewErp.Application.Delivery;
 /// Накладні за кордон через Nova Post International, як вкладка «Міжнародна» діалогу ТТН старого сайту. Документ лежить разом
 /// із внутрішніми (dd_novaposhta_document) з carrier = international; видалення — через ShipmentService. Як у Java-версії.
 /// </summary>
-public sealed partial class InternationalShipmentService(IShipmentRepository repository, INovaPostInternationalClient client, TimeProvider clock)
+public sealed class InternationalShipmentService(IShipmentRepository repository, INovaPostInternationalClient client, TimeProvider clock)
 {
     /// <summary>Запис відправника (erp_shipment_sender) міжнародної накладної: відправник один, з налаштувань.</summary>
     public const string SenderId = "international";
@@ -33,7 +32,7 @@ public sealed partial class InternationalShipmentService(IShipmentRepository rep
     public static IReadOnlyList<CountryDto> Countries()
     {
         var comparer = StringComparer.Create(Ukrainian, ignoreCase: false);
-        return Regions().Where(r => r.Code != "UA").OrderBy(r => r.Name, comparer).Select(r => new CountryDto(r.Code, r.Name)).ToList();
+        return CountryNames.All.Where(c => c.Code != "UA").OrderBy(c => c.Ukrainian, comparer).Select(c => new CountryDto(c.Code, c.Ukrainian)).ToList();
     }
 
     public async Task<IReadOnlyList<HsCodeDto>> HsCodesAsync(string? keyword, string? countryCode, CancellationToken ct) =>
@@ -65,33 +64,7 @@ public sealed partial class InternationalShipmentService(IShipmentRepository rep
         if (string.IsNullOrWhiteSpace(country))
             return "";
         var name = country.Trim();
-        return Regions().FirstOrDefault(r => r.Code != "UA" && (r.Code.Equals(name, StringComparison.OrdinalIgnoreCase)
-            || r.Name.Equals(name, StringComparison.OrdinalIgnoreCase) || r.EnglishName.Equals(name, StringComparison.OrdinalIgnoreCase)))?.Code ?? "";
+        return CountryNames.All.FirstOrDefault(c => c.Code != "UA" && (c.Code.Equals(name, StringComparison.OrdinalIgnoreCase)
+            || c.Ukrainian.Equals(name, StringComparison.OrdinalIgnoreCase) || c.English.Equals(name, StringComparison.OrdinalIgnoreCase)))?.Code ?? "";
     }
-
-    private sealed record Region(string Code, string Name, string EnglishName);
-
-    // Назву RegionInfo дає мовою поточної культури інтерфейсу, тож на час читання ставимо українську.
-    private static List<Region> Regions()
-    {
-        var previous = CultureInfo.CurrentUICulture;
-        CultureInfo.CurrentUICulture = Ukrainian;
-        try
-        {
-            return CultureInfo.GetCultures(CultureTypes.SpecificCultures)
-                .Select(c => { try { return new RegionInfo(c.Name); } catch (ArgumentException) { return null; } })
-                .OfType<RegionInfo>()
-                .Where(r => TwoLetters().IsMatch(r.TwoLetterISORegionName))
-                .DistinctBy(r => r.TwoLetterISORegionName)
-                .Select(r => new Region(r.TwoLetterISORegionName, r.DisplayName, r.EnglishName))
-                .ToList();
-        }
-        finally
-        {
-            CultureInfo.CurrentUICulture = previous;
-        }
-    }
-
-    [GeneratedRegex("^[A-Z]{2}$")]
-    private static partial Regex TwoLetters();
 }
