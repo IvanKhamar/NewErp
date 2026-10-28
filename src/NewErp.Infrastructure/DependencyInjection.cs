@@ -92,6 +92,14 @@ public static class DependencyInjection
             services.AddSingleton<INovaPoshtaClient>(new StubNovaPoshtaClient(novaPoshta.FakeDocuments));
         else
             services.AddSingleton<INovaPoshtaClient>(_ => new NovaPoshtaClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, novaPoshta));
+        // Nova Post International (накладні за кордон) — так само: справжній клієнт лише з ключем (NovaPostInternational:ApiKey).
+        var international = configuration.GetSection(NovaPostInternationalOptions.SectionName).Get<NovaPostInternationalOptions>()
+            ?? new NovaPostInternationalOptions();
+        if (international.Configured)
+            services.AddSingleton<INovaPostInternationalClient>(_ =>
+                new NovaPostInternationalClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, international));
+        else
+            services.AddSingleton<INovaPostInternationalClient>(new StubNovaPostInternationalClient(international.FakeDocuments));
         // Checkbox і ПриватБанк — так само: справжній клієнт лише з ключами в user-secrets, інакше заглушка.
         var checkbox = configuration.GetSection(CheckboxOptions.SectionName).Get<CheckboxOptions>() ?? new CheckboxOptions();
         if (checkbox.Cashiers.Any(c => c.Login != "" && c.Password != ""))

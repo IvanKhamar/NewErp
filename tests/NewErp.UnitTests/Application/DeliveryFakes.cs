@@ -88,6 +88,9 @@ internal sealed class FakeShipmentRepository : IShipmentRepository
     public Task<OrderShippingInfo?> GetOrderShippingInfoAsync(int orderId, CancellationToken ct) =>
         Task.FromResult(Orders.GetValueOrDefault(orderId));
 
+    public Task<InternationalOrderInfo?> GetInternationalOrderInfoAsync(int orderId, CancellationToken ct) =>
+        Task.FromResult<InternationalOrderInfo?>(null);
+
     public void Add(ShipmentDocument document, string senderId, int userId, DateTime createdAt) =>
         Stored.Add(new StoredShipment(document, senderId));
 

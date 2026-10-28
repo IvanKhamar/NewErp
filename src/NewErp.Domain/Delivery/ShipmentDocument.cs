@@ -38,6 +38,9 @@ public class ShipmentDocument
 
     public const string NovaPoshta = "novaposhta";
 
+    /// <summary>Nova Post International (за кордон); внутрішній API їх не відстежує.</summary>
+    public const string International = "international";
+
     private ShipmentDocument() { }
 
     /// <param name="documentRef">Ref документа в API Нової Пошти (потрібен для друку й видалення); якщо невідомий — номер ТТН.</param>

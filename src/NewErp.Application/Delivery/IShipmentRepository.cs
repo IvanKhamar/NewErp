@@ -21,6 +21,9 @@ public interface IShipmentRepository
     /// <returns>null, якщо замовлення немає.</returns>
     Task<OrderShippingInfo?> GetOrderShippingInfoAsync(int orderId, CancellationToken ct);
 
+    /// <summary>Дані для міжнародної форми: адреса доставки за кордоном і рядки замовлення; null, якщо замовлення немає.</summary>
+    Task<InternationalOrderInfo?> GetInternationalOrderInfoAsync(int orderId, CancellationToken ct);
+
     /// <summary>Нова ТТН і відправник, від якого її створено (збережеться разом із SaveChangesAsync).</summary>
     void Add(ShipmentDocument document, string senderId, int userId, DateTime createdAt);
 

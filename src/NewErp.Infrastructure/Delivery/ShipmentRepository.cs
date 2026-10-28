@@ -24,7 +24,8 @@ public sealed class ShipmentRepository(ErpDbContext db) : IShipmentRepository
         var rows = await (
             from d in db.ShipmentDocuments
             join o in db.DdOrders on d.OrderId equals o.OrderId
-            where d.Number != "" && !finalCodes.Contains(d.StatusCode)
+            // Накладні за кордон внутрішньому API невідомі: питати про них — лише збирати помилки.
+            where d.Number != "" && !finalCodes.Contains(d.StatusCode) && d.Carrier != ShipmentDocument.International
             select new { Document = d, o.Telephone }
         ).ToListAsync(ct);
         return rows.Select(r => new OpenShipment(r.Document, r.Telephone)).ToList();
@@ -73,6 +74,30 @@ public sealed class ShipmentRepository(ErpDbContext db) : IShipmentRepository
             select new { Document = d, SenderId = s == null ? null : s.SenderId }
         ).FirstOrDefaultAsync(ct);
         return row is null ? null : new StoredShipment(row.Document, row.SenderId);
+    }
+
+    public async Task<InternationalOrderInfo?> GetInternationalOrderInfoAsync(int orderId, CancellationToken ct)
+    {
+        var lines = await db.DdOrderProducts.AsNoTracking()
+            .Where(p => p.OrderId == orderId)
+            .OrderBy(p => p.OrderProductId)
+            .Select(p => new InternationalOrderLine(p.Name, p.Quantity, p.Total))
+            .ToListAsync(ct);
+        // Як для внутрішньої форми: адреса доставки, а якщо її не заповнено, то покупець.
+        var o = await db.DdOrders.AsNoTracking()
+            .Where(x => x.OrderId == orderId)
+            .Select(x => new
+            {
+                FirstName = x.ShippingFirstname != "" ? x.ShippingFirstname : x.Firstname,
+                LastName = x.ShippingLastname != "" ? x.ShippingLastname : x.Lastname,
+                x.Telephone, x.Email, x.ShippingCountry, x.ShippingZone, x.ShippingCity, x.ShippingPostcode,
+                x.ShippingAddress1, x.ShippingAddress2, x.Total, x.CurrencyCode,
+            })
+            .FirstOrDefaultAsync(ct);
+        return o is null
+            ? null
+            : new InternationalOrderInfo(o.FirstName, o.LastName, o.Telephone, o.Email, o.ShippingCountry, o.ShippingZone, o.ShippingCity,
+                o.ShippingPostcode, $"{o.ShippingAddress1} {o.ShippingAddress2}".Trim(), o.Total, o.CurrencyCode, lines);
     }
 
     public Task<OrderShippingInfo?> GetOrderShippingInfoAsync(int orderId, CancellationToken ct) =>

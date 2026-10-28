@@ -144,6 +144,33 @@ public class OrderPagesTests : WebTestContext
     }
 
     [Fact]
+    public void Card_CreatesInternationalWaybill_AndHidesNovaPoshtaPrinting()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        var anna = new InternationalShipment.RecipientInfo("Anna", "Kowalska", "48600100200", "", "PL", "", "Kraków", "Floriańska", "", "", "31-019");
+        Api.Respond("/orders/291/shipment/international/form", HttpStatusCode.OK, new InternationalFormDto(anna, new InternationalShipment.TermsInfo(),
+            [new InternationalShipment.Item("Сукня лляна", "", "", 0, 1m, 1500m)], 1500m, "UAH", SeatPreset.All, CanCreate: true, Test: true));
+        Api.Respond("/delivery/international/countries", HttpStatusCode.OK, new List<CountryDto> { new("PL", "Польща") });
+        Api.Respond("/orders/291/shipment/international", HttpStatusCode.OK, new ShipmentDto(
+            6, 291, ShipmentDocument.International, "TEST0000000001", 1500, "", 0, ShipmentTone.Info, false, "", false, null, null, null), HttpMethod.Post);
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForElement("[data-test=create-international]").Click();
+
+        provider.WaitForAssertion(() => Assert.NotNull(provider.Find("[data-test=fake-warning]")));
+        provider.Find("[data-test=create]").Click();
+
+        page.WaitForAssertion(() => Assert.Equal("TEST0000000001", page.Find("[data-test=ttn]").TextContent.Trim()));
+        Assert.Contains("Nova Post International", page.Find("[data-test=carrier]").TextContent);
+        Assert.DoesNotContain("Друк ТТН", page.Markup);
+        var body = Api.Bodies["/orders/291/shipment/international"];
+        Assert.Contains("\"countryCode\":\"PL\"", body);
+        Assert.Contains("\"incoterm\":\"DAP\"", body);
+        Assert.Contains("\"parcels\":[{\"weight\":1,\"width\":31", body); // типова коробка «маленька»
+    }
+
+    [Fact]
     public void Card_IssuesCheque_AndShowsLinkedPayments()
     {
         Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));

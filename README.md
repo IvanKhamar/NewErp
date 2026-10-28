@@ -132,6 +132,16 @@ dotnet user-secrets set "NovaPoshta:DropoffPoints:0:AddressRef" "..." --project 
 ```
 Трекінг і довідник беруть ключ типового відправника або окремий `NovaPoshta:ApiKey`. Якщо у відправника бракує якогось поля, API повідомить про це при першому зверненні до Нової Пошти.
 
+**Nova Post International (необов'язково).** Накладні за кордон. Без ключа працює заглушка (у розробці створює тестові накладні з номером на TEST). `Sandbox: true` шле справжні запити на api-stage.novapost.com. Відправник — компанія магазину; з кодом ЄДРПОУ API бере цю ж адресу як адресу реєстрації:
+```
+dotnet user-secrets set "NovaPostInternational:ApiKey" "..." --project src/NewErp.Api
+dotnet user-secrets set "NovaPostInternational:Sandbox" "true" --project src/NewErp.Api
+dotnet user-secrets set "NovaPostInternational:Sender:CompanyTin" "..." --project src/NewErp.Api
+dotnet user-secrets set "NovaPostInternational:Sender:CompanyName" "ТОВ ..." --project src/NewErp.Api
+dotnet user-secrets set "NovaPostInternational:Sender:Phone" "380..." --project src/NewErp.Api
+```
+Інші поля відправника: `Name`, `Email`, `City`, `Street`, `Building`, `Flat`, `PostCode`.
+
 **Checkbox і ПриватБанк (необов'язково).** Без ключів працюють заглушки. Ключі касира Checkbox прив'язуються до касира NewErp за його id, рахунок ПриватБанку — це пара id + токен Автоклієнта:
 
 ```

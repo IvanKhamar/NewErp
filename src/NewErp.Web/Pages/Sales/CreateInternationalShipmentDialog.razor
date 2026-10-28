@@ -1,0 +1,245 @@
+@inject OrdersApi Api
+
+@* Накладна за кордон (Nova Post International), вкладка «Міжнародна» старого сайту; повертає Ok(ShipmentDto).
+   Усі перевірки на сервері (InternationalShipment): він перелічує все пропущене одразу. *@
+<MudDialog>
+    <DialogContent>
+        @if (_form is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @if (!_form.CanCreate)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Ключ API Nova Post International не задано, тож накладну створити не можна.</MudAlert>
+            }
+            else if (_form.Test)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" data-test="fake-warning">
+                    Ключа API немає: створиться лише тестова накладна (номер на TEST), у Nova Post її не буде.
+                </MudAlert>
+            }
+
+            <MudText Typo="Typo.subtitle2">Отримувач</MudText>
+            <div class="d-flex flex-wrap gap-3 mb-2">
+                <MudTextField @bind-Value="_lastName" Label="Прізвище" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_firstName" Label="Ім'я" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_phone" Label="Телефон" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_email" Label="Email" Margin="Margin.Dense" />
+            </div>
+            <div class="d-flex flex-wrap gap-3 mb-2">
+                <MudSelect T="string" @bind-Value="_country" Label="Країна" Margin="Margin.Dense" Style="min-width: 200px" data-test="country">
+                    @foreach (var country in _countries)
+                    {
+                        <MudSelectItem T="string" Value="country.Code">@country.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_region" Label="Штат / область" Margin="Margin.Dense" Required="NeedsRegion"
+                              HelperText="Обов'язково для США, Ірландії, Канади" data-test="region" />
+                <MudTextField @bind-Value="_city" Label="Населений пункт" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_postCode" Label="Індекс" Margin="Margin.Dense" />
+            </div>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <MudTextField @bind-Value="_street" Label="Вулиця" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_building" Label="Будинок" Margin="Margin.Dense" data-test="building" />
+                <MudTextField @bind-Value="_flat" Label="Квартира" Margin="Margin.Dense" />
+            </div>
+
+            <MudText Typo="Typo.subtitle2">Митниця</MudText>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                <MudSelect T="string" @bind-Value="_incoterm" Label="Умови поставки" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("DAP")">DAP</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("DDP")">DDP</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_payerFeesCustoms" Label="Мито сплачує" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("Recipient")">Recipient</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Sender")">Sender</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_exportReason" Label="Причина експорту" Margin="Margin.Dense">
+                    @foreach (var reason in new[] { "Selling", "Gift", "Sample", "Return" })
+                    {
+                        <MudSelectItem T="string" Value="reason">@reason</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_cargoCategory" Label="Категорія вантажу" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("parcel")">parcel</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("documents")">documents</MudSelectItem>
+                </MudSelect>
+                <MudNumericField @bind-Value="_declaredCost" Label="@($"Декларована вартість, {_form.Currency}")" Margin="Margin.Dense" Min="0" Format="0.##" />
+            </div>
+
+            <MudText Typo="Typo.subtitle2">Товари</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Для кожного товару: код УКТЗЕД (почніть вводити назву — з'являться підказки), англійська назва і вага всього рядка в грамах.
+            </MudText>
+            <MudSimpleTable Dense="true" Elevation="0" Class="mb-3" data-test="items">
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr>
+                            <td style="min-width: 14rem">@item.Name × @item.Amount, @Fmt.Money(item.Cost)</td>
+                            <td style="min-width: 18rem">
+                                <MudAutocomplete T="HsCodeDto" Value="item.HsCode" ValueChanged="code => PickHsCode(item, code)" SearchFunc="SearchHsCodesAsync"
+                                                 ToStringFunc="@(c => c is null ? "" : c.Label == "" ? c.HsCode : $"{c.HsCode} — {c.Label}")"
+                                                 CoerceValue="true" MinCharacters="2" DebounceInterval="300" Label="Код УКТЗЕД" Margin="Margin.Dense" />
+                            </td>
+                            <td><MudTextField @bind-Value="item.NameEng" Label="Англійська назва" Margin="Margin.Dense" /></td>
+                            <td style="max-width: 8rem"><MudNumericField @bind-Value="item.WeightGrams" Label="Вага, г" Margin="Margin.Dense" Min="0" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+
+            <div class="d-flex align-center flex-wrap gap-2 mb-1">
+                <MudText Typo="Typo.subtitle2">Місця</MudText>
+                <MudSpacer />
+                @foreach (var preset in _form.SeatPresets)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => AddSeat(preset.Seat)">+ @preset.Name</MudButton>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => AddSeat(new ShipmentSeat(1, 0, 0, 0))">+ Інша</MudButton>
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Одне місце важить стільки, скільки товари в ньому; вагу в кг беремо, лише коли місць кілька.</MudText>
+            <MudSimpleTable Dense="true" Elevation="0" data-test="seats">
+                <thead><tr><th>Вага, кг</th><th>Ширина, см</th><th>Довжина, см</th><th>Висота, см</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var seat in _seats)
+                    {
+                        <tr>
+                            <td><MudNumericField @bind-Value="seat.Weight" Margin="Margin.Dense" Min="0" Format="0.###" /></td>
+                            <td><MudNumericField @bind-Value="seat.Width" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudNumericField @bind-Value="seat.Length" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudNumericField @bind-Value="seat.Height" Margin="Margin.Dense" Min="0" /></td>
+                            <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Прибрати місце" OnClick="() => _seats.Remove(seat)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3" data-test="error">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateAsync" Disabled="@(_busy || _form is not { CanCreate: true })"
+                   data-test="create">Створити накладну</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    private InternationalFormDto? _form;
+    private IReadOnlyList<CountryDto> _countries = [];
+    private string _firstName = "";
+    private string _lastName = "";
+    private string _phone = "";
+    private string _email = "";
+    private string? _country;
+    private string _region = "";
+    private string _city = "";
+    private string _street = "";
+    private string _building = "";
+    private string _flat = "";
+    private string _postCode = "";
+    private string _incoterm = "DAP";
+    private string _payerFeesCustoms = "Recipient";
+    private string _exportReason = "Selling";
+    private string _cargoCategory = "parcel";
+    private decimal _declaredCost;
+    private List<ItemRow> _items = [];
+    private List<SeatRow> _seats = [];
+    private string? _error;
+    private bool _busy;
+
+    private bool NeedsRegion => _country is not null && InternationalShipment.RegionRequired.Contains(_country);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var form = await Api.InternationalFormAsync(OrderId);
+            _countries = await Api.CountriesAsync();
+            var r = form.Recipient;
+            (_firstName, _lastName, _phone, _email) = (r.FirstName ?? "", r.LastName ?? "", r.Phone ?? "", r.Email ?? "");
+            _country = string.IsNullOrEmpty(r.CountryCode) ? null : r.CountryCode;
+            (_region, _city, _street, _postCode) = (r.Region ?? "", r.City ?? "", r.Street ?? "", r.PostCode ?? "");
+            (_incoterm, _payerFeesCustoms, _exportReason, _cargoCategory) =
+                (form.Terms.Incoterm, form.Terms.PayerFeesCustoms, form.Terms.ExportReason, form.Terms.CargoCategory);
+            _declaredCost = form.DeclaredCost;
+            _items = form.Items.Select(i => new ItemRow(i)).ToList();
+            _seats = [new SeatRow(form.SeatPresets[0].Seat)];
+            _form = form;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task<IEnumerable<HsCodeDto>> SearchHsCodesAsync(string search, CancellationToken ct)
+    {
+        var found = await Api.HsCodesAsync(search, _country ?? "");
+        // Код, який знайшовся не в підказках, теж приймаємо: як ввели.
+        return found.Count > 0 || string.IsNullOrWhiteSpace(search) ? found : [new HsCodeDto(search.Trim(), "", "")];
+    }
+
+    // Підказка заповнює англійську назву, якщо її ще не ввели.
+    private static void PickHsCode(ItemRow item, HsCodeDto? code)
+    {
+        item.HsCode = code;
+        if (code is { NameEng: not "" } && string.IsNullOrWhiteSpace(item.NameEng))
+            item.NameEng = code.NameEng;
+    }
+
+    private void AddSeat(ShipmentSeat seat) => _seats.Add(new SeatRow(seat));
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var request = new CreateInternationalShipmentRequest(
+                new InternationalShipment.RecipientInfo(_firstName, _lastName, _phone, _email, _country, _region, _city, _street, _building, _flat, _postCode),
+                new InternationalShipment.TermsInfo(_incoterm, _exportReason, _payerFeesCustoms, _cargoCategory),
+                _items.Select(i => i.ToItem()).ToList(), _seats.Select(s => s.ToSeat()).ToList(), _declaredCost, _form!.Currency);
+            Dialog.Close(DialogResult.Ok(await Api.CreateInternationalShipmentAsync(OrderId, request)));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Рядок замовлення: назва й кількість — із замовлення, митні поля вводять (підказка заповнює англійську назву).</summary>
+    private sealed class ItemRow(InternationalShipment.Item item)
+    {
+        public string Name { get; } = item.Name ?? "";
+        public decimal Amount { get; } = item.Amount ?? 1;
+        public decimal Cost { get; } = item.Cost ?? 0;
+        public HsCodeDto? HsCode { get; set; }
+        public string NameEng { get; set; } = item.NameEng ?? "";
+        public int WeightGrams { get; set; } = item.WeightGrams;
+        public InternationalShipment.Item ToItem() => new(Name, NameEng, HsCode?.HsCode ?? "", WeightGrams, Amount, Cost);
+    }
+
+    /// <summary>Рядок місця, який можна редагувати (ShipmentSeat — незмінний record).</summary>
+    private sealed class SeatRow(ShipmentSeat seat)
+    {
+        public decimal Weight { get; set; } = seat.Weight;
+        public decimal Width { get; set; } = seat.Width;
+        public decimal Length { get; set; } = seat.Length;
+        public decimal Height { get; set; } = seat.Height;
+        public ShipmentSeat ToSeat() => new(Weight, Width, Length, Height);
+    }
+}
