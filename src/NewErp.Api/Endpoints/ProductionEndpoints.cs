@@ -96,6 +96,9 @@ public static class ProductionEndpoints
             .WithSummary("План пошиву: скільки кожного розміру пошити й розкроїти для активних замовлень (Production:PlanStatusIds); "
                 + "onlyToSew=false — також розміри, яких вистачає");
 
+        production.MapGet("/plan/materials", (PlanMaterialsService service, CancellationToken ct) => service.GetAsync(ct))
+            .WithSummary("Розхідники для плану пошиву: скільки треба на крій і пошив, залишок, замовлене в постачальників і нестача");
+
         production.MapGet("/log", (IProductionRepository repo, [AsParameters] ProductionLogFilter filter, CancellationToken ct) =>
             repo.ListLogAsync(filter, ct))
             .WithSummary("Журнал крою й пошиву (stage = cut або sewn), нові записи першими");
