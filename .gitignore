@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Database dumps (a copy of the real shop holds real customers): never in the repo.
+*.sql.gz
+/dumps/

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NewErp.Api\NewErp.Api.csproj" />
+    <ProjectReference Include="..\..\tools\NewErp.SchemaCheck\NewErp.SchemaCheck.csproj" />
   </ItemGroup>
 
 </Project>
