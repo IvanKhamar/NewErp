@@ -184,6 +184,8 @@ public class NewOrderServiceTests
             Replaced = (draft, lines);
             return Task.CompletedTask;
         }
+
+        public Task<decimal> VoucherPaidAsync(int orderId, CancellationToken ct) => Task.FromResult(0m);
     }
 
     private sealed class RecordingHandler(List<string> calls) : IOrderStatusHandler

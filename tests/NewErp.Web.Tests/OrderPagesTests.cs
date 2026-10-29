@@ -80,7 +80,8 @@ public class OrderPagesTests : WebTestContext
         page.WaitForAssertion(() => Assert.Equal("20450000000291", page.Find("[data-test=ttn]").TextContent.Trim()));
         Assert.Contains("mud-chip-color-success", page.Find("[data-test=shipment-status]").ClassName);
 
-        var text = page.FindComponent<MudBlazor.MudTextField<string>>();
+        // На картці кілька текстових полів (код сертифіката теж), тож беремо саме поле SMS.
+        var text = page.FindComponents<MudBlazor.MudTextField<string>>().Single(t => t.Instance.Label == "Текст");
         page.InvokeAsync(() => text.Instance.ValueChanged.InvokeAsync("Ваша ТТН 20450000000007"));
         page.Find("[data-test=send-sms]").Click();
 

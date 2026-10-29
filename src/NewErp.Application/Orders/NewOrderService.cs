@@ -1,5 +1,6 @@
 using NewErp.Application.Common;
 using NewErp.Domain.Common;
+using NewErp.Domain.Marketing;
 using NewErp.Domain.Orders;
 
 namespace NewErp.Application.Orders;
@@ -88,9 +89,17 @@ public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, Or
         var products = (await store.GetProductsAsync(lines.Select(l => l.ProductId).Distinct().ToList(), ct)).ToDictionary(p => p.Id);
         var records = lines.Select(line => ToRecord(line, products)).ToList();
 
+        // Списаний у замовленні сертифікат лишається: нова сума має покрити і його, і завдаток.
+        var voucher = await store.VoucherPaidAsync(orderId, ct);
+        var total = draft.Total - voucher;
+        if (total < 0)
+            throw new DomainException($"Сума замовлення стала меншою за оплату сертифікатом ({GiftVoucher.Plain(voucher)} грн). Спершу зніміть сертифікат.");
+        if (draft.Prepayment > total)
+            throw new DomainException("Сума завдатку не може перевищувати суму замовлення.");
+
         var warnings = await orderService.ReapplyStatusAsync(
             orderId, current.StatusId, () => store.ReplaceLinesAsync(orderId, draft, records, Now(), ct), userId, ct);
-        return new UpdateOrderCompositionResult(draft.Total, warnings);
+        return new UpdateOrderCompositionResult(total, warnings);
     }
 
     private static NewOrderLineRecord ToRecord(OrderDraftLine line, Dictionary<int, ProductPickDto> products)

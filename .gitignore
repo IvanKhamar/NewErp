@@ -484,3 +484,12 @@ $RECYCLE.BIN/
 # Database dumps (a copy of the real shop holds real customers): never in the repo.
 *.sql.gz
 /dumps/
+
+# Secrets never go into the repo (it is public): keys and certificates, local config overrides, env files.
+.env.*
+secrets.json
+appsettings.*.local.json
+*.pfx
+*.p12
+*.pem
+*.key
