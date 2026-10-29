@@ -5,6 +5,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 
 using NewErp.Application.Auth;
+using NewErp.Web.Api;
 
 namespace NewErp.Web.Auth;
 
@@ -31,7 +32,9 @@ public sealed class ApiAuthenticationStateProvider(HttpClient http) : Authentica
         var response = await http.PostAsJsonAsync("/auth/login", request);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             return null;
-        response.EnsureSuccessStatusCode();
+        // Наприклад, 429 після кількох невдалих спроб: людині показуємо пояснення сервера, а не «сервер недоступний».
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(await ApiErrors.ReadAsync(response));
 
         var user = await response.Content.ReadFromJsonAsync<CurrentUser>();
         SetUser(user);
