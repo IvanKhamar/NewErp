@@ -19,7 +19,7 @@ public static class Policies
 
 public static class AuthSetup
 {
-    public static IServiceCollection AddErpAuth(this IServiceCollection services)
+    public static IServiceCollection AddErpAuth(this IServiceCollection services, IHostEnvironment environment)
     {
         // Після POST /auth/login сервер видає зашифровану cookie, і браузер сам надсилає її з кожним запитом.
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -28,6 +28,10 @@ public static class AuthSetup
                 options.Cookie.Name = "newerp.auth";
                 options.Cookie.HttpOnly = true; // JavaScript на сторінці не може прочитати cookie
                 options.Cookie.SameSite = SameSiteMode.Strict; // чужі сайти не надішлють запит від імені користувача (захист від CSRF)
+                // На сервері cookie їде лише через HTTPS. Локально й у тестах — ще й через http://localhost.
+                options.Cookie.SecurePolicy = environment.IsDevelopment() || environment.IsEnvironment("Testing")
+                    ? CookieSecurePolicy.SameAsRequest
+                    : CookieSecurePolicy.Always;
                 options.ExpireTimeSpan = TimeSpan.FromHours(8);
                 options.SlidingExpiration = true; // поки користувач працює, сесія подовжується
 

@@ -231,6 +231,7 @@ else
                 </MudPaper>
                 <LiqPayPanel OrderId="Id" Total="_order.Total" />
             </AuthorizeView>
+            <VoucherPanel OrderId="Id" OnChanged="LoadAsync" />
 
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">SMS клієнту</MudText>

@@ -98,6 +98,14 @@ public partial class ErpDbContext : DbContext
 
     public virtual DbSet<DdUser> DdUsers { get; set; }
 
+    public virtual DbSet<DdVoucher> DdVouchers { get; set; }
+
+    public virtual DbSet<DdVoucherHistory> DdVoucherHistories { get; set; }
+
+    public virtual DbSet<DdVoucherTheme> DdVoucherThemes { get; set; }
+
+    public virtual DbSet<DdVoucherThemeDescription> DdVoucherThemeDescriptions { get; set; }
+
     public virtual DbSet<DdWarehouse> DdWarehouses { get; set; }
 
     public virtual DbSet<ErpOrderManager> ErpOrderManagers { get; set; }
@@ -1219,6 +1227,84 @@ public partial class ErpDbContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(20)
                 .HasColumnName("username");
+        });
+
+        modelBuilder.Entity<DdVoucher>(entity =>
+        {
+            entity.HasKey(e => e.VoucherId).HasName("PRIMARY");
+
+            entity.ToTable("dd_voucher");
+
+            entity.Property(e => e.VoucherId).HasColumnName("voucher_id");
+            entity.Property(e => e.Amount)
+                .HasPrecision(15, 4)
+                .HasColumnName("amount");
+            entity.Property(e => e.Code)
+                .HasMaxLength(10)
+                .HasColumnName("code");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.FromEmail)
+                .HasMaxLength(96)
+                .HasColumnName("from_email");
+            entity.Property(e => e.FromName)
+                .HasMaxLength(64)
+                .HasColumnName("from_name");
+            entity.Property(e => e.Message)
+                .HasColumnType("text")
+                .HasColumnName("message");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.ToEmail)
+                .HasMaxLength(96)
+                .HasColumnName("to_email");
+            entity.Property(e => e.ToName)
+                .HasMaxLength(64)
+                .HasColumnName("to_name");
+            entity.Property(e => e.VoucherThemeId).HasColumnName("voucher_theme_id");
+        });
+
+        modelBuilder.Entity<DdVoucherHistory>(entity =>
+        {
+            entity.HasKey(e => e.VoucherHistoryId).HasName("PRIMARY");
+
+            entity.ToTable("dd_voucher_history");
+
+            entity.Property(e => e.VoucherHistoryId).HasColumnName("voucher_history_id");
+            entity.Property(e => e.Amount)
+                .HasPrecision(15, 4)
+                .HasColumnName("amount");
+            entity.Property(e => e.DateAdded)
+                .HasColumnType("datetime")
+                .HasColumnName("date_added");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.VoucherId).HasColumnName("voucher_id");
+        });
+
+        modelBuilder.Entity<DdVoucherTheme>(entity =>
+        {
+            entity.HasKey(e => e.VoucherThemeId).HasName("PRIMARY");
+
+            entity.ToTable("dd_voucher_theme");
+
+            entity.Property(e => e.VoucherThemeId).HasColumnName("voucher_theme_id");
+            entity.Property(e => e.Image)
+                .HasMaxLength(255)
+                .HasColumnName("image");
+        });
+
+        modelBuilder.Entity<DdVoucherThemeDescription>(entity =>
+        {
+            entity.HasKey(e => new { e.VoucherThemeId, e.LanguageId }).HasName("PRIMARY");
+
+            entity.ToTable("dd_voucher_theme_description");
+
+            entity.Property(e => e.VoucherThemeId).HasColumnName("voucher_theme_id");
+            entity.Property(e => e.LanguageId).HasColumnName("language_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(32)
+                .HasColumnName("name");
         });
 
         modelBuilder.Entity<DdWarehouse>(entity =>

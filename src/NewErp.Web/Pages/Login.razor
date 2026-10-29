@@ -47,6 +47,10 @@
             // Тимчасовий пароль від адміна треба змінити до того, як працювати далі.
             Navigation.NavigateTo(user.MustChangePassword ? "change-password" : SafeReturnUrl());
         }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
         catch (HttpRequestException)
         {
             _error = "Сервер недоступний. Спробуйте ще раз.";

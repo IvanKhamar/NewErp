@@ -2,6 +2,7 @@
 using NewErp.Api.Auth;
 using NewErp.Api.Endpoints;
 using NewErp.Application;
+using NewErp.Application.Auth;
 using NewErp.Application.Catalog;
 using NewErp.Application.Competitors;
 using NewErp.Application.Marketing;
@@ -15,6 +16,8 @@ using NewErp.Infrastructure;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+// Без заголовка «Server: Kestrel»: не підказуємо, на чому працює сервер.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -23,7 +26,9 @@ builder.Services.AddExceptionHandler<ErrorHandler>();
 // Інакше поза Development була б порожня 400, а в Development — 500.
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddHealthChecks();
-builder.Services.AddErpAuth();
+builder.Services.AddErpAuth(builder.Environment);
+builder.Services.Configure<LoginThrottleOptions>(builder.Configuration.GetSection(LoginThrottleOptions.SectionName));
+builder.Services.AddSingleton<LoginThrottle>();
 
 builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusOptions.SectionName));
 builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockOptions.SectionName));
@@ -33,6 +38,7 @@ builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(PreOrderOptions.SectionName));
 builder.Services.AddHostedService<PreOrderSettleWorker>();
 builder.Services.Configure<MarketingOptions>(builder.Configuration.GetSection(MarketingOptions.SectionName));
+builder.Services.Configure<VoucherOptions>(builder.Configuration.GetSection(VoucherOptions.SectionName));
 builder.Services.Configure<RevenueFeedOptions>(builder.Configuration.GetSection(RevenueFeedOptions.SectionName));
 builder.Services.Configure<CompetitorOptions>(builder.Configuration.GetSection(CompetitorOptions.SectionName));
 builder.Services.AddApplication();
@@ -44,11 +50,16 @@ builder.Services.AddHostedService<CompetitorPriceWorker>();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseSecurityHeaders();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous(); // інтерактивна документація: /scalar
+}
+else
+{
+    app.UseHsts(); // браузер надалі ходить сюди лише через HTTPS
 }
 
 app.UseHttpsRedirection();

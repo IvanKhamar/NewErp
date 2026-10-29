@@ -15,7 +15,14 @@ public sealed class AuthService(IUserLoginStore store, IPasswordHasher hasher, T
             return null;
 
         var user = await store.FindByUsernameAsync(request.Username.Trim(), ct);
-        if (user is null || !user.IsActive || !hasher.Verify(user.PasswordHash, request.Password))
+        if (user is null)
+        {
+            // Хешуємо й тоді, коли логіна немає: інакше відповідь була б помітно швидшою і за часом можна було б дізнатися, які логіни є.
+            hasher.Hash(request.Password);
+            return null;
+        }
+        // Пароль перевіряємо й для вимкненого користувача — з тієї ж причини.
+        if (!hasher.Verify(user.PasswordHash, request.Password) || !user.IsActive)
             return null;
 
         await store.SetLastLoginAsync(user.UserId, clock.GetLocalNow().DateTime, ct);
