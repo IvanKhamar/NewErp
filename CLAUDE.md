@@ -32,6 +32,7 @@ dotnet build
 dotnet test
 dotnet run --project src/NewErp.Api   # /scalar — документація API
 dotnet run --project tools/NewErp.DevSeed   # вигадані дані в порожню базу
+dotnet run --project tools/NewErp.SchemaCheck -- --database newerp_shop_copy   # звірити базу зі схемою NewErp (фаза 14)
 dotnet tool restore && dotnet ef ...  # dotnet-ef закріплено в dotnet-tools.json
 ```
 

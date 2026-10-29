@@ -13,5 +13,6 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/NewErp.DevSeed/NewErp.DevSeed.csproj" />
+    <Project Path="tools/NewErp.SchemaCheck/NewErp.SchemaCheck.csproj" />
   </Folder>
 </Solution>
