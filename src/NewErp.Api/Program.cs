@@ -33,6 +33,7 @@ builder.Services.Configure<ProductSortOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<PreOrderOptions>(builder.Configuration.GetSection(PreOrderOptions.SectionName));
 builder.Services.AddHostedService<PreOrderSettleWorker>();
 builder.Services.Configure<MarketingOptions>(builder.Configuration.GetSection(MarketingOptions.SectionName));
+builder.Services.Configure<VoucherOptions>(builder.Configuration.GetSection(VoucherOptions.SectionName));
 builder.Services.Configure<RevenueFeedOptions>(builder.Configuration.GetSection(RevenueFeedOptions.SectionName));
 builder.Services.Configure<CompetitorOptions>(builder.Configuration.GetSection(CompetitorOptions.SectionName));
 builder.Services.AddApplication();

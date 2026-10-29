@@ -40,5 +40,34 @@ public static class MarketingEndpoints
             return Results.File([.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(csv)], "text/csv; charset=utf-8", name);
         })
             .WithSummary("Унікальні телефони чи e-mail клієнтів (джерела: Orders, Questions, Subscribers) за період, CSV для Excel");
+
+        var vouchers = marketing.MapGroup("/vouchers");
+
+        vouchers.MapGet("", (string? search, VoucherService service, CancellationToken ct) => service.ListAsync(search, ct))
+            .WithSummary("Подарункові сертифікати з залишком (новіші вгорі, до 500); search — код або ім'я");
+
+        vouchers.MapGet("/{id:int}", (int id, VoucherService service, CancellationToken ct) => service.GetAsync(id, ct))
+            .WithSummary("Сертифікат з історією списань");
+
+        vouchers.MapGet("/themes", (VoucherService service, CancellationToken ct) => service.ThemesAsync(ct))
+            .WithSummary("Теми (картинки) сертифікатів старого сайту");
+
+        vouchers.MapPost("", (SaveVoucherRequest request, VoucherService service, CancellationToken ct) => service.CreateAsync(request, ct))
+            .WithSummary("Новий сертифікат; порожній код згенерується (8 символів без 0/O й 1/I)");
+
+        vouchers.MapPut("/{id:int}", (int id, SaveVoucherRequest request, VoucherService service, CancellationToken ct) =>
+            service.UpdateAsync(id, request, ct))
+            .WithSummary("Змінити сертифікат (історія списань лишається)");
+
+        vouchers.MapDelete("/{id:int}", async (int id, VoucherService service, CancellationToken ct) =>
+        {
+            await service.DeleteAsync(id, ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Видалити сертифікат, яким ще не платили (інакше — вимкнути)");
+
+        vouchers.MapPost("/{id:int}/sms", (int id, SendVoucherSmsRequest request, VoucherService service, CancellationToken ct) =>
+            service.SendSmsAsync(id, request.Phone, ct))
+            .WithSummary("Надіслати код і залишок отримувачу SMS (текст — Vouchers:SmsText), із записом у журнал SMS");
     }
 }
