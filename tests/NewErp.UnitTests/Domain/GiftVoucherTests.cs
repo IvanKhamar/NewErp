@@ -28,6 +28,19 @@ public class GiftVoucherTests
         Assert.Matches("^[A-HJ-NP-Z2-9]{8}$", GiftVoucher.NewCode(new Random(42)));
 
     [Fact]
+    public void ASpending_FitsTheBalanceAndWhatTheOrderStillNeeds()
+    {
+        GiftVoucher.RequireRedeemable(500m, 650m, 500m, true);
+
+        Assert.Equal("На сертифікаті лише 650 грн.",
+            Assert.Throws<DomainException>(() => GiftVoucher.RequireRedeemable(700m, 650m, 900m, true)).Message);
+        Assert.Equal("Це більше, ніж лишилось сплатити за замовлення (500 грн).",
+            Assert.Throws<DomainException>(() => GiftVoucher.RequireRedeemable(600m, 650m, 500m, true)).Message);
+        Assert.Throws<DomainException>(() => GiftVoucher.RequireRedeemable(0m, 650m, 500m, true));
+        Assert.StartsWith("Сертифікат зараз", Assert.Throws<DomainException>(() => GiftVoucher.RequireRedeemable(10m, 650m, 500m, false)).Message);
+    }
+
+    [Fact]
     public void BalanceAndUsability()
     {
         Assert.Equal(650m, GiftVoucher.Balance(1000m, -350m));

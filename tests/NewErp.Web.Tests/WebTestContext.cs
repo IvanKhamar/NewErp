@@ -28,6 +28,7 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
         Services.AddScoped<ApiAuthenticationStateProvider>();
         Services.AddScoped<StockApi>();
         Services.AddScoped<FinanceApi>();
+        Services.AddScoped<MarketingApi>(); // картка замовлення показує сертифікат
         Services.AddScoped<Clipboard>();
     }
 

@@ -32,6 +32,12 @@ public interface INewOrderStore
     /// <summary>Склад замовлення або null, якщо замовлення немає.</summary>
     Task<OrderCompositionDto?> GetCompositionAsync(int orderId, CancellationToken ct);
 
-    /// <summary>Замінює товари, опції й підсумки замовлення, оновлює суму й завдаток.</summary>
+    /// <summary>
+    /// Замінює товари, опції й підсумки замовлення, оновлює суму й завдаток. Списаний у замовленні сертифікат (рядок підсумку
+    /// voucher) лишається, і сума замовлення менша на нього.
+    /// </summary>
     Task ReplaceLinesAsync(int orderId, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, DateTime now, CancellationToken ct);
+
+    /// <summary>Скільки замовлення сплачено сертифікатами (з плюсом), за його рядками підсумку voucher.</summary>
+    Task<decimal> VoucherPaidAsync(int orderId, CancellationToken ct);
 }
