@@ -480,3 +480,12 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Secrets never go into the repo (it is public): keys and certificates, local config overrides, env files.
+.env.*
+secrets.json
+appsettings.*.local.json
+*.pfx
+*.p12
+*.pem
+*.key

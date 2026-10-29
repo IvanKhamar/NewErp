@@ -33,3 +33,15 @@ jobs:
           global-json-file: global.json
       - run: dotnet build -c Release
       - run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+
+  # The repo is public: every push and PR is scanned for keys, tokens and passwords that slipped into a commit.
+  # A finding fails the check; a test value it flags by mistake goes into .gitleaksignore with a comment.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

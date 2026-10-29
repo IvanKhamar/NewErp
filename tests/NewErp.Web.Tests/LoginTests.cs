@@ -32,6 +32,17 @@ public class LoginTests : WebTestContext
     }
 
     [Fact]
+    public void TooManyFailures_ShowsTheServerExplanation()
+    {
+        Api.Respond("/auth/login", HttpStatusCode.TooManyRequests,
+            new { title = "Забагато невдалих спроб входу", detail = "Забагато невдалих спроб входу. Спробуйте знову через 15 хв." });
+
+        var page = RenderAndSubmit("admin", "wrong");
+
+        page.WaitForAssertion(() => Assert.Contains("через 15 хв", page.Find("[data-test=login-error]").TextContent));
+    }
+
+    [Fact]
     public void TemporaryPassword_GoesToChangePassword()
     {
         Api.Respond("/auth/login", HttpStatusCode.OK, new CurrentUser(8, "novyi", "Новий Працівник", Roles.Storekeeper, MustChangePassword: true));
