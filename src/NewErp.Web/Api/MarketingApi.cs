@@ -59,6 +59,23 @@ public sealed class MarketingApi(HttpClient http)
     public async Task<SmsSendResult> SendVoucherSmsAsync(int id, string phone) =>
         await ReadAsync<SmsSendResult>(await http.PostAsJsonAsync($"/marketing/vouchers/{id}/sms", new SendVoucherSmsRequest(phone)));
 
+    /// <summary>Сертифікат, списаний у замовленні, або null (API відповідає 204).</summary>
+    public async Task<OrderVoucherDto?> OrderVoucherAsync(int orderId)
+    {
+        var response = await http.GetAsync($"/orders/{orderId}/voucher");
+        return response.StatusCode == System.Net.HttpStatusCode.NoContent ? null : await ReadAsync<OrderVoucherDto>(response);
+    }
+
+    public async Task<OrderVoucherDto> RedeemVoucherAsync(int orderId, RedeemVoucherRequest request) =>
+        await ReadAsync<OrderVoucherDto>(await http.PostAsJsonAsync($"/orders/{orderId}/voucher", request));
+
+    public async Task ReleaseVoucherAsync(int orderId)
+    {
+        var response = await http.DeleteAsync($"/orders/{orderId}/voucher");
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(await ApiErrors.ReadAsync(response));
+    }
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

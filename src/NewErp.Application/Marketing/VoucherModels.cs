@@ -30,5 +30,11 @@ public sealed record VoucherCardDto(int Id, int OrderId, string Code, string Fro
     int ThemeId, string ThemeName, string Message, decimal Amount, decimal Balance, bool Active, bool Usable, DateTime CreatedAt,
     IReadOnlyList<VoucherHistoryRow> History);
 
+/// <summary>Amount = null: скільки дозволяють залишок сертифіката й замовлення.</summary>
+public sealed record RedeemVoucherRequest(string? Code, decimal? Amount);
+
+/// <summary>Сертифікат, списаний у замовленні: скільки ним сплачено, нова сума замовлення й що лишилось на сертифікаті.</summary>
+public sealed record OrderVoucherDto(int OrderId, int VoucherId, string Code, decimal Amount, decimal OrderTotal, decimal VoucherBalance);
+
 /// <summary>Списання (сума з мінусом) чи повернення (з плюсом) у замовленні.</summary>
 public sealed record VoucherHistoryRow(int OrderId, string Customer, decimal Amount, DateTime Date);

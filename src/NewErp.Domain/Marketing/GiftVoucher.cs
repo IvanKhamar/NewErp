@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using NewErp.Domain.Common;
 
 namespace NewErp.Domain.Marketing;
@@ -55,6 +57,23 @@ public sealed record GiftVoucher(string Code, string FromName, string FromEmail,
     /// замовлення оплачене. Залишок перевіряють окремо.
     /// </summary>
     public static bool Usable(bool active, int orderId, bool orderPaid) => active && (orderId == 0 || orderPaid);
+
+    /// <summary>Перевіряє списання в замовленні.</summary>
+    /// <param name="left">Скільки замовленню ще треба: його сума мінус завдаток.</param>
+    public static void RequireRedeemable(decimal? amount, decimal balance, decimal left, bool usable)
+    {
+        if (!usable)
+            throw new DomainException("Сертифікат зараз не можна використати: він вимкнений або куплений у ще не оплаченому замовленні.");
+        if (amount is not { } sum || sum <= 0 || decimal.Round(sum, 2) != sum)
+            throw new DomainException("Сума списання — більше 0, не більше двох знаків після коми.");
+        if (sum > balance)
+            throw new DomainException($"На сертифікаті лише {Plain(balance)} грн.");
+        if (sum > left)
+            throw new DomainException($"Це більше, ніж лишилось сплатити за замовлення ({Plain(left)} грн).");
+    }
+
+    /// <summary>Сума без зайвих нулів, як toPlainString у Java-версії: 650, 650.5.</summary>
+    public static string Plain(decimal value) => value.ToString("0.##########", CultureInfo.InvariantCulture);
 
     private static string Text(string? value) => value?.Trim() ?? "";
 }

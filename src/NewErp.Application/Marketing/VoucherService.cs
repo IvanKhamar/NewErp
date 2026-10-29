@@ -66,6 +66,44 @@ public sealed class VoucherService(IVoucherStore store, ISmsSender sender, ISmsL
         return result;
     }
 
+    /// <summary>Сертифікат, списаний у замовленні, якщо є.</summary>
+    public async Task<OrderVoucherDto?> ForOrderAsync(int orderId, CancellationToken ct)
+    {
+        if (await store.SpentInOrderAsync(orderId, ct) is not { } spent)
+            return null;
+        var voucher = await GetAsync(spent.VoucherId, ct);
+        var total = (await store.OrderSumsAsync(orderId, ct))?.Total ?? 0;
+        return new OrderVoucherDto(orderId, voucher.Id, voucher.Code, spent.Amount, total, voucher.Balance);
+    }
+
+    /// <summary>
+    /// Оплачує частину ручного замовлення сертифікатом. Amount = null: скільки дозволяють сертифікат і замовлення. Один сертифікат
+    /// на замовлення; щоб змінити, спершу його знімають.
+    /// </summary>
+    public async Task<OrderVoucherDto> RedeemAsync(int orderId, string? code, decimal? amount, CancellationToken ct)
+    {
+        var order = await store.OrderSumsAsync(orderId, ct) ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
+        if (await store.SpentInOrderAsync(orderId, ct) is not null)
+            throw new DomainException("За замовленням уже списано сертифікат. Щоб змінити суму, спершу зніміть його.");
+
+        var clean = code?.Trim().ToUpperInvariant() ?? "";
+        var row = await store.FindByCodeAsync(clean, ct) ?? throw new NotFoundException($"Сертифіката з кодом {clean} немає.");
+        var voucher = Card(row, []);
+        var left = Math.Max(order.Total - order.Prepayment, 0);
+        var spend = amount ?? Math.Min(voucher.Balance, left);
+        GiftVoucher.RequireRedeemable(spend, voucher.Balance, left, voucher.Usable);
+
+        await store.RedeemAsync(orderId, voucher.Id, voucher.Code, spend, clock.GetLocalNow().DateTime, ct);
+        return (await ForOrderAsync(orderId, ct))!;
+    }
+
+    public async Task ReleaseAsync(int orderId, CancellationToken ct)
+    {
+        var spent = await store.SpentInOrderAsync(orderId, ct)
+            ?? throw new NotFoundException($"За замовленням {orderId} сертифікат не списано.");
+        await store.ReleaseAsync(orderId, spent.VoucherId, spent.Amount, ct);
+    }
+
     private async Task<GiftVoucher> ValidateAsync(SaveVoucherRequest r, string? code, int? exceptId, CancellationToken ct)
     {
         var voucher = GiftVoucher.Of(code, r.FromName, r.FromEmail, r.ToName, r.ToEmail, r.ThemeId, r.Message, r.Amount, r.Active);

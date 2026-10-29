@@ -9,6 +9,7 @@ using NewErp.Application.Marketing;
 using NewErp.Application.Sms;
 using NewErp.Web.Api;
 using NewErp.Web.Pages.Marketing;
+using NewErp.Web.Pages.Sales;
 
 namespace NewErp.Web.Tests;
 
@@ -50,5 +51,32 @@ public class VoucherPagesTests : WebTestContext
         provider.WaitForElement("input[data-test=phone]").Change("0671112233");
         provider.Find("button[data-test=send-sms]").Click();
         provider.WaitForAssertion(() => Assert.Contains("\"phone\":\"0671112233\"", Api.Bodies["/marketing/vouchers/1/sms"]));
+    }
+
+    [Fact]
+    public void OrderPanel_SpendsACode_WithTheWholeAvailableSumWhenNoAmountIsTyped()
+    {
+        Api.Respond("/orders/1001/voucher", HttpStatusCode.NoContent);
+        Api.Respond("/orders/1001/voucher", HttpStatusCode.OK, new OrderVoucherDto(1001, 1, "GIFT1000", 650m, 850m, 0m), HttpMethod.Post);
+        var reloads = 0;
+
+        var panel = Render<VoucherPanel>(p => p.Add(c => c.OrderId, 1001).Add(c => c.OnChanged, () => reloads++));
+        panel.WaitForElement("input[data-test=voucher-code]").Change("gift1000");
+        panel.Find("button[data-test=voucher-redeem]").Click();
+
+        panel.WaitForAssertion(() => Assert.Contains("GIFT1000", panel.Find("[data-test=voucher-spent]").TextContent));
+        Assert.Equal("{\"code\":\"gift1000\",\"amount\":null}", Api.Bodies["/orders/1001/voucher"]);
+        Assert.Equal(1, reloads);
+    }
+
+    [Fact]
+    public void OrderPanel_ShowsTheSpentVoucherInsteadOfTheForm()
+    {
+        Api.Respond("/orders/1002/voucher", HttpStatusCode.OK, new OrderVoucherDto(1002, 1, "GIFT1000", 300m, 500m, 350m));
+
+        var panel = Render<VoucherPanel>(p => p.Add(c => c.OrderId, 1002));
+
+        panel.WaitForElement("button[data-test=voucher-release]");
+        Assert.Empty(panel.FindAll("input[data-test=voucher-code]"));
     }
 }

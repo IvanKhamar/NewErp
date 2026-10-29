@@ -69,5 +69,23 @@ public static class MarketingEndpoints
         vouchers.MapPost("/{id:int}/sms", (int id, SendVoucherSmsRequest request, VoucherService service, CancellationToken ct) =>
             service.SendSmsAsync(id, request.Phone, ct))
             .WithSummary("Надіслати код і залишок отримувачу SMS (текст — Vouchers:SmsText), із записом у журнал SMS");
+
+        // Окремі ендпоінти, тож запити замовлення й зміни складу лишаються такими, як були. Доступ — як до замовлень.
+        var orderVoucher = app.MapGroup("/orders/{id:int}/voucher").WithTags("Маркетинг").RequireAuthorization(Policies.Orders);
+
+        orderVoucher.MapGet("", async (int id, VoucherService service, CancellationToken ct) =>
+            await service.ForOrderAsync(id, ct) is { } spent ? Results.Ok(spent) : Results.NoContent())
+            .WithSummary("Сертифікат, списаний у замовленні (204, якщо немає)");
+
+        orderVoucher.MapPost("", (int id, RedeemVoucherRequest request, VoucherService service, CancellationToken ct) =>
+            service.RedeemAsync(id, request.Code, request.Amount, ct))
+            .WithSummary("Оплатити частину замовлення сертифікатом: рядок підсумку voucher, історія сертифіката, менша сума замовлення");
+
+        orderVoucher.MapDelete("", async (int id, VoucherService service, CancellationToken ct) =>
+        {
+            await service.ReleaseAsync(id, ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Зняти сертифікат із замовлення: гроші повертаються на сертифікат, сума замовлення — як була");
     }
 }

@@ -1,0 +1,97 @@
+@using NewErp.Application.Marketing
+@inject MarketingApi Api
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+@* Подарунковий сертифікат як частина оплати: списаний або код, щоб списати (сума замовлення стає меншою на нього). *@
+<MudPaper Class="pa-4 mb-4" Outlined="true" data-test="voucher">
+    <MudText Typo="Typo.h6" Class="mb-2">Подарунковий сертифікат</MudText>
+    @if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_spent is { } spent)
+    {
+        <div class="d-flex align-center flex-wrap gap-2">
+            <MudText Typo="Typo.body2" data-test="voucher-spent">
+                @spent.Code: −@Fmt.Money(spent.Amount) (на сертифікаті лишилось @Fmt.Money(spent.VoucherBalance))
+            </MudText>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Close" OnClick="ReleaseAsync" Disabled="_busy"
+                       data-test="voucher-release">Зняти</MudButton>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-center flex-wrap gap-2">
+            <MudTextField @bind-Value="_code" Placeholder="Код" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px"
+                          data-test="voucher-code" />
+            <MudNumericField T="decimal?" @bind-Value="_amount" Placeholder="Сума (усе)" Min="0" HideSpinButtons="true" Variant="Variant.Outlined"
+                             Margin="Margin.Dense" Style="max-width: 150px" data-test="voucher-amount" />
+            <MudButton Variant="Variant.Outlined" OnClick="RedeemAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_code))"
+                       data-test="voucher-redeem">Списати</MudButton>
+        </div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public int OrderId { get; set; }
+
+    /// <summary>Сума замовлення змінилася: картці треба перечитати замовлення.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private OrderVoucherDto? _spent;
+    private bool _loaded;
+    private string _code = "";
+    private decimal? _amount;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        _spent = await Api.OrderVoucherAsync(OrderId);
+        _loaded = true;
+    }
+
+    private Task RedeemAsync() => RunAsync(async () =>
+    {
+        var result = await Api.RedeemVoucherAsync(OrderId, new RedeemVoucherRequest(_code, _amount));
+        Snackbar.Add($"Списано {Fmt.Money(result.Amount)} із сертифіката {result.Code}.", Severity.Success);
+        (_spent, _code, _amount) = (result, "", null);
+        await OnChanged.InvokeAsync();
+    });
+
+    private async Task ReleaseAsync()
+    {
+        var spent = _spent!;
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Зняти сертифікат?",
+            $"{Fmt.Money(spent.Amount)} повернеться на сертифікат {spent.Code}, а сума замовлення збільшиться.", yesText: "Зняти", cancelText: "Залишити");
+        if (confirmed != true)
+            return;
+        await RunAsync(async () =>
+        {
+            await Api.ReleaseVoucherAsync(OrderId);
+            Snackbar.Add("Сертифікат знято.", Severity.Success);
+            _spent = null;
+            await OnChanged.InvokeAsync();
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            _loaded = true;
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -24,6 +24,52 @@ public sealed class VoucherStore(ErpDbContext db, IOptions<ErpOptions> options) 
 
     public Task<VoucherRow?> FindAsync(int id, CancellationToken ct) => Rows(db.DdVouchers.Where(v => v.VoucherId == id)).FirstOrDefaultAsync(ct);
 
+    public Task<VoucherRow?> FindByCodeAsync(string code, CancellationToken ct) =>
+        Rows(db.DdVouchers.Where(v => v.Code == code).OrderByDescending(v => v.VoucherId)).FirstOrDefaultAsync(ct);
+
+    public async Task<OrderSums?> OrderSumsAsync(int orderId, CancellationToken ct) =>
+        await db.DdOrders.AsNoTracking()
+            .Where(o => o.OrderId == orderId && o.OrderStatusId > 0)
+            .Select(o => new OrderSums(o.Total, o.Prepayment))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<SpentInOrder?> SpentInOrderAsync(int orderId, CancellationToken ct) =>
+        await db.DdVoucherHistories.AsNoTracking()
+            .Where(h => h.OrderId == orderId)
+            .GroupBy(h => h.VoucherId)
+            .Select(g => new { VoucherId = g.Key, Spent = -g.Sum(h => h.Amount) })
+            .Where(x => x.Spent != 0)
+            .OrderBy(x => x.VoucherId)
+            .Select(x => new SpentInOrder(x.VoucherId, x.Spent))
+            .FirstOrDefaultAsync(ct);
+
+    // Таблиці OpenCart — MyISAM, без транзакцій: ті самі записи, що й на оформленні в магазині, один за одним. Рядок сертифіката
+    // стоїть одразу перед підсумком (sort_order 98 і 99), як їх сортує OpenCart.
+    public async Task RedeemAsync(int orderId, int voucherId, string code, decimal amount, DateTime now, CancellationToken ct)
+    {
+        db.DdVoucherHistories.Add(new DdVoucherHistory { VoucherId = voucherId, OrderId = orderId, Amount = -amount, DateAdded = now });
+        db.DdOrderTotals.Add(new DdOrderTotal
+        {
+            OrderId = orderId, Code = "voucher", Title = $"Подарунковий сертифікат ({code})", Value = -amount, SortOrder = 98,
+        });
+        await db.SaveChangesAsync(ct);
+        await ChangeTotalAsync(orderId, -amount, ct);
+    }
+
+    public async Task ReleaseAsync(int orderId, int voucherId, decimal amount, CancellationToken ct)
+    {
+        await db.DdVoucherHistories.Where(h => h.OrderId == orderId && h.VoucherId == voucherId).ExecuteDeleteAsync(ct);
+        await db.DdOrderTotals.Where(t => t.OrderId == orderId && t.Code == "voucher").ExecuteDeleteAsync(ct);
+        await ChangeTotalAsync(orderId, amount, ct);
+    }
+
+    private async Task ChangeTotalAsync(int orderId, decimal by, CancellationToken ct)
+    {
+        await db.DdOrderTotals.Where(t => t.OrderId == orderId && t.Code == "total")
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.Value, t => t.Value + by).SetProperty(t => t.SortOrder, 99), ct);
+        await db.DdOrders.Where(o => o.OrderId == orderId).ExecuteUpdateAsync(s => s.SetProperty(o => o.Total, o => o.Total + by), ct);
+    }
+
     public Task<bool> CodeTakenAsync(string code, int? exceptId, CancellationToken ct) =>
         db.DdVouchers.AnyAsync(v => v.Code == code && v.VoucherId != (exceptId ?? 0), ct);
 

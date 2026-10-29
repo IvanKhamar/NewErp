@@ -248,15 +248,24 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
         var shippingMethod = await db.DdOrders.Where(o => o.OrderId == orderId).Select(o => o.ShippingMethod).SingleAsync(ct);
 
         // Як editOrder старого сайту: рядки, опції й підсумки видаляються й пишуться заново (MyISAM, без транзакції).
+        // Списаний сертифікат зберігає свій рядок підсумку (і запис у dd_voucher_history), а нова сума менша на нього.
+        var voucher = await VoucherPaidAsync(orderId, ct);
         await db.DdOrderOptions.Where(o => o.OrderId == orderId).ExecuteDeleteAsync(ct);
         await db.DdOrderProducts.Where(p => p.OrderId == orderId).ExecuteDeleteAsync(ct);
-        await db.DdOrderTotals.Where(t => t.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrderTotals.Where(t => t.OrderId == orderId && t.Code != "voucher").ExecuteDeleteAsync(ct);
         await AddLinesAsync(orderId, shippingMethod, draft, lines, ct);
+        var total = draft.Total - voucher;
+        if (voucher > 0)
+            await db.DdOrderTotals.Where(t => t.OrderId == orderId && t.Code == "total")
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.Value, total).SetProperty(t => t.SortOrder, 99), ct);
         await db.DdOrders.Where(o => o.OrderId == orderId).ExecuteUpdateAsync(s => s
-            .SetProperty(o => o.Total, draft.Total)
+            .SetProperty(o => o.Total, total)
             .SetProperty(o => o.Prepayment, draft.Prepayment)
             .SetProperty(o => o.DateModified, now), ct);
     }
+
+    public async Task<decimal> VoucherPaidAsync(int orderId, CancellationToken ct) =>
+        -await db.DdOrderTotals.Where(t => t.OrderId == orderId && t.Code == "voucher").SumAsync(t => t.Value, ct);
 
     private async Task AddLinesAsync(int orderId, string shippingMethod, OrderDraft draft, IReadOnlyList<NewOrderLineRecord> lines, CancellationToken ct)
     {
