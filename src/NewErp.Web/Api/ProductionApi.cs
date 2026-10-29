@@ -49,6 +49,8 @@ public sealed class ProductionApi(HttpClient http)
 
     public Task<SewingPlanDto> PlanAsync(bool onlyToSew) => GetAsync<SewingPlanDto>($"/production/plan?onlyToSew={(onlyToSew ? "true" : "false")}");
 
+    public Task<PlanMaterialsDto> PlanMaterialsAsync() => GetAsync<PlanMaterialsDto>("/production/plan/materials");
+
     public Task<List<ProductionLogDto>> LogAsync(int? modelId = null, int limit = 200) =>
         GetAsync<List<ProductionLogDto>>($"/production/log?limit={limit}" + (modelId is { } id ? $"&productionId={id}" : ""));
 

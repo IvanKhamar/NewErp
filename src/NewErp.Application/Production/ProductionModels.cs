@@ -146,3 +146,16 @@ public sealed record SewingPlanRowDto(
 public sealed record SewingPlanIssueDto(string ProductName, string Reason, IReadOnlyList<int> OrderIds);
 
 public sealed record SewingPlanDto(int OrderCount, IReadOnlyList<SewingPlanRowDto> Rows, IReadOnlyList<SewingPlanIssueDto> Issues);
+
+/// <summary>
+/// Розхідник для плану пошиву. Needed — скільки знадобиться на крій і пошив плану; InStock — залишок; OnOrder — замовлено в
+/// постачальників і ще не отримано; Shortage — скільки бракує й після замовленого (0 — вистачає).
+/// </summary>
+public sealed record PlanMaterialDto(
+    int ItemId, string Name, string Unit, decimal Needed, decimal InStock, decimal OnOrder, decimal Shortage, IReadOnlyList<PlanMaterialUseDto> Uses);
+
+/// <summary>На що саме йде розхідник: модель, розмір, етап («Крій» чи «Пошив») і кількість.</summary>
+public sealed record PlanMaterialUseDto(int ProductionId, string ModelName, string SizeName, string Stage, decimal Quantity);
+
+/// <summary>Розхідники плану пошиву: спершу ті, яких бракує. Warnings — розхідники зі специфікацій, яких немає на складі.</summary>
+public sealed record PlanMaterialsDto(IReadOnlyList<PlanMaterialDto> Materials, IReadOnlyList<string> Warnings);

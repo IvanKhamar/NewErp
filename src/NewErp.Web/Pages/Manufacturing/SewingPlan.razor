@@ -74,11 +74,84 @@
     }
 }
 
+<MudText Typo="Typo.h5" Class="mt-6 mb-1">Розхідники для плану</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Скільки розхідників знадобиться, щоб розкроїти й пошити все, що в плані, за специфікаціями крою й пошиву. «Бракує» — чого не
+    вистачить навіть після вже замовленого в постачальників.
+</MudText>
+@if (_materialsError is not null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true">@_materialsError</MudAlert>
+}
+else if (_materials is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @foreach (var warning in _materials.Warnings)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">@warning</MudAlert>
+    }
+    <MudSimpleTable Dense="true" Elevation="0" data-test="materials">
+        <thead>
+            <tr>
+                <th>Розхідник</th><th style="text-align: right">Потрібно</th><th style="text-align: right">Є</th>
+                <th style="text-align: right">Замовлено</th><th style="text-align: right">Бракує</th><th>На що</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var material in _materials.Materials)
+            {
+                <tr>
+                    <td>@material.Name</td>
+                    <td style="text-align: right">@Qty(material.Needed) @material.Unit</td>
+                    <td style="text-align: right">@Qty(material.InStock)</td>
+                    <td style="text-align: right">@Qty(material.OnOrder)</td>
+                    <td style="text-align: right">
+                        @if (material.Shortage > 0)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Error"><b>@Qty(material.Shortage) @material.Unit</b></MudText>
+                        }
+                        else
+                        {
+                            <span>—</span>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var use in material.Uses)
+                        {
+                            <MudText Typo="Typo.caption" Class="d-block">@use.ModelName @use.SizeName · @use.Stage.ToLowerInvariant() @Qty(use.Quantity)</MudText>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    @if (_materials.Materials.Count == 0)
+    {
+        <MudText Class="mt-2">Розхідників не треба: шити нічого або в моделей плану немає специфікацій.</MudText>
+    }
+}
+
 @code {
     private SewingPlanDto? _plan;
     private bool _onlyToSew = true;
+    private PlanMaterialsDto? _materials;
+    private string? _materialsError;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        try
+        {
+            _materials = await Api.PlanMaterialsAsync();
+        }
+        catch (ApiException e)
+        {
+            _materialsError = e.Message;
+        }
+    }
 
     private async Task LoadAsync() => _plan = await Api.PlanAsync(_onlyToSew);
 
