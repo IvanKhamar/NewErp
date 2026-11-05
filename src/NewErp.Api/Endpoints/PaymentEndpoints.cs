@@ -14,6 +14,10 @@ public static class PaymentEndpoints
                 service.ListAsync(filter, ct))
             .WithSummary("Надходження з фільтрами (період, linked, замовлення, пошук, hidden), посторінково");
 
+        payments.MapPost("/auto-match", (DateOnly? from, DateOnly? to, BankPaymentService service, CancellationToken ct) =>
+                service.AutoMatchAsync(from, to, ct))
+            .WithSummary("Прив'язати платежі без замовлення, у яких рівно одне впевнене замовлення: у призначенні його номер чи телефон, сума збігається, іншого платежу в нього немає (типово за 31 день)");
+
         payments.MapPost("/import", (DateOnly? from, DateOnly? to, BankPaymentService service, CancellationToken ct) =>
                 service.ImportAsync(from, to, ct))
             .WithSummary("Завантажити виписку (типово вчора й сьогодні); без ключів банку нічого не запитує: clientConfigured = false");

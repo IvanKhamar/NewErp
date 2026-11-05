@@ -11,6 +11,9 @@ public interface IStockRepository
 
     Task<IReadOnlyList<StockItemDto>> ListItemsAsync(StockItemFilter filter, CancellationToken ct);
 
+    /// <summary>Активні позиції з мінімумом, які рух від since опустив нижче нього й які досі нижче.</summary>
+    Task<IReadOnlyList<int>> FellBelowMinimumAsync(DateTime since, CancellationToken ct);
+
     Task<StockItemDto?> GetItemDtoAsync(int itemId, CancellationToken ct);
 
     Task<IReadOnlyList<StockMovementDto>> ListMovementsAsync(int itemId, CancellationToken ct);

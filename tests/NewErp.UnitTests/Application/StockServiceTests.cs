@@ -62,6 +62,9 @@ public class StockServiceTests
         public Dictionary<int, StockItem> Items { get; } = [];
         public HashSet<string> CategoryNames { get; } = [];
         public List<StockMovement> Movements { get; } = [];
+
+        public Task<IReadOnlyList<int>> FellBelowMinimumAsync(DateTime since, CancellationToken ct) => Task.FromResult<IReadOnlyList<int>>([]);
+
         public int SaveCount { get; private set; }
 
         public Task<StockItem?> FindItemAsync(int itemId, CancellationToken ct) => Task.FromResult(Items.GetValueOrDefault(itemId));

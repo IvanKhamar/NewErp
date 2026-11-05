@@ -18,7 +18,12 @@ public sealed record BankTransaction(
     string Purpose, string Payer, string PayerAccount, string PayerBankCode, string PayerTaxCode);
 
 /// <summary>Підсумок імпорту. ClientConfigured = false — ключі банку не задано, нічого не завантажувалось.</summary>
-public sealed record BankImportResult(bool ClientConfigured, int Fetched, int Added, int Skipped);
+public sealed record BankImportResult(bool ClientConfigured, int Fetched, int Added, int Skipped, int AutoLinked = 0);
+
+public sealed record AutoMatchLink(int PaymentId, int OrderId);
+
+/// <summary>Checked — переглянуті платежі без замовлення; Links — ті, що мали рівно одне впевнене замовлення.</summary>
+public sealed record AutoMatchResult(int Checked, IReadOnlyList<AutoMatchLink> Links);
 
 /// <summary>Замовлення, запропоноване для платежу, і що в ньому збіглося.</summary>
 public sealed record PaymentSuggestionDto(

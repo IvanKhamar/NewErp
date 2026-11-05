@@ -79,4 +79,33 @@ public class FinancePagesTests : WebTestContext
 
         page.WaitForAssertion(() => Assert.Contains("Ключі ПриватБанку не задано", page.Find("[data-test=import-result]").TextContent));
     }
+
+    [Fact]
+    public void Payments_AutoMatch_SaysWhatItLinked()
+    {
+        Api.Respond("/payments/bank", HttpStatusCode.OK, new PagedResult<BankPaymentDto>([], 1, 50, 0));
+        Api.Respond("/payments/bank/auto-match", HttpStatusCode.OK, new AutoMatchResult(3, [new AutoMatchLink(7, 1001)]), HttpMethod.Post);
+
+        var page = Render<BankPayments>();
+        page.WaitForElement("[data-test=auto-match]").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            var text = page.Find("[data-test=auto-match-result]").TextContent;
+            Assert.Contains("Перевірено платежів без замовлення: 3, прив'язано: 1", text);
+            Assert.Contains("платіж 7 → №1001", text);
+        });
+    }
+
+    [Fact]
+    public void Payments_Import_SaysHowManyWereLinked()
+    {
+        Api.Respond("/payments/bank", HttpStatusCode.OK, new PagedResult<BankPaymentDto>([], 1, 50, 0));
+        Api.Respond("/payments/bank/import", HttpStatusCode.OK, new BankImportResult(true, 5, 2, 3, AutoLinked: 1));
+
+        var page = Render<BankPayments>();
+        page.WaitForElement("[data-test=import]").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("прив'язано автоматично: 1", page.Find("[data-test=import-result]").TextContent));
+    }
 }

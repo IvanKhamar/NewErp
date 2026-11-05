@@ -45,6 +45,39 @@ public class PlanMaterialsApiTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync("/production/plan/materials")).StatusCode);
     }
 
+    [MySqlFact]
+    public async Task Materials_UpToTheMinimum_AndBoth()
+    {
+        var storekeeper = await factory.LoginAsync(ApiFactory.Storekeeper);
+        var fabric = await CreateAsync(storekeeper, "/stock/items", new SaveStockItemRequest(null, null, "Льон для мінімуму", "м", 0));
+        var thread = await CreateAsync(storekeeper, "/stock/items", new SaveStockItemRequest(null, null, "Нитки для мінімуму", "шт", 0));
+
+        var modelId = await CreateAsync(storekeeper, "/production/models", new SaveProductionModelRequest("Сукня мінімуму", [new("S"), new("M")], MinTotal: 10));
+        var front = await CreateAsync(storekeeper, $"/production/models/{modelId}/components", new SaveComponentRequest("Перед"));
+        (await storekeeper.PutAsJsonAsync($"/production/components/{front}/bom",
+            new SetComponentBomRequest([new(null, fabric, 1.5m)]))).EnsureSuccessStatusCode();
+        (await storekeeper.PutAsJsonAsync($"/production/models/{modelId}/sewn-bom",
+            new SetSewnBomRequest([new(null, front, null, 1), new(null, null, thread, 2)]))).EnsureSuccessStatusCode();
+
+        async Task<Dictionary<string, PlanMaterialDto>> MaterialsAsync(string scope) =>
+            (await storekeeper.GetFromJsonAsync<PlanMaterialsDto>($"/production/plan/materials?scope={scope}"))!.Materials.ToDictionary(m => m.Name);
+
+        // До мінімуму 10: без часток — порівну, по 5 кожного розміру: 10 деталей на крій, 10 штук на пошив.
+        var minimum = await MaterialsAsync("minimum");
+        Assert.Equal(15m, minimum["Льон для мінімуму"].Needed);
+        Assert.Equal(20m, minimum["Нитки для мінімуму"].Needed);
+        Assert.All(minimum["Нитки для мінімуму"].Uses, use => Assert.True(use.ForMinimum));
+
+        // Для замовлень цієї моделі немає: вона не прив'язана до товарів.
+        Assert.DoesNotContain("Льон для мінімуму", (await MaterialsAsync("orders")).Keys);
+        Assert.Equal(20m, (await MaterialsAsync("all"))["Нитки для мінімуму"].Needed);
+
+        // Без scope — те саме, що orders.
+        var plain = (await storekeeper.GetFromJsonAsync<PlanMaterialsDto>("/production/plan/materials"))!;
+        Assert.Equal((await MaterialsAsync("orders")).Keys, plain.Materials.Select(m => m.Name));
+        Assert.Equal(HttpStatusCode.BadRequest, (await storekeeper.GetAsync("/production/plan/materials?scope=wrong")).StatusCode);
+    }
+
     private static async Task<int> CreateAsync<T>(HttpClient client, string url, T request)
     {
         var response = await client.PostAsJsonAsync(url, request);

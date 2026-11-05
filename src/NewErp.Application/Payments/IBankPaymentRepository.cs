@@ -7,6 +7,9 @@ public interface IBankPaymentRepository
 {
     Task<PagedResult<BankPaymentDto>> ListAsync(BankPaymentFilter filter, CancellationToken ct);
 
+    /// <summary>Видимі платежі без замовлення за період, новіші спершу.</summary>
+    Task<IReadOnlyList<int>> UnlinkedIdsAsync(DateOnly from, DateOnly to, int limit, CancellationToken ct);
+
     Task<BankPayment?> GetAsync(int id, CancellationToken ct);
 
     Task<BankPaymentDto?> GetDtoAsync(int id, CancellationToken ct);

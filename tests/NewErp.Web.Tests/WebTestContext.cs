@@ -41,6 +41,9 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
 
         public List<string> Requests { get; } = [];
 
+        /// <summary>Те саме, але з рядком запиту: щоб перевірити параметри.</summary>
+        public List<string> Urls { get; } = [];
+
         /// <summary>Тіла запитів, що змінюють дані (POST/PUT), за шляхом.</summary>
         public Dictionary<string, string> Bodies { get; } = [];
 
@@ -52,6 +55,7 @@ public abstract class WebTestContext : BunitContext, IAsyncLifetime
         {
             var path = request.RequestUri!.AbsolutePath;
             Requests.Add(path);
+            Urls.Add(request.RequestUri.PathAndQuery);
             if (request.Content is not null)
                 Bodies[path] = await request.Content.ReadAsStringAsync(cancellationToken);
             return _responses.TryGetValue($"{request.Method} {path}", out var respond) || _responses.TryGetValue(path, out respond) ? respond() : new HttpResponseMessage(HttpStatusCode.NotFound);

@@ -155,7 +155,7 @@ public sealed record PlanMaterialDto(
     int ItemId, string Name, string Unit, decimal Needed, decimal InStock, decimal OnOrder, decimal Shortage, IReadOnlyList<PlanMaterialUseDto> Uses);
 
 /// <summary>На що саме йде розхідник: модель, розмір, етап («Крій» чи «Пошив») і кількість.</summary>
-public sealed record PlanMaterialUseDto(int ProductionId, string ModelName, string SizeName, string Stage, decimal Quantity);
+public sealed record PlanMaterialUseDto(int ProductionId, string ModelName, string SizeName, string Stage, decimal Quantity, bool ForMinimum = false);
 
 /// <summary>Розхідники плану пошиву: спершу ті, яких бракує. Warnings — розхідники зі специфікацій, яких немає на складі.</summary>
 public sealed record PlanMaterialsDto(IReadOnlyList<PlanMaterialDto> Materials, IReadOnlyList<string> Warnings);

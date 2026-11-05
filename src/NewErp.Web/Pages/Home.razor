@@ -1,10 +1,15 @@
 @page "/"
+@using NewErp.Web.Pages.Inventory
 @attribute [Authorize]
 
 <PageTitle>NewErp</PageTitle>
 
 <AuthorizeView>
     <MudText Typo="Typo.h4" GutterBottom="true">Вітаємо, @context.User.Identity?.Name!</MudText>
+</AuthorizeView>
+
+<AuthorizeView Roles="@Access.Stock">
+    <LowStockPanel />
 </AuthorizeView>
 
 <AuthorizeView Roles="@Access.Orders">

@@ -94,6 +94,8 @@ public sealed class FinanceApi(HttpClient http)
 
     public async Task<BankImportResult> ImportAsync() => await ReadAsync<BankImportResult>(await http.PostAsync("/payments/bank/import", null));
 
+    public async Task<AutoMatchResult> AutoMatchAsync() => await ReadAsync<AutoMatchResult>(await http.PostAsync("/payments/bank/auto-match", null));
+
     public Task<List<PaymentSuggestionDto>> SuggestionsAsync(int paymentId, string? customer) =>
         GetAsync<List<PaymentSuggestionDto>>($"/payments/bank/{paymentId}/suggestions" +
             (string.IsNullOrWhiteSpace(customer) ? "" : $"?customer={Uri.EscapeDataString(customer.Trim())}"));

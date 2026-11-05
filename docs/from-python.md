@@ -27,9 +27,9 @@ How to use this file:
 | 23 | Nova Poshta courier delivery to an address: `toDoor`, `streetRef`, `building`, `flat`; `GET /delivery/streets` | a958344 | DONE: `feat/py-order-delivery`, 2026-11-05 |
 | 24 | Sale prices (`dd_product_special`, `percent`) in the product search of a new order: `price`, `regularPrice` | b660c33 | DONE: `feat/py-order-delivery`, 2026-11-05 |
 | 25 | Coupon admin `/marketing/coupons` with products/categories and their `*_exclude` tables, usage history | 0d88a5b | DONE: `feat/py-coupons`, 2026-11-05 |
-| 26 | Low-stock alerts: a daily SMS (`stock.alertPhones`, `alertTime`), `POST /stock/alerts/low-stock`, home panel | ab43938 | TODO |
-| 27 | Consumables for the sewing plan `GET /production/plan/materials?scope=orders|minimum|all` | f672a8c | DONE here (Python ported it from .NET); only `scope=minimum|all` is new: TODO |
-| 28 | Automatic bank payment matching after import and `POST /payments/bank/auto-match`; `autoLinked` | ddbc1c9 | TODO |
+| 26 | Low-stock alerts: a daily SMS (`stock.alertPhones`, `alertTime`), `POST /stock/alerts/low-stock`, home panel | ab43938 | DONE: `feat/py-alerts-matching`, 2026-11-05; home panel `LowStockPanel` |
+| 27 | Consumables for the sewing plan `GET /production/plan/materials?scope=orders|minimum|all` | f672a8c | DONE here (Python ported it from .NET); `scope=minimum|all` DONE: `feat/py-alerts-matching`, 2026-11-05 |
+| 28 | Automatic bank payment matching after import and `POST /payments/bank/auto-match`; `autoLinked` | ddbc1c9 | DONE: `feat/py-alerts-matching`, 2026-11-05 |
 | 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | TODO |
 | 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | TODO |
 | 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | TODO |
