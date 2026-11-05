@@ -1,0 +1,223 @@
+@inject MarketingApi Api
+@inject ProductsApi Products
+@inject ISnackbar Snackbar
+
+@* Новий купон або наявний: на що діє, на що не діє ніколи, і хто ним уже скористався. *@
+<MudDialog>
+    <DialogContent>
+        @if (!_loaded)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="8">
+                    <MudTextField @bind-Value="_name" Label="Назва" MaxLength="128" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="name" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_code" Label="Код" MaxLength="20" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="code" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" @bind-Value="_type" Label="Тип знижки" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="type">
+                        <MudSelectItem T="string" Value="@("P")">Відсоток</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("F")">Сума, грн</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal?" @bind-Value="_discount" Label="Знижка" Min="0" HideSpinButtons="true" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="discount" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal" @bind-Value="_total" Label="Від суми замовлення, грн" Min="0" HideSpinButtons="true" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="total" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker @bind-Date="_start" Label="Діє з" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" data-test="start" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudDatePicker @bind-Date="_end" Label="Діє до" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" data-test="end" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="int" @bind-Value="_usesTotal" Label="Використань усього" Min="0" HelperText="0 — без обмежень" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="int" @bind-Value="_usesCustomer" Label="На одного клієнта" Min="0" HelperText="0 — без обмежень" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" Class="d-flex flex-wrap gap-4">
+                    <MudSwitch T="bool" @bind-Value="_active" Color="Color.Primary" Label="Діє" />
+                    <MudSwitch T="bool" @bind-Value="_logged" Color="Color.Primary" Label="Лише для тих, хто ввійшов" />
+                    <MudSwitch T="bool" @bind-Value="_shipping" Color="Color.Primary" Label="Безкоштовна доставка" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_productIds" Label="Діє на товари" HelperText="@ProductsHelper(_card?.Products)" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="product-ids" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_excludedProductIds" Label="Не діє на товари" HelperText="@ProductsHelper(_card?.ExcludedProducts)" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="excluded-product-ids" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSimpleTable Dense="true" Elevation="0" Style="max-height: 16rem; overflow-y: auto" data-test="categories">
+                        <thead><tr><th>Категорія</th><th>Діє</th><th>Не діє</th></tr></thead>
+                        <tbody>
+                            @foreach (var category in _categories)
+                            {
+                                <tr>
+                                    <td>@category.Name</td>
+                                    <td><MudCheckBox T="bool" Value="_included.Contains(category.Id)" ValueChanged="on => Toggle(_included, category.Id, on)" Dense="true" data-test="@($"category-{category.Id}")" /></td>
+                                    <td><MudCheckBox T="bool" Value="_excluded.Contains(category.Id)" ValueChanged="on => Toggle(_excluded, category.Id, on)" Dense="true" data-test="@($"excluded-category-{category.Id}")" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudItem>
+            </MudGrid>
+
+            @if (_card is { History.Count: > 0 })
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-4 mb-1">Скористалися</MudText>
+                <MudSimpleTable Dense="true" Elevation="0" data-test="history">
+                    <thead><tr><th>Замовлення</th><th>Клієнт</th><th style="text-align: right">Сума</th><th>Дата</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _card.History)
+                        {
+                            <tr>
+                                <td>№@row.OrderId</td>
+                                <td>@(row.CustomerId == 0 ? "—" : $"№{row.CustomerId}")</td>
+                                <td style="text-align: right">@Fmt.Money(row.Amount)</td>
+                                <td>@Fmt.Date(row.DateAdded)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3" data-test="error">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (Id is not null)
+        {
+            <MudButton Color="Color.Error" OnClick="DeleteAsync" Disabled="@(_busy || _card is { History.Count: > 0 })" data-test="delete">Видалити</MudButton>
+            <MudSpacer />
+        }
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_busy || !_loaded)" data-test="save">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int? Id { get; set; }
+
+    private CouponCardDto? _card;
+    private IReadOnlyList<LookupItem> _categories = [];
+    private readonly HashSet<int> _included = [];
+    private readonly HashSet<int> _excluded = [];
+    private string _name = "";
+    private string _code = "";
+    private string _type = "P";
+    private decimal? _discount;
+    private decimal _total;
+    private DateTime? _start;
+    private DateTime? _end;
+    private int _usesTotal = 1;
+    private int _usesCustomer = 1;
+    private bool _active = true;
+    private bool _logged;
+    private bool _shipping;
+    private string _productIds = "";
+    private string _excludedProductIds = "";
+    private string? _error;
+    private bool _busy;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _categories = await Products.CategoriesAsync();
+            if (Id is { } id)
+                Fill(await Api.CouponAsync(id));
+            _loaded = true;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private void Fill(CouponCardDto card)
+    {
+        _card = card;
+        (_name, _code, _type, _discount, _total) = (card.Name, card.Code, card.Type, card.Discount, card.Total);
+        (_start, _end) = (card.DateStart?.ToDateTime(TimeOnly.MinValue), card.DateEnd?.ToDateTime(TimeOnly.MinValue));
+        (_usesTotal, _usesCustomer, _active, _logged, _shipping) = (card.UsesTotal, card.UsesCustomer, card.Active, card.Logged, card.Shipping);
+        _productIds = string.Join(", ", card.Products.Select(p => p.Id));
+        _excludedProductIds = string.Join(", ", card.ExcludedProducts.Select(p => p.Id));
+        _included.UnionWith(card.Categories.Select(c => c.Id));
+        _excluded.UnionWith(card.ExcludedCategories.Select(c => c.Id));
+        // Вимкнена категорія не прийде в довіднику, але лишається в купоні: без цього вона зникла б при збереженні.
+        _categories = [.. _categories, .. card.Categories.Concat(card.ExcludedCategories).Where(c => _categories.All(known => known.Id != c.Id)).DistinctBy(c => c.Id)];
+    }
+
+    private static string ProductsHelper(IReadOnlyList<LookupItem>? saved) =>
+        saved is { Count: > 0 } ? string.Join(", ", saved.Select(p => p.Name)) : "Номери через кому; порожньо — весь кошик";
+
+    private static void Toggle(HashSet<int> set, int id, bool on)
+    {
+        if (on)
+            set.Add(id);
+        else
+            set.Remove(id);
+    }
+
+    /// <summary>Номери товарів, введені текстом; щось інше стає зрозумілою помилкою.</summary>
+    private static List<int> ParseIds(string text)
+    {
+        var ids = new List<int>();
+        foreach (var part in text.Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!int.TryParse(part, out var id) || id <= 0)
+                throw new ApiException($"«{part}» — не номер товару.");
+            ids.Add(id);
+        }
+        return ids;
+    }
+
+    private async Task SaveAsync() => await RunAsync(async () =>
+    {
+        var request = new SaveCouponRequest(
+            _name, _code, _type, _discount, _total, _logged, _shipping,
+            _start is { } start ? DateOnly.FromDateTime(start) : null, _end is { } end ? DateOnly.FromDateTime(end) : null,
+            _usesTotal, _usesCustomer, _active, ParseIds(_productIds), _included.ToList(), ParseIds(_excludedProductIds), _excluded.ToList());
+        var saved = Id is { } id ? await Api.UpdateCouponAsync(id, request) : await Api.CreateCouponAsync(request);
+        Snackbar.Add($"Купон {saved.Code} збережено.", Severity.Success);
+        Dialog.Close(DialogResult.Ok(saved));
+    });
+
+    private async Task DeleteAsync() => await RunAsync(async () =>
+    {
+        await Api.DeleteCouponAsync(Id!.Value);
+        Snackbar.Add("Купон видалено.", Severity.Success);
+        Dialog.Close(DialogResult.Ok(true));
+    });
+
+    private async Task RunAsync(Func<Task> work)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await work();
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -76,6 +76,24 @@ public sealed class MarketingApi(HttpClient http)
             throw new ApiException(await ApiErrors.ReadAsync(response));
     }
 
+    public Task<List<CouponListItem>> CouponsAsync(string search) =>
+        GetAsync<List<CouponListItem>>($"/marketing/coupons?search={Uri.EscapeDataString(search)}");
+
+    public Task<CouponCardDto> CouponAsync(int id) => GetAsync<CouponCardDto>($"/marketing/coupons/{id}");
+
+    public async Task<CouponCardDto> CreateCouponAsync(SaveCouponRequest request) =>
+        await ReadAsync<CouponCardDto>(await http.PostAsJsonAsync("/marketing/coupons", request));
+
+    public async Task<CouponCardDto> UpdateCouponAsync(int id, SaveCouponRequest request) =>
+        await ReadAsync<CouponCardDto>(await http.PutAsJsonAsync($"/marketing/coupons/{id}", request));
+
+    public async Task DeleteCouponAsync(int id)
+    {
+        var response = await http.DeleteAsync($"/marketing/coupons/{id}");
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(await ApiErrors.ReadAsync(response));
+    }
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

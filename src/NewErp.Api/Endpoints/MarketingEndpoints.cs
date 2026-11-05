@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 
 using NewErp.Api.Auth;
@@ -40,6 +41,29 @@ public static class MarketingEndpoints
             return Results.File([.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(csv)], "text/csv; charset=utf-8", name);
         })
             .WithSummary("Унікальні телефони чи e-mail клієнтів (джерела: Orders, Questions, Subscribers) за період, CSV для Excel");
+
+        var coupons = marketing.MapGroup("/coupons");
+
+        coupons.MapGet("", (string? search, CouponService service, CancellationToken ct) => service.ListAsync(search, ct))
+            .WithSummary("Купони (новіші вгорі, до 500) з кількістю використань; search — код або назва");
+
+        coupons.MapGet("/{id:int}", (int id, CouponService service, CancellationToken ct) => service.GetAsync(id, ct))
+            .WithSummary("Купон з товарами й категоріями, на які діє і на які не діє, та історією");
+
+        coupons.MapPost("", (SaveCouponRequest request, ClaimsPrincipal user, CouponService service, CancellationToken ct) =>
+            service.CreateAsync(request, user.GetUserId(), ct))
+            .WithSummary("Новий купон: type P (відсоток) або F (сума), дати обов'язкові; списки товарів і категорій (порожньо — на весь кошик) і виключення");
+
+        coupons.MapPut("/{id:int}", (int id, SaveCouponRequest request, ClaimsPrincipal user, CouponService service, CancellationToken ct) =>
+            service.UpdateAsync(id, request, user.GetUserId(), ct))
+            .WithSummary("Змінити купон разом зі списками");
+
+        coupons.MapDelete("/{id:int}", async (int id, ClaimsPrincipal user, CouponService service, CancellationToken ct) =>
+        {
+            await service.DeleteAsync(id, user.GetUserId(), ct);
+            return Results.NoContent();
+        })
+            .WithSummary("Видалити купон, яким ще не користувались (інакше його можна лише вимкнути)");
 
         var vouchers = marketing.MapGroup("/vouchers");
 
