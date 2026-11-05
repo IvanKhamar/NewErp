@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IPreOrderStore, PreOrderStore>();
         services.AddScoped<IMarketingStore, MarketingStore>();
         services.AddScoped<IVoucherStore, VoucherStore>();
+        services.AddScoped<ICouponStore, CouponStore>();
         services.AddScoped<ICompetitorStore, CompetitorStore>();
         services.AddSingleton<IPageFetcher>(_ => new HttpPageFetcher());
 

@@ -1,0 +1,84 @@
+@page "/marketing/coupons"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject MarketingApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Купони — NewErp</PageTitle>
+
+@* Як «Купони» старого сайту: список із кількістю використань; клік відкриває купон зі списками й історією. *@
+<div class="d-flex align-center flex-wrap gap-2 mb-3">
+    <MudText Typo="Typo.h4">Купони</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => OpenAsync(null)" data-test="new-coupon">
+        Новий купон
+    </MudButton>
+</div>
+
+<MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Placeholder="Код або назва" Adornment="Adornment.Start"
+              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" DebounceInterval="400" Variant="Variant.Outlined" Margin="Margin.Dense"
+              Class="mb-3" Style="max-width: 360px" />
+
+<MudTable T="CouponListItem" Items="_coupons" Dense="true" Hover="true" Striped="true" Loading="_coupons is null"
+          OnRowClick="row => OpenAsync(row.Item!.Id)" RowStyle="cursor: pointer" data-test="coupons">
+    <HeaderContent>
+        <MudTh>Код</MudTh>
+        <MudTh>Назва</MudTh>
+        <MudTh Style="text-align: right">Знижка</MudTh>
+        <MudTh Style="text-align: right">Від суми</MudTh>
+        <MudTh>Діє</MudTh>
+        <MudTh Style="text-align: right">Використано</MudTh>
+        <MudTh>Стан</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Код">@context.Code</MudTd>
+        <MudTd DataLabel="Назва">@context.Name</MudTd>
+        <MudTd DataLabel="Знижка" Style="text-align: right">@Discount(context.Type, context.Discount)</MudTd>
+        <MudTd DataLabel="Від суми" Style="text-align: right">@Fmt.Money(context.Total)</MudTd>
+        <MudTd DataLabel="Діє">@Period(context.DateStart, context.DateEnd)</MudTd>
+        <MudTd DataLabel="Використано" Style="text-align: right">@Uses(context)</MudTd>
+        <MudTd DataLabel="Стан"><StatusChip Name="@(context.Active ? "діє" : "вимкнено")" Color="@(context.Active ? "#4caf50" : "#9e9e9e")" /></MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>Купонів немає.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<CouponListItem>? _coupons;
+    private string _search = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    public static string Discount(string type, decimal discount) => type == "P" ? $"{discount:0.##} %" : Fmt.Money(discount);
+
+    public static string Period(DateOnly? start, DateOnly? end) =>
+        start is null && end is null ? "без обмежень" : $"{start?.ToString("dd.MM.yyyy") ?? "…"} – {end?.ToString("dd.MM.yyyy") ?? "…"}";
+
+    private static string Uses(CouponListItem coupon) => coupon.UsesTotal == 0 ? $"{coupon.Used}" : $"{coupon.Used} / {coupon.UsesTotal}";
+
+    private async Task SearchAsync(string? search)
+    {
+        _search = search ?? "";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _coupons = await Api.CouponsAsync(_search);
+        }
+        catch (ApiException e)
+        {
+            _coupons = [];
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task OpenAsync(int? id)
+    {
+        var dialog = await Dialogs.ShowAsync<CouponDialog>(id is null ? "Новий купон" : "Купон",
+            new DialogParameters<CouponDialog> { { d => d.Id, id } }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+            await LoadAsync();
+    }
+}
