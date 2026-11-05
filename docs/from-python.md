@@ -18,6 +18,33 @@ How to use this file:
   Sanitizer), money and access changes written to an audit log (who, what; personal data not logged), secrets only in
   settings/env, never shown or edited in pages.
 
+## Port order and what is left (stopped here on 2026-11-05)
+
+API, tests and Blazor pages for each group, one branch and one PR per group. Items can share files, so groups go one after another.
+
+| Group | Branch | Items | State |
+|---|---|---|---|
+| 1 | `feat/py-security` | 32, 33, 34, audit log | merged |
+| 2 | `feat/py-order-delivery` | 23, 24 | merged |
+| 3 | `feat/py-coupons` | 25 | merged |
+| 4 | `feat/py-alerts-matching` | 26, 27, 28 | merged |
+| 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
+| 6 | `feat/py-order-tools` | 35–42 | TODO |
+| 7 | `feat/py-product-form` | 43–45, 75, 76 | TODO |
+| 8 | `feat/py-catalog-lists` | 46–52 | TODO |
+| 9 | `feat/py-customers` | 53, 54 | TODO |
+| 10 | `feat/py-monobank` | 55, 56 | TODO |
+| 11 | `feat/py-marketing` | 57–62, 77 | TODO |
+| 12 | `feat/py-admin` | 63–68, 69, 70 | TODO |
+
+Things to know when continuing:
+
+- **Running the tests:** a throwaway `mysql:8.4` on port 3317 and `redis:7` on 6389, with `NEWERP_TEST_DB=server=127.0.0.1;port=3317;user=root` and `NEWERP_TEST_REDIS=localhost:6389`. Check that nothing was skipped.
+- **`dd_customer_transaction`** is already in `db/reconstructed.sql` and mapped (group 5), for groups 6 and 9.
+- **Local `newerp_dev`** needs the sections added by groups 2, 3 and 5 of `db/reconstructed.sql`, run by hand: `dd_product_special`, the coupon tables and the report tables.
+- **Not tried against the real services:** Nova Poshta courier delivery, `tools/NewErp.SchemaCheck --integrations`, and the shapes of the reconstructed tables against the real database.
+- **Daily timer:** `LowStockAlertWorker` has no test of its own.
+
 ---
 
 ## Earlier Python-first items (23–34)
@@ -30,9 +57,9 @@ How to use this file:
 | 26 | Low-stock alerts: a daily SMS (`stock.alertPhones`, `alertTime`), `POST /stock/alerts/low-stock`, home panel | ab43938 | DONE: `feat/py-alerts-matching`, 2026-11-05; home panel `LowStockPanel` |
 | 27 | Consumables for the sewing plan `GET /production/plan/materials?scope=orders|minimum|all` | f672a8c | DONE here (Python ported it from .NET); `scope=minimum|all` DONE: `feat/py-alerts-matching`, 2026-11-05 |
 | 28 | Automatic bank payment matching after import and `POST /payments/bank/auto-match`; `autoLinked` | ddbc1c9 | DONE: `feat/py-alerts-matching`, 2026-11-05 |
-| 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | TODO |
-| 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | TODO |
-| 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | TODO |
+| 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | DONE: `feat/py-reports`, 2026-11-05; `tools/NewErp.SchemaCheck --integrations` (the schema part was already there) |
+| 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | DONE: `feat/py-reports`, 2026-11-05 |
+| 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | DONE: `feat/py-reports`, 2026-11-05 |
 | 32 | "Different customers from one IP" (`sharedIp`) in the customer risk check | 6761c0f | DONE: `feat/py-security`, 2026-11-05 |
 | 33 | The login throttle shared between instances (Redis); client IP only from trusted proxies | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; `ConnectionStrings:Redis`, `TrustedProxies` |
 | 34 | Login CSRF: a double-submit token on the login form | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; no token here: login takes only JSON, which another site cannot send without CORS (test `Login_TakesOnlyJson`) |
@@ -118,7 +145,7 @@ How to use this file:
 
 ## 69–71. Status lists, banners and SEO addresses, standard reports — Python e3b53bd
 
-- **Status:** TODO
+- **Status:** 71 DONE: `feat/py-reports`, 2026-11-05. 69, 70 TODO
 - **Contract:** `/admin/status-lists/{order-statuses|return-statuses|return-reasons|return-actions|stock-statuses}`,
   `/catalog/banners`, `/catalog/seo-urls`, `GET /reports/standard/{kind}?from=&to=&group=day|week|month`.
 - **Security:** a used status can only be renamed; colours `#rrggbb`; banner links only the shop or https; SEO

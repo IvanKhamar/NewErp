@@ -81,6 +81,9 @@ public sealed class OrdersApi(HttpClient http)
 
     public Task<List<CityDto>> CitiesAsync(string search) => GetAsync<List<CityDto>>($"/delivery/cities?search={Uri.EscapeDataString(search)}");
 
+    public Task<NewErp.Application.Reports.OrderRemarketingDto> RemarketingAsync(int orderId) =>
+        GetAsync<NewErp.Application.Reports.OrderRemarketingDto>($"/orders/{orderId}/remarketing");
+
     public Task<List<StreetDto>> StreetsAsync(string cityRef, string search) =>
         GetAsync<List<StreetDto>>($"/delivery/streets?cityRef={Uri.EscapeDataString(cityRef)}&search={Uri.EscapeDataString(search)}");
 

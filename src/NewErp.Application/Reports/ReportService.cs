@@ -103,9 +103,11 @@ public sealed class ReportService(IReportStore store, TimeProvider clock)
         return (list.Count, list.Sum(f => f.Total));
     }
 
-    private (DateOnly From, DateOnly To) Range(ReportFilter filter)
+    private (DateOnly From, DateOnly To) Range(ReportFilter filter) => PeriodOf(filter, Today());
+
+    /// <summary>Період фільтра з перевіркою; спільний для всіх звітів із фільтром.</summary>
+    public static (DateOnly From, DateOnly To) PeriodOf(ReportFilter filter, DateOnly today)
     {
-        var today = Today();
         // Типово — поточний місяць, як у старих звітах.
         var from = filter.From ?? new DateOnly(today.Year, today.Month, 1);
         var to = filter.To ?? today;

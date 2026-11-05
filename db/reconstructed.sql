@@ -623,3 +623,96 @@ CREATE TABLE `dd_coupon_category_exclude` (
   `category_id` int(11) NOT NULL,
   PRIMARY KEY (`coupon_id`,`category_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Ремаркетинг: звідки прийшло замовлення й коли пікселі надіслали події ═══
+
+-- Таблиця модуля «Remarketing All in One» старого сайту; вітрина пише її для кожного замовлення. Структуру відновлено
+-- з admin/controller/sale/order.php (картка замовлення) і admin/model/report/remarketing.php; у справжній базі можуть бути
+-- й інші колонки, звірити. Час 0000-00-00 00:00:00 означає, що подію не надіслано.
+-- Без NO_ZERO_DATE лише в цьому сеансі, інакше MySQL 8 не прийме такі значення за замовчуванням (як у schema.sql).
+SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
+CREATE TABLE `dd_remarketing_orders` (
+  `order_id` int(11) NOT NULL,
+  `first_referrer` varchar(255) NOT NULL DEFAULT '',
+  `last_referrer` varchar(255) NOT NULL DEFAULT '',
+  `utm_source` varchar(255) NOT NULL DEFAULT '',
+  `utm_medium` varchar(255) NOT NULL DEFAULT '',
+  `utm_campaign` varchar(255) NOT NULL DEFAULT '',
+  `utm_content` varchar(255) NOT NULL DEFAULT '',
+  `utm_term` varchar(255) NOT NULL DEFAULT '',
+  `utm_referrer` varchar(255) NOT NULL DEFAULT '',
+  `success_page` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `ga4` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `facebook` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `facebook_lead` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `esputnik` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `telegram` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `tiktok` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  PRIMARY KEY (`order_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ═══ Дані вітрини для звітів: хто на сайті, бонуси, баланс, дії, пошук, лічильники ═══
+
+-- Стандартні таблиці OpenCart, яких немає в нашому дампі. customer_online вітрина пише, лише якщо увімкнено
+-- «Customers Online», і сама видаляє старі записи.
+CREATE TABLE `dd_customer_online` (
+  `ip` varchar(40) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `url` text NOT NULL,
+  `referer` text NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`ip`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_customer_reward` (
+  `customer_reward_id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL DEFAULT '0',
+  `order_id` int(11) NOT NULL DEFAULT '0',
+  `description` text NOT NULL,
+  `points` int(8) NOT NULL DEFAULT '0',
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`customer_reward_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_customer_transaction` (
+  `customer_transaction_id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL,
+  `order_id` int(11) NOT NULL,
+  `description` text NOT NULL,
+  `amount` decimal(15,4) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`customer_transaction_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_customer_activity` (
+  `customer_activity_id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL,
+  `key` varchar(64) NOT NULL,
+  `data` text NOT NULL,
+  `ip` varchar(40) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`customer_activity_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_customer_search` (
+  `customer_search_id` int(11) NOT NULL AUTO_INCREMENT,
+  `store_id` int(11) NOT NULL,
+  `language_id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `keyword` varchar(255) NOT NULL,
+  `category_id` int(11),
+  `sub_category` tinyint(1) NOT NULL,
+  `description` tinyint(1) NOT NULL,
+  `products` int(11) NOT NULL,
+  `ip` varchar(40) NOT NULL,
+  `date_added` datetime NOT NULL,
+  PRIMARY KEY (`customer_search_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `dd_statistics` (
+  `statistics_id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` varchar(64) NOT NULL,
+  `value` decimal(15,4) NOT NULL,
+  PRIMARY KEY (`statistics_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

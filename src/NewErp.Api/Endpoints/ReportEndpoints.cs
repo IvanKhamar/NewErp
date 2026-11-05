@@ -26,6 +26,32 @@ public static class ReportEndpoints
         reports.MapGet("/statuses", ([AsParameters] ReportFilter filter, ReportService service, CancellationToken ct) => service.StatusesAsync(filter, ct))
             .WithSummary("Замовлення (кількість і сума) та повернення за статусами, скасовані теж; типово — поточний місяць");
 
+        reports.MapGet("/utm", ([AsParameters] ReportFilter filter, string? source, string? medium, string? campaign, bool? bySource,
+                RemarketingService service, CancellationToken ct) =>
+                service.UtmReportAsync(filter, new UtmFilter(source, medium, campaign, bySource ?? false), ct))
+            .WithSummary("Замовлення за мітками UTM (таблиця модуля ремаркетингу вітрини) за періодами; bySource=true — рядок на кожне джерело");
+
+        reports.MapGet("/online", (StoreReportService service, CancellationToken ct) => service.OnlineAsync(ct))
+            .WithSummary("Хто зараз на сайті (вітрина пише, якщо увімкнено Customers Online)");
+
+        reports.MapGet("/product-views", (StoreReportService service, CancellationToken ct) => service.ProductViewsAsync(ct))
+            .WithSummary("Найпереглядуваніші товари: перегляди, продано й скільки продано на 100 переглядів");
+
+        reports.MapGet("/rewards", (StoreReportService service, CancellationToken ct) => service.RewardsAsync(ct))
+            .WithSummary("Бонусні бали покупців: залишок (нараховано мінус витрачено)");
+
+        reports.MapGet("/taxes", ([AsParameters] ReportFilter filter, StoreReportService service, CancellationToken ct) => service.TaxesAsync(filter, ct))
+            .WithSummary("Податки з підсумків замовлень (рядки tax) за період і назвою податку");
+
+        reports.MapGet("/standard/{kind}", (string kind, DateOnly? from, DateOnly? to, string? group, StandardReportService service, CancellationToken ct) =>
+                service.ReportAsync(kind, from, to, group, ct))
+            .WithSummary("Стандартні звіти OpenCart за період (from–to, типово 30 днів; group: day, week, month)");
+
+        app.MapGet("/orders/{id:int}/remarketing", (int id, RemarketingService service, CancellationToken ct) => service.ForOrderAsync(id, ct))
+            .WithTags("Замовлення")
+            .RequireAuthorization(Policies.Orders)
+            .WithSummary("Мітки UTM замовлення й час, коли пікселі вітрини надіслали події");
+
         // Фід забирає зовнішній дашборд, тож він без входу, але з токеном. Без токена в налаштуваннях — 404, з чужим — 401.
         app.MapGet("/feeds/revenue.json", async (
                 [Microsoft.AspNetCore.Mvc.FromHeader(Name = "X-Feed-Token")] string? header, string? token, int? days,

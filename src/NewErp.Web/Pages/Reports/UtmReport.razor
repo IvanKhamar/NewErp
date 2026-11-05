@@ -1,0 +1,105 @@
+@inject ReportsApi Api
+
+@* Звідки приходять замовлення: мітки, які записав модуль ремаркетингу вітрини. Період, статус і групування — з фільтра сторінки. *@
+<div class="d-flex flex-wrap align-center gap-3 mb-3">
+    <MudSelect T="string" Value="_source" ValueChanged="SourceAsync" Label="Джерело" Clearable="true" Style="min-width: 160px" data-test="utm-source">
+        @foreach (var value in _report?.Sources ?? [])
+        {
+            <MudSelectItem T="string" Value="value">@value</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="string" Value="_medium" ValueChanged="MediumAsync" Label="Канал" Clearable="true" Style="min-width: 160px">
+        @foreach (var value in _report?.Mediums ?? [])
+        {
+            <MudSelectItem T="string" Value="value">@value</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="string" Value="_campaign" ValueChanged="CampaignAsync" Label="Кампанія" Clearable="true" Style="min-width: 160px">
+        @foreach (var value in _report?.Campaigns ?? [])
+        {
+            <MudSelectItem T="string" Value="value">@value</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSwitch T="bool" Value="_bySource" ValueChanged="BySourceAsync" Color="Color.Primary" Label="Рядок на кожне джерело" />
+</div>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true" data-test="utm-error">@_error</MudAlert>
+}
+else if (_report is not null)
+{
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="utm">
+        <thead>
+            <tr>
+                <th>Період</th>
+                @if (_bySource)
+                {
+                    <th>Джерело</th>
+                }
+                <th style="text-align: right">Замовлень</th><th style="text-align: right">Товарів</th><th style="text-align: right">Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _report.Rows)
+            {
+                <tr>
+                    <td>@(row.Start == row.End ? row.Start.ToString("dd.MM.yyyy") : $"{row.Start:dd.MM.yyyy} – {row.End:dd.MM.yyyy}")</td>
+                    @if (_bySource)
+                    {
+                        <td>@row.UtmSource</td>
+                    }
+                    <td style="text-align: right">@row.Orders</td>
+                    <td style="text-align: right">@row.Products</td>
+                    <td style="text-align: right">@Fmt.Money(row.Total)</td>
+                </tr>
+            }
+            <tr>
+                <td colspan="@(_bySource ? 2 : 1)"><b>Разом</b></td>
+                <td style="text-align: right"><b>@_report.Orders</b></td>
+                <td></td>
+                <td style="text-align: right"><b>@Fmt.Money(_report.Total)</b></td>
+            </tr>
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    [Parameter, EditorRequired] public required ReportFilter Filter { get; set; }
+
+    private ReportFilter? _loaded;
+    private UtmReportDto? _report;
+    private string? _error;
+    private string? _source;
+    private string? _medium;
+    private string? _campaign;
+    private bool _bySource;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded != Filter)
+            await LoadAsync();
+    }
+
+    private Task SourceAsync(string? value) { _source = value; return LoadAsync(); }
+
+    private Task MediumAsync(string? value) { _medium = value; return LoadAsync(); }
+
+    private Task CampaignAsync(string? value) { _campaign = value; return LoadAsync(); }
+
+    private Task BySourceAsync(bool value) { _bySource = value; return LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        _loaded = Filter;
+        try
+        {
+            _report = await Api.UtmAsync(Filter, new UtmFilter(_source, _medium, _campaign, _bySource));
+            _error = null;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+}
