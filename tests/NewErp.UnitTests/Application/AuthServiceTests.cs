@@ -10,6 +10,7 @@ public class AuthServiceTests
 {
     private readonly FakeUserLoginStore _store = new();
     private readonly AuthService _service;
+    private readonly FakeAudit _audit = new();
     private readonly UserAdminService _admin;
 
     public AuthServiceTests()
@@ -18,7 +19,7 @@ public class AuthServiceTests
         _store.Add(2, "ihor", "Ігор Тест", active: false, "hash:secret-pass", Roles.Manager);
         _store.Add(3, "marta", "Марта Тест", active: true, passwordHash: null, role: null); // є на старому сайті, доступу немає
         _service = new AuthService(_store, new FakeHasher(), new FakeTimeProvider());
-        _admin = new UserAdminService(_store, new FakeHasher(), new FakeTimeProvider());
+        _admin = new UserAdminService(_store, new FakeHasher(), new FakeTimeProvider(), _audit);
     }
 
     [Fact]
@@ -62,7 +63,7 @@ public class AuthServiceTests
     [Fact]
     public async Task Create_NewWorkerGetsTemporaryPasswordAndMustChangeIt()
     {
-        var result = await _admin.CreateAsync(new CreateUserRequest("sklad2", "Петро", "Новий", null, "storekeeper"), CancellationToken.None);
+        var result = await _admin.CreateAsync(actorId: 1, new CreateUserRequest("sklad2", "Петро", "Новий", null, "storekeeper"), CancellationToken.None);
 
         Assert.Equal(12, result.TemporaryPassword!.Length);
         var login = await _service.LoginAsync(new LoginRequest("sklad2", result.TemporaryPassword), CancellationToken.None);
@@ -73,9 +74,9 @@ public class AuthServiceTests
     public async Task Create_TakenUsernameOrUnknownRole_Rejected()
     {
         await Assert.ThrowsAsync<DomainException>(() =>
-            _admin.CreateAsync(new CreateUserRequest("olena", "Олена", "Друга", null, Roles.Manager), CancellationToken.None));
+            _admin.CreateAsync(actorId: 1, new CreateUserRequest("olena", "Олена", "Друга", null, Roles.Manager), CancellationToken.None));
         await Assert.ThrowsAsync<DomainException>(() =>
-            _admin.CreateAsync(new CreateUserRequest("new1", "Нова", "Людина", null, "Boss"), CancellationToken.None));
+            _admin.CreateAsync(actorId: 1, new CreateUserRequest("new1", "Нова", "Людина", null, "Boss"), CancellationToken.None));
     }
 
     [Fact]
@@ -107,6 +108,25 @@ public class AuthServiceTests
 
         Assert.Null(await _store.GetActiveSecurityStampAsync(2, CancellationToken.None));
         await Assert.ThrowsAsync<NotFoundException>(() => _admin.RevokeAsync(actorId: 1, 2, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AccessChanges_AreAudited_WithWhoDidIt()
+    {
+        await _admin.SetAccessAsync(actorId: 1, 3, new SetAccessRequest(Roles.Manager, "Temporary-Pass-1"), CancellationToken.None);
+        await _admin.ResetPasswordAsync(actorId: 1, 3, new ResetPasswordRequest("Temporary-Pass-2"), CancellationToken.None);
+        await _admin.RevokeAsync(actorId: 1, 3, CancellationToken.None);
+
+        Assert.Equal(
+            [$"user access set: 3, role {Roles.Manager}, by user 1", "user password reset: 3, by user 1", "user access revoked: 3, by user 1"],
+            _audit.Lines);
+    }
+
+    private sealed class FakeAudit : NewErp.Application.IAuditLog
+    {
+        public List<string> Lines { get; } = [];
+
+        public void Record(string text) => Lines.Add(text);
     }
 
     private sealed class FakeHasher : IPasswordHasher

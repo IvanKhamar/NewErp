@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
 using NewErp.Application.Marketing;
 using NewErp.Application.Orders;
 using NewErp.Domain.Orders;
+using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.IntegrationTests;
 
@@ -105,6 +109,32 @@ public class NewOrderApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal((CustomerRiskLevel.Red, 1), (risk!.Level, risk.TotalOrders));
         Assert.Equal([ApiFactory.CancelledOrderId], risk.CancelledOrderIds);
+    }
+
+    [MySqlFact]
+    public async Task CustomerRisk_WarnsAboutDifferentCustomersFromOneIp()
+    {
+        const string ip = "198.51.100.7";
+        int[] orderIds = [ApiFactory.OrderId, 2, ApiFactory.CancelledOrderId];
+        var client = await factory.LoginAsync(ApiFactory.Manager);
+        await SetIpAsync(orderIds, ip);
+        try
+        {
+            var risk = await client.GetFromJsonAsync<CustomerRiskDto>("/orders/customer-risk?telephone=0935554433");
+
+            Assert.Equal((ip, 3, 3), (risk!.SharedIp!.Ip, risk.SharedIp.UniqueClients, risk.SharedIp.Clients.Count));
+        }
+        finally
+        {
+            await SetIpAsync(orderIds, "");
+        }
+    }
+
+    private async Task SetIpAsync(int[] orderIds, string ip)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
+        await db.DdOrders.Where(o => orderIds.Contains(o.OrderId)).ExecuteUpdateAsync(s => s.SetProperty(o => o.Ip, ip));
     }
 
     [MySqlFact]

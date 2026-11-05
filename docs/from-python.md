@@ -1,7 +1,7 @@
 # Features built in Python first, to port here
 
 The Python version (`IvanKhamar/NewErpPython`, locally `F:\PROJECTS\NewErpPython\NewErpPython`) got these features
-before this repo: items 23–71 of its `docs/plan.md`. Most come from a direct comparison with the old PHP admin
+before this repo: items 23–77 of its `docs/plan.md`. Most come from a direct comparison with the old PHP admin
 (`F:\PROJECTS\VIDRO\Vidro_OpenCart_WebSite`, every custom `admin/controller/*` action and the admin menu).
 
 How to use this file:
@@ -33,9 +33,9 @@ How to use this file:
 | 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | TODO |
 | 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | TODO |
 | 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | TODO |
-| 32 | "Different customers from one IP" (`sharedIp`) in the customer risk check | 6761c0f | TODO |
-| 33 | The login throttle shared between instances (Redis); client IP only from trusted proxies | 167f2a3 | TODO |
-| 34 | Login CSRF: a double-submit token on the login form | 167f2a3 | TODO |
+| 32 | "Different customers from one IP" (`sharedIp`) in the customer risk check | 6761c0f | DONE: `feat/py-security`, 2026-11-05 |
+| 33 | The login throttle shared between instances (Redis); client IP only from trusted proxies | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; `ConnectionStrings:Redis`, `TrustedProxies` |
+| 34 | Login CSRF: a double-submit token on the login form | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; no token here: login takes only JSON, which another site cannot send without CORS (test `Login_TakesOnlyJson`) |
 
 ## 35–42. Orders: the old admin's order page tools — Python 67f29fb
 
@@ -125,3 +125,28 @@ How to use this file:
   addresses unique and only for known page kinds; reports at most 366 days and 500 rows.
 - **Tables:** `dd_stock_status`, `dd_banner`, `dd_banner_image`, `dd_customer_activity`, `dd_customer_search`,
   `dd_statistics`.
+
+## 75. Picture upload — Python 87f8bd3
+
+- **Status:** TODO
+- **Contract:** `POST /catalog/pictures/{kind}` (multipart field `file`; `kind`: products, categories, banners, vouchers) returns 201 `{"path": "catalog/<kind>/<16 hex>.<ext>"}`; a file picker next to each picture path field of the product, category, banner and voucher theme forms. Setting `NEWERP_PICTURES__IMAGE_DIR` (the storefront's image folder on a shared volume); empty: 400 with a text naming the setting.
+- **Security:** the browser's file name and type are not used; the type comes from the first bytes (JPEG, PNG, WebP, GIF only; SVG is refused because it can carry scripts); at most 5 MB; the server makes the name; an existing file is never overwritten; the path can't leave the folder; audited.
+
+## 76. Options other than sizes in the product form — Python df5af90
+
+- **Status:** TODO
+- **Contract:** `options` next to `sizes` in `GET /catalog/products/{id}/edit`, `POST` and `PUT`: `{optionId, name, required, value, values: [{optionValueId, name, price, pricePrefix, quantity}]}`; `GET /catalog/products/form-lookups` gets `options: [{id, name, type, hasValues, values}]`, without the size option. `select`, `radio`, `checkbox` and `image` options have values; the others hold a text in `value`.
+- **Rules:** keep sizes and other options apart when reading (the Python form first read every option value as a size, so saving refused the product or dropped its colours). Rows are changed in place, because the lines of old orders point to them. A new non-size value has `subtract = 0`, because production keeps stock only by size and the storefront would hide it at zero. A value with stock can't be removed. An option with nothing left is removed with its `dd_product_option` row.
+- **Security:** an option or value must exist and belong together; a list option needs at least one value; `<` and `>` are refused in a text value.
+
+## 77. TikTok catalog sync and the Klaviyo log — Python ef9592d
+
+- **Status:** TODO
+- **Contract:** `POST /marketing/tiktok/sync` returns `{configured, uploaded, failed}` and a scheduled task every `tiktokSync.intervalHours` (0: only by hand); `GET /marketing/klaviyo/log` returns `{enabled, size, text, cut}`. Settings: TikTok access token, `bcId`, `catalogId`; the Klaviyo log path.
+- **Rules:** batches of 1000 to `https://business-api.tiktok.com/open_api/v1.3/catalog/product/upload/`, accepted when the answer's `message` is `OK`. `sku_id` is the product id, as in the feed, because many products share a print code. Disabled products go as `OUT_OF_STOCK`.
+- **Security:** the token only in settings and only in the `Access-Token` header, never logged; a refused batch is counted, not an error; the log is masked and admin only. Python tried it only against a fake TikTok, so check the first real run.
+
+## Python fixes of 2026-11-05 to keep in mind
+
+- **The audit log must really be written.** Python's default level dropped every `audit.info` line. Have a test that checks the line through the app's normal logging settings, without setting a level in the test.
+- **Tests that depend on today's date.** A web test with a fixed payment date and a default window of the last 31 days started failing a month later. Give such tests a date relative to today.

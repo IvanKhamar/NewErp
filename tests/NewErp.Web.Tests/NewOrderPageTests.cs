@@ -85,5 +85,28 @@ public class NewOrderPageTests : WebTestContext
         Assert.Contains("value=\"+380501112233\"", page.Markup);
     }
 
+    [Fact]
+    public void PickCustomer_WarnsAboutDifferentCustomersFromOneIp()
+    {
+        Api.Respond("/orders/customer-risk", HttpStatusCode.OK, Risk(CustomerRiskLevel.Green) with
+        {
+            TotalOrders = 1,
+            SharedIp = new SharedIpDto("198.51.100.7", 3, ["Ганна Нова (0671112233)", "Іван Сидоренко (0672223344)", "Олена Коваль (0673334455)"]),
+        });
+        var page = Render<NewOrder>();
+        page.WaitForAssertion(() => page.Find("[data-test=save]"));
+
+        var customer = page.FindComponent<MudAutocomplete<CustomerPickDto>>();
+        page.InvokeAsync(() => customer.Instance.ValueChanged.InvokeAsync(
+            new CustomerPickDto(0, "Ганна", "Нова", "+380671112233", "", "", "Київ", "", "Відділення №1", 11)));
+
+        page.WaitForAssertion(() =>
+        {
+            var warning = page.Find("[data-test=shared-ip]").TextContent;
+            Assert.Contains("З IP 198.51.100.7 замовляли 3 різних клієнтів", warning);
+            Assert.Contains("Іван Сидоренко (0672223344)", warning);
+        });
+    }
+
     private static CustomerRiskDto Risk(CustomerRiskLevel level) => new(level, 0, 0, [], 0, "Потенційний фрод-ризик.");
 }

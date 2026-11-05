@@ -134,6 +134,32 @@ public class NewOrderServiceTests
         Assert.Null(_store.LastRiskQuery);
     }
 
+    [Fact]
+    public async Task CheckRisk_ShowsTheBusiestOfTheLastThreeIps()
+    {
+        _store.CustomerOrders = [(1, 22)];
+        _store.Ips = ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"];
+        (string, string, string)[] Clients(int count) => Enumerable.Range(1, count).Select(i => ("Ім'я", $"П{i}", $"067000000{i}")).ToArray();
+        _store.FromIp["10.0.0.1"] = Clients(2); // замало
+        _store.FromIp["10.0.0.2"] = Clients(3);
+        _store.FromIp["10.0.0.3"] = Clients(4);
+        _store.FromIp["10.0.0.4"] = Clients(9); // четверта адреса не перевіряється
+
+        var risk = await _service.CheckRiskAsync(new CustomerRiskQuery("0671234567"), CancellationToken.None);
+
+        Assert.Equal(("10.0.0.3", 4, 4), (risk.SharedIp!.Ip, risk.SharedIp.UniqueClients, risk.SharedIp.Clients.Count));
+    }
+
+    [Fact]
+    public async Task CheckRisk_NoSharedIp_WithoutSiteOrders()
+    {
+        _store.CustomerOrders = [(1, 22)];
+
+        var risk = await _service.CheckRiskAsync(new CustomerRiskQuery("0671234567"), CancellationToken.None);
+
+        Assert.Null(risk.SharedIp);
+    }
+
     private sealed class FakeNewOrderStore(OrderServiceTests.FakeOrderStore orders) : INewOrderStore
     {
         public Dictionary<int, ProductPickDto> Products { get; } = [];
@@ -159,6 +185,15 @@ public class NewOrderServiceTests
             LastSince = since;
             return Task.FromResult(CustomerOrders);
         }
+
+        public IReadOnlyList<string> Ips { get; set; } = [];
+
+        public Dictionary<string, (string, string, string)[]> FromIp { get; } = [];
+
+        public Task<IReadOnlyList<string>> OrderIpsAsync(IReadOnlyList<int> orderIds, CancellationToken ct) => Task.FromResult(Ips);
+
+        public Task<IReadOnlyList<(string Firstname, string Lastname, string Telephone)>> OrdersFromIpAsync(string ip, DateTime since, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<(string Firstname, string Lastname, string Telephone)>>(FromIp.GetValueOrDefault(ip, []));
 
         public Task<OrderMethodsDto> ListMethodsAsync(CancellationToken ct) => Task.FromResult(new OrderMethodsDto([], []));
 

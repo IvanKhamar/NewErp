@@ -7,12 +7,12 @@ namespace NewErp.Application.Auth;
 /// Керування користувачами (лише Admin): нові працівники, доступ до NewErp, ролі, скидання паролів.
 /// Будь-яка зміна видає нову версію облікового запису, тож старі сесії цієї людини одразу перестають діяти.
 /// </summary>
-public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hasher, TimeProvider clock)
+public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hasher, TimeProvider clock, IAuditLog audit)
 {
     public Task<IReadOnlyList<UserDto>> ListAsync(CancellationToken ct) => store.ListAsync(ct);
 
     /// <summary>Новий працівник: рядок у dd_user (спільний зі старим сайтом) і вхід у NewErp з тимчасовим паролем.</summary>
-    public async Task<UserAccessResult> CreateAsync(CreateUserRequest request, CancellationToken ct)
+    public async Task<UserAccessResult> CreateAsync(int actorId, CreateUserRequest request, CancellationToken ct)
     {
         var username = RequireText(request.Username, "Логін", 3, 20);
         var user = new NewUser(
@@ -29,6 +29,7 @@ public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hash
 
         var userId = await store.CreateUserAsync(user, clock.GetLocalNow().DateTime, ct);
         await store.SaveLoginAsync(userId, role, hasher.Hash(password), mustChangePassword: true, ct);
+        audit.Record($"user created: {userId}, role {role}, by user {actorId}");
         return new UserAccessResult(userId, password);
     }
 
@@ -48,6 +49,7 @@ public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hash
             password = TemporaryPassword(request.TemporaryPassword, user.Username);
 
         await store.SaveLoginAsync(userId, role, password is null ? null : hasher.Hash(password), password is null ? null : true, ct);
+        audit.Record($"user access set: {userId}, role {role}, by user {actorId}");
         return new UserAccessResult(userId, password);
     }
 
@@ -58,10 +60,11 @@ public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hash
             throw new DomainException("Не можна забрати доступ у самого себе.");
         if (!await store.DeleteLoginAsync(userId, ct))
             throw new NotFoundException($"У користувача {userId} немає доступу до NewErp.");
+        audit.Record($"user access revoked: {userId}, by user {actorId}");
     }
 
     /// <summary>Скидає пароль на тимчасовий; людина змінить його сама після входу.</summary>
-    public async Task<UserAccessResult> ResetPasswordAsync(int userId, ResetPasswordRequest request, CancellationToken ct)
+    public async Task<UserAccessResult> ResetPasswordAsync(int actorId, int userId, ResetPasswordRequest request, CancellationToken ct)
     {
         var user = await store.GetAsync(userId, ct);
         if (user is not { HasAccess: true })
@@ -69,6 +72,7 @@ public sealed class UserAdminService(IUserLoginStore store, IPasswordHasher hash
 
         var password = TemporaryPassword(request.TemporaryPassword, user.Username);
         await store.SaveLoginAsync(userId, role: null, hasher.Hash(password), mustChangePassword: true, ct);
+        audit.Record($"user password reset: {userId}, by user {actorId}");
         return new UserAccessResult(userId, password);
     }
 

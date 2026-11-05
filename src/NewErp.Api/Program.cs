@@ -28,7 +28,7 @@ builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadReq
 builder.Services.AddHealthChecks();
 builder.Services.AddErpAuth(builder.Environment);
 builder.Services.Configure<LoginThrottleOptions>(builder.Configuration.GetSection(LoginThrottleOptions.SectionName));
-builder.Services.AddSingleton<LoginThrottle>();
+builder.Services.AddTrustedProxies(builder.Configuration);
 
 builder.Services.Configure<BonusOptions>(builder.Configuration.GetSection(BonusOptions.SectionName));
 builder.Services.Configure<StockOptions>(builder.Configuration.GetSection(StockOptions.SectionName));
@@ -49,6 +49,7 @@ builder.Services.AddHostedService<CompetitorPriceWorker>();
 
 var app = builder.Build();
 
+app.UseTrustedProxies(app.Configuration); // першим: решта вже бачить справжню адресу клієнта й HTTPS
 app.UseExceptionHandler();
 app.UseSecurityHeaders();
 

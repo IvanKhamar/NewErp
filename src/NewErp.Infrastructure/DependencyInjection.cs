@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
+using NewErp.Application;
 using NewErp.Application.Auth;
 using NewErp.Application.Cashbox;
 using NewErp.Application.Catalog;
@@ -53,6 +55,15 @@ public static class DependencyInjection
 
         services.AddDbContext<ErpDbContext>(options => options.UseMySQL(connectionString));
         services.Configure<ErpOptions>(configuration.GetSection(ErpOptions.SectionName));
+        services.AddSingleton<IAuditLog, AuditLog>();
+        // Кілька екземплярів застосунку мають рахувати невдалі входи разом: тоді задаємо ConnectionStrings:Redis.
+        services.AddSingleton<ILoginThrottle>(provider =>
+        {
+            var redis = provider.GetRequiredService<IConfiguration>().GetConnectionString("Redis");
+            return string.IsNullOrWhiteSpace(redis)
+                ? ActivatorUtilities.CreateInstance<LoginThrottle>(provider)
+                : new RedisLoginThrottle(RedisLoginThrottle.Connect(redis), provider.GetRequiredService<IOptions<LoginThrottleOptions>>());
+        });
 
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IOrderStore, OrderStore>();
