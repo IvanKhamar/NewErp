@@ -10,14 +10,24 @@
 <div class="d-flex align-center flex-wrap gap-2 mb-2">
     <MudText Typo="Typo.h4">Надходження на рахунок</MudText>
     <MudSpacer />
+    <MudTooltip Text="Прив'язує платіж, лише коли замовлення одне й у призначенні його номер чи телефон, а сума збігається.">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="AutoMatchAsync" Disabled="_busy"
+                   data-test="auto-match">Зіставити автоматично</MudButton>
+    </MudTooltip>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="ImportAsync" Disabled="_busy"
                data-test="import">Завантажити виписку</MudButton>
 </div>
+@if (_autoMatch is { } matched)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-3" data-test="auto-match-result">
+        Перевірено платежів без замовлення: @matched.Checked, прив'язано: @matched.Links.Count@(matched.Links.Count > 0 ? ": " + string.Join(", ", matched.Links.Select(l => $"платіж {l.PaymentId} → №{l.OrderId}")) : "").
+    </MudAlert>
+}
 @if (_import is { } import)
 {
     <MudAlert Severity="@(import.ClientConfigured ? Severity.Success : Severity.Info)" Class="mb-3" data-test="import-result">
         @(import.ClientConfigured
-            ? $"Отримано операцій: {import.Fetched}, нових надходжень: {import.Added}."
+            ? $"Отримано операцій: {import.Fetched}, нових надходжень: {import.Added}, прив'язано автоматично: {import.AutoLinked}."
             : "Ключі ПриватБанку не задано, тож виписка не завантажувалась. Так і має бути в локальній розробці.")
     </MudAlert>
 }
@@ -87,6 +97,7 @@
 @code {
     private PagedResult<BankPaymentDto>? _page;
     private BankImportResult? _import;
+    private AutoMatchResult? _autoMatch;
     private string _view = "unlinked";
     private string _search = "";
     private int _pageNumber = 1;
@@ -116,6 +127,8 @@
     }
 
     private Task ImportAsync() => RunAsync(null, async () => _import = await Api.ImportAsync());
+
+    private Task AutoMatchAsync() => RunAsync(null, async () => _autoMatch = await Api.AutoMatchAsync());
 
     private async Task MatchAsync(BankPaymentDto payment)
     {

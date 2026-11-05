@@ -10,6 +10,14 @@ namespace NewErp.Infrastructure.Payments;
 
 public sealed class BankPaymentRepository(ErpDbContext db, IOptions<ErpOptions> options) : IBankPaymentRepository
 {
+    public async Task<IReadOnlyList<int>> UnlinkedIdsAsync(DateOnly from, DateOnly to, int limit, CancellationToken ct) =>
+        await db.BankPayments.AsNoTracking()
+            .Where(p => p.IsVisible && p.OrderId == 0 && p.TranDate >= from && p.TranDate <= to)
+            .OrderByDescending(p => p.TranDate).ThenByDescending(p => p.TranTime).ThenByDescending(p => p.Id)
+            .Take(limit)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
+
     public async Task<PagedResult<BankPaymentDto>> ListAsync(BankPaymentFilter filter, CancellationToken ct)
     {
         var (page, pageSize) = Paging.Normalize(filter.Page, filter.PageSize);

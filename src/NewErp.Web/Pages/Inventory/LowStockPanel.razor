@@ -1,0 +1,41 @@
+@inject StockApi Api
+
+@* Комірник одразу бачить, чого мало: сповіщення всередині застосунку, поруч із SMS. *@
+@if (_items is { Count: > 0 })
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" data-test="low-stock">
+        <div>
+            <b>Мало на складі: @_items.Count поз. нижче мінімуму</b> ·
+            <MudLink Href="stock/reorder" Typo="Typo.body2">що дозамовити</MudLink>
+        </div>
+        @foreach (var item in _items.Take(Shown))
+        {
+            <div>
+                <MudLink Href="@($"stock/items/{item.Id}")" Typo="Typo.body2">@item.Name</MudLink>
+                — @item.Quantity.ToString("0.###") @item.Unit (мін. @item.MinQuantity.ToString("0.###"))
+            </div>
+        }
+        @if (_items.Count > Shown)
+        {
+            <MudLink Href="stock" Typo="Typo.body2" data-test="low-stock-all">усі @_items.Count</MudLink>
+        }
+    </MudAlert>
+}
+
+@code {
+    private const int Shown = 10;
+
+    private List<StockItemDto>? _items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _items = await Api.ItemsAsync(belowMinimumOnly: true);
+        }
+        catch (ApiException)
+        {
+            // Лише підказка на головній: без неї сторінка однаково працює.
+        }
+    }
+}

@@ -79,6 +79,11 @@
     Скільки розхідників знадобиться, щоб розкроїти й пошити все, що в плані, за специфікаціями крою й пошиву. «Бракує» — чого не
     вистачить навіть після вже замовленого в постачальників.
 </MudText>
+<MudSelect T="string" Value="_scope" ValueChanged="ScopeAsync" Label="На що рахувати" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" Style="max-width: 24rem" data-test="materials-scope">
+    <MudSelectItem T="string" Value="@("orders")">Для замовлень</MudSelectItem>
+    <MudSelectItem T="string" Value="@("minimum")">До мінімального запасу</MudSelectItem>
+    <MudSelectItem T="string" Value="@("all")">Усе разом</MudSelectItem>
+</MudSelect>
 @if (_materialsError is not null)
 {
     <MudAlert Severity="Severity.Error" Dense="true">@_materialsError</MudAlert>
@@ -121,7 +126,7 @@ else
                     <td>
                         @foreach (var use in material.Uses)
                         {
-                            <MudText Typo="Typo.caption" Class="d-block">@use.ModelName @use.SizeName · @use.Stage.ToLowerInvariant() @Qty(use.Quantity)</MudText>
+                            <MudText Typo="Typo.caption" Class="d-block">@use.ModelName @use.SizeName · @use.Stage.ToLowerInvariant() @Qty(use.Quantity)@(use.ForMinimum ? " (до мінімуму)" : "")</MudText>
                         }
                     </td>
                 </tr>
@@ -139,13 +144,27 @@ else
     private bool _onlyToSew = true;
     private PlanMaterialsDto? _materials;
     private string? _materialsError;
+    private string _scope = "orders";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+        await LoadMaterialsAsync();
+    }
+
+    private async Task ScopeAsync(string scope)
+    {
+        _scope = scope;
+        _materials = null;
+        await LoadMaterialsAsync();
+    }
+
+    private async Task LoadMaterialsAsync()
+    {
+        _materialsError = null;
         try
         {
-            _materials = await Api.PlanMaterialsAsync();
+            _materials = await Api.PlanMaterialsAsync(_scope);
         }
         catch (ApiException e)
         {

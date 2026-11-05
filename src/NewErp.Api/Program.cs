@@ -46,6 +46,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<CashboxScheduleOptions>(builder.Configuration.GetSection(CashboxScheduleOptions.SectionName));
 builder.Services.AddHostedService<CashboxAutoCloseWorker>();
 builder.Services.AddHostedService<CompetitorPriceWorker>();
+builder.Services.AddHostedService<LowStockAlertWorker>();
 
 var app = builder.Build();
 

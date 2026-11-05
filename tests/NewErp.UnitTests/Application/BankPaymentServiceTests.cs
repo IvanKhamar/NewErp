@@ -10,6 +10,7 @@ namespace NewErp.UnitTests.Application;
 public class BankPaymentServiceTests
 {
     private readonly FakeBankRepository _repository = new();
+    private readonly FakeAudit _audit = new();
     private readonly FakeBankClient _client = new();
     private readonly BankPaymentService _service;
     private static readonly CancellationToken Ct = CancellationToken.None;
@@ -18,7 +19,7 @@ public class BankPaymentServiceTests
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero));
         clock.SetLocalTimeZone(TimeZoneInfo.Utc);
-        _service = new BankPaymentService(_repository, _client, clock);
+        _service = new BankPaymentService(_repository, _client, clock, _audit);
     }
 
     private static BankTransaction Tx(string id, decimal amount, bool incoming = true, string purpose = "Оплата") =>
@@ -83,6 +84,45 @@ public class BankPaymentServiceTests
         Assert.Equal(0, payment.OrderId);
     }
 
+    [Fact]
+    public async Task Import_LinksANewPayment_WhenOneOrderIsConfident_AndAuditsIt()
+    {
+        _repository.Candidates.Add(new OrderCandidate(12345, "Олена", "0670000001", 1500m, 0, new DateTime(2026, 10, 14), "Нове", null));
+        _client.Transactions.Add(Tx("tx-new", 1500m, purpose: "Замовлення 12345"));
+
+        var result = await _service.ImportAsync(null, null, Ct);
+
+        Assert.Equal(1, result.AutoLinked);
+        var payment = _repository.Payments.Single(p => p.AppCode == "tx-new");
+        Assert.Equal(12345, payment.OrderId);
+        Assert.Contains("order 12345", Assert.Single(_audit.Lines));
+    }
+
+    [Fact]
+    public async Task Import_LeavesAPaymentAlone_WhenTwoOrdersAreConfident()
+    {
+        _repository.Candidates.Add(new OrderCandidate(12345, "Олена", "0670000001", 1500m, 0, new DateTime(2026, 10, 14), "Нове", null));
+        _repository.Candidates.Add(new OrderCandidate(12346, "Ірина", "0670000002", 1500m, 0, new DateTime(2026, 10, 14), "Нове", null));
+        _client.Transactions.Add(Tx("tx-new", 1500m, purpose: "Замовлення 12345 і 12346"));
+
+        var result = await _service.ImportAsync(null, null, Ct);
+
+        Assert.Equal(0, result.AutoLinked);
+        Assert.Equal(0, _repository.Payments.Single(p => p.AppCode == "tx-new").OrderId);
+        Assert.Empty(_audit.Lines);
+    }
+
+    [Fact]
+    public async Task AutoMatch_LaterStartThanEnd_IsRefused() =>
+        await Assert.ThrowsAsync<DomainException>(() => _service.AutoMatchAsync(new DateOnly(2026, 10, 31), new DateOnly(2026, 10, 1), Ct));
+
+    private sealed class FakeAudit : NewErp.Application.IAuditLog
+    {
+        public List<string> Lines { get; } = [];
+
+        public void Record(string text) => Lines.Add(text);
+    }
+
     private sealed class FakeBankClient : IBankStatementClient
     {
         public bool IsConfigured { get; set; } = true;
@@ -107,6 +147,9 @@ public class BankPaymentServiceTests
         public CandidateQuery? LastQuery { get; private set; }
 
         public Task<PagedResult<BankPaymentDto>> ListAsync(BankPaymentFilter filter, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<int>> UnlinkedIdsAsync(DateOnly from, DateOnly to, int limit, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<int>>(Payments.Where(p => p.OrderId == 0).Select(p => p.Id).ToList());
 
         public Task<BankPayment?> GetAsync(int id, CancellationToken ct) => Task.FromResult(Payments.FirstOrDefault(p => p.Id == id));
 

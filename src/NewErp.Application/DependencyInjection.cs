@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();
         services.AddScoped<VoucherService>();
+        services.AddScoped<LowStockAlertService>();
         services.AddScoped<CouponService>();
         services.AddScoped<CompetitorService>();
         // OrderService викликає всіх IOrderStatusHandler при зміні статусу замовлення.

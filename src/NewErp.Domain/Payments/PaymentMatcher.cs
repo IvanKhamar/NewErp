@@ -38,6 +38,22 @@ public static class PaymentMatcher
             .Distinct()
             .ToList();
 
+    /// <summary>
+    /// Досить упевнено, щоб прив'язати без людини: призначення називає замовлення (номер чи телефон), сума збігається (усе
+    /// замовлення, завдаток або решта) і платежу в замовлення ще немає. Прізвища й суми замало: таку саму суму може сплатити тезка.
+    /// </summary>
+    public static bool IsConfident(ScoredCandidate candidate) =>
+        (candidate.Reasons & (MatchReason.OrderNumber | MatchReason.Phone)) != 0
+        && (candidate.Reasons & (MatchReason.Total | MatchReason.Prepayment)) != 0
+        && candidate.Order.LinkedPaymentId is null;
+
+    /// <summary>Замовлення для автоматичної прив'язки: лише коли впевнений кандидат рівно один (двоє — питання для людини).</summary>
+    public static OrderCandidate? ConfidentMatch(IEnumerable<ScoredCandidate> ranked)
+    {
+        var confident = ranked.Where(IsConfident).ToList();
+        return confident.Count == 1 ? confident[0].Order : null;
+    }
+
     public static IReadOnlyList<ScoredCandidate> Rank(BankPayment payment, IEnumerable<OrderCandidate> candidates)
     {
         var text = $"{payment.Description} {payment.Terminal}";

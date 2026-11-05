@@ -12,6 +12,9 @@ public static class StockEndpoints
     {
         var stock = app.MapGroup("/stock").WithTags("Склад: розхідники").RequireAuthorization(Policies.Stock);
 
+        stock.MapPost("/alerts/low-stock", (LowStockAlertService service, CancellationToken ct) => service.SendAsync(ct))
+            .WithSummary("Надіслати SMS про розхідники, що за добу впали нижче мінімуму (те саме робить щоденна задача)");
+
         stock.MapGet("/categories", (IStockRepository repo, CancellationToken ct) => repo.ListCategoriesAsync(ct));
 
         stock.MapPost("/categories", async (CreateStockCategoryRequest request, StockService service, CancellationToken ct) =>

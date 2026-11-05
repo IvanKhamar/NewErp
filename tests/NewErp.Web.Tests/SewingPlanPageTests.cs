@@ -29,6 +29,23 @@ public class SewingPlanPageTests : WebTestContext
     }
 
     [Fact]
+    public void Materials_ChoosingAScope_AsksAgain_AndMarksWhatIsForTheMinimum()
+    {
+        Services.AddScoped<ProductionApi>();
+        Api.Respond("/production/plan", HttpStatusCode.OK, new SewingPlanDto(1, [], []));
+        Api.Respond("/production/plan/materials", HttpStatusCode.OK, new PlanMaterialsDto(
+            [new(10, "Тканина льон", "м", 15m, 1m, 0m, 14m, [new(1, "Сукня лляна", "M", "Крій", 15m, ForMinimum: true)])], []));
+
+        var page = Render<SewingPlan>();
+        page.WaitForAssertion(() => Assert.Contains("(до мінімуму)", page.Find("[data-test=materials]").TextContent));
+
+        var scope = page.FindComponent<MudBlazor.MudSelect<string>>();
+        page.InvokeAsync(() => scope.Instance.ValueChanged.InvokeAsync("minimum"));
+
+        page.WaitForAssertion(() => Assert.Contains(Api.Urls, u => u.Contains("/production/plan/materials?scope=minimum", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void Materials_ShowShortageInRed_AndWhatTheyAreFor()
     {
         Services.AddScoped<ProductionApi>();

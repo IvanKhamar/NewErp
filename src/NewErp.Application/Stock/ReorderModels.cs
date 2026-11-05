@@ -10,6 +10,12 @@ public sealed class StockOptions
     /// Запас із подушкою, щоб позиція не ставала «нижче мінімуму» одразу після приходу.
     /// </summary>
     public decimal ReorderTargetFactor { get; set; } = 2;
+
+    /// <summary>Кому щодня SMS про розхідники, що впали нижче мінімуму (Stock__AlertPhones__0...); порожньо — нікому.</summary>
+    public List<string> AlertPhones { get; set; } = [];
+
+    /// <summary>О котрій годині її надсилати, HH:mm; «-» — ніколи.</summary>
+    public string AlertTime { get; set; } = "08:00";
 }
 
 /// <summary>

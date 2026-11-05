@@ -35,6 +35,14 @@ public sealed class StockRepository(ErpDbContext db) : IStockRepository
     public Task<StockItemDto?> GetItemDtoAsync(int itemId, CancellationToken ct) =>
         Project(db.StockItems.AsNoTracking().Where(i => i.Id == itemId)).FirstOrDefaultAsync(ct);
 
+    public async Task<IReadOnlyList<int>> FellBelowMinimumAsync(DateTime since, CancellationToken ct) =>
+        await db.StockItems.AsNoTracking()
+            .Where(i => i.IsActive && i.MinQuantity > 0 && i.Quantity < i.MinQuantity
+                && db.StockMovements.Any(m => m.ItemId == i.Id && m.CreatedAt >= since && m.StockBefore >= i.MinQuantity && m.StockAfter < i.MinQuantity))
+            .OrderBy(i => i.Name)
+            .Select(i => i.Id)
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<StockMovementDto>> ListMovementsAsync(int itemId, CancellationToken ct) =>
         await db.StockMovements.AsNoTracking()
             .Where(m => m.ItemId == itemId)
