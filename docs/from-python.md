@@ -18,6 +18,33 @@ How to use this file:
   Sanitizer), money and access changes written to an audit log (who, what; personal data not logged), secrets only in
   settings/env, never shown or edited in pages.
 
+## Port order and what is left (stopped here on 2026-11-05)
+
+API, tests and Blazor pages for each group, one branch and one PR per group. Items can share files, so groups go one after another.
+
+| Group | Branch | Items | State |
+|---|---|---|---|
+| 1 | `feat/py-security` | 32, 33, 34, audit log | merged |
+| 2 | `feat/py-order-delivery` | 23, 24 | merged |
+| 3 | `feat/py-coupons` | 25 | merged |
+| 4 | `feat/py-alerts-matching` | 26, 27, 28 | merged |
+| 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
+| 6 | `feat/py-order-tools` | 35–42 | TODO |
+| 7 | `feat/py-product-form` | 43–45, 75, 76 | TODO |
+| 8 | `feat/py-catalog-lists` | 46–52 | TODO |
+| 9 | `feat/py-customers` | 53, 54 | TODO |
+| 10 | `feat/py-monobank` | 55, 56 | TODO |
+| 11 | `feat/py-marketing` | 57–62, 77 | TODO |
+| 12 | `feat/py-admin` | 63–68, 69, 70 | TODO |
+
+Things to know when continuing:
+
+- **Running the tests:** a throwaway `mysql:8.4` on port 3317 and `redis:7` on 6389, with `NEWERP_TEST_DB=server=127.0.0.1;port=3317;user=root` and `NEWERP_TEST_REDIS=localhost:6389`. Check that nothing was skipped.
+- **`dd_customer_transaction`** is already in `db/reconstructed.sql` and mapped (group 5), for groups 6 and 9.
+- **Local `newerp_dev`** needs the sections added by groups 2, 3 and 5 of `db/reconstructed.sql`, run by hand: `dd_product_special`, the coupon tables and the report tables.
+- **Not tried against the real services:** Nova Poshta courier delivery, `tools/NewErp.SchemaCheck --integrations`, and the shapes of the reconstructed tables against the real database.
+- **Daily timer:** `LowStockAlertWorker` has no test of its own.
+
 ---
 
 ## Earlier Python-first items (23–34)
