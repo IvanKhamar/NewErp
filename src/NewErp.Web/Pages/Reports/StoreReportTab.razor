@@ -1,0 +1,121 @@
+@inject ReportsApi Api
+
+@* Те, що записує вітрина: хто зараз на сайті, перегляди товарів, бонуси покупців і податки. Вкладка вантажить дані, лише коли її відкрили. *@
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true" data-test="store-report-error">@_error</MudAlert>
+}
+else if (Kind == OnlineKind && _online is not null)
+{
+    <MudText Typo="Typo.body2" Class="mb-2">Вітрина пише ці дані, лише якщо увімкнено «Customers Online».</MudText>
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="online">
+        <thead><tr><th>Коли</th><th>IP</th><th>Покупець</th><th>Сторінка</th><th>Звідки</th></tr></thead>
+        <tbody>
+            @foreach (var visitor in _online)
+            {
+                <tr>
+                    <td>@Fmt.Date(visitor.DateAdded)</td>
+                    <td>@visitor.Ip</td>
+                    <td>@(visitor.Customer ?? "гість")</td>
+                    <td style="word-break: break-all">@visitor.Url</td>
+                    <td style="word-break: break-all">@visitor.Referer</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+else if (Kind == ViewsKind && _views is not null)
+{
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="views">
+        <thead><tr><th>Товар</th><th>Модель</th><th style="text-align: right">Переглядів</th><th style="text-align: right">Продано</th><th style="text-align: right">Продано на 100 переглядів</th></tr></thead>
+        <tbody>
+            @foreach (var product in _views)
+            {
+                <tr>
+                    <td>@product.Name</td>
+                    <td>@product.Model</td>
+                    <td style="text-align: right">@product.Viewed</td>
+                    <td style="text-align: right">@product.Sold</td>
+                    <td style="text-align: right">@(product.Percent is { } percent ? Fmt.Qty(percent) : "—")</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+else if (Kind == RewardsKind && _rewards is not null)
+{
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="rewards">
+        <thead><tr><th>Покупець</th><th style="text-align: right">Балів</th><th>Остання зміна</th></tr></thead>
+        <tbody>
+            @foreach (var reward in _rewards)
+            {
+                <tr>
+                    <td>@(reward.Customer ?? $"№{reward.CustomerId}")</td>
+                    <td style="text-align: right">@reward.Points</td>
+                    <td>@Fmt.Date(reward.LastChange)</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+else if (Kind == TaxesKind && _taxes is not null)
+{
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="taxes">
+        <thead><tr><th>Період</th><th>Податок</th><th style="text-align: right">Замовлень</th><th style="text-align: right">Сума</th></tr></thead>
+        <tbody>
+            @foreach (var row in _taxes.Rows)
+            {
+                <tr>
+                    <td>@(row.Start == row.End ? row.Start.ToString("dd.MM.yyyy") : $"{row.Start:dd.MM.yyyy} – {row.End:dd.MM.yyyy}")</td>
+                    <td>@row.Title</td>
+                    <td style="text-align: right">@row.Orders</td>
+                    <td style="text-align: right">@Fmt.Money(row.Total)</td>
+                </tr>
+            }
+            <tr><td colspan="3"><b>Разом</b></td><td style="text-align: right"><b>@Fmt.Money(_taxes.Total)</b></td></tr>
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    public const string OnlineKind = "online";
+    public const string ViewsKind = "views";
+    public const string RewardsKind = "rewards";
+    public const string TaxesKind = "taxes";
+
+    [Parameter, EditorRequired] public required string Kind { get; set; }
+
+    /// <summary>Потрібен лише податкам: решта звітів не мають періоду.</summary>
+    [Parameter] public ReportFilter? Filter { get; set; }
+
+    private bool _started;
+    private ReportFilter? _loaded;
+    private IReadOnlyList<OnlineVisitorDto>? _online;
+    private IReadOnlyList<ProductViewsDto>? _views;
+    private IReadOnlyList<CustomerRewardDto>? _rewards;
+    private TaxReportDto? _taxes;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_started && (Kind != TaxesKind || _loaded == Filter))
+            return;
+        _started = true;
+        _loaded = Filter;
+        try
+        {
+            switch (Kind)
+            {
+                case OnlineKind: _online = await Api.OnlineAsync(); break;
+                case ViewsKind: _views = await Api.ProductViewsAsync(); break;
+                case RewardsKind: _rewards = await Api.RewardsAsync(); break;
+                case TaxesKind: _taxes = await Api.TaxesAsync(Filter ?? new ReportFilter()); break;
+            }
+            _error = null;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+}

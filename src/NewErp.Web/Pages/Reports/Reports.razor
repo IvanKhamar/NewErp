@@ -118,6 +118,21 @@
             }
         }
     </MudTabPanel>
+    <MudTabPanel Text="Звідки (UTM)">
+        <UtmReport Filter="_applied" />
+    </MudTabPanel>
+    <MudTabPanel Text="Податки">
+        <StoreReportTab Kind="@StoreReportTab.TaxesKind" Filter="_applied" />
+    </MudTabPanel>
+    <MudTabPanel Text="На сайті">
+        <StoreReportTab Kind="@StoreReportTab.OnlineKind" />
+    </MudTabPanel>
+    <MudTabPanel Text="Перегляди">
+        <StoreReportTab Kind="@StoreReportTab.ViewsKind" />
+    </MudTabPanel>
+    <MudTabPanel Text="Бонуси">
+        <StoreReportTab Kind="@StoreReportTab.RewardsKind" />
+    </MudTabPanel>
 </MudTabs>
 
 @code {
@@ -126,6 +141,7 @@
     private DateTime? _to;
     private int? _statusId;
     private ReportGrouping _group = ReportGrouping.Week;
+    private ReportFilter _applied = new();
     private SalesReportDto? _sales;
     private ProductSalesDto? _products;
     private StatusReportDto? _byStatus;
@@ -146,6 +162,7 @@
         {
             var filter = new ReportFilter(
                 _from is { } f ? DateOnly.FromDateTime(f) : null, _to is { } t ? DateOnly.FromDateTime(t) : null, _statusId, _group);
+            _applied = filter;
             _sales = await Api.SalesAsync(filter);
             _products = await Api.ProductsAsync(filter);
             _byStatus = await Api.StatusesAsync(filter);

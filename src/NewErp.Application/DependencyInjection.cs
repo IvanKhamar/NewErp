@@ -30,6 +30,9 @@ public static class DependencyInjection
         services.AddScoped<ReturnService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<ReportService>();
+        services.AddScoped<RemarketingService>();
+        services.AddScoped<StoreReportService>();
+        services.AddScoped<StandardReportService>();
         services.AddScoped<LocationService>();
         services.AddScoped<BonusService>();
         services.AddScoped<StockService>();

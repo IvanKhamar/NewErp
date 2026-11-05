@@ -1,0 +1,98 @@
+@page "/reports/standard"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject ReportsApi Api
+
+<PageTitle>Стандартні звіти — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Стандартні звіти</MudText>
+
+<MudPaper Class="pa-3 mb-3 d-flex flex-wrap align-center gap-3" Elevation="0" Outlined="true">
+    <MudSelect T="string" @bind-Value="_kind" Label="Звіт" Style="min-width: 240px" data-test="kind">
+        @foreach (var (kind, name) in Kinds)
+        {
+            <MudSelectItem T="string" Value="kind">@name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudDatePicker @bind-Date="_from" Label="З" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+    <MudDatePicker @bind-Date="_to" Label="По" DateFormat="dd.MM.yyyy" Style="max-width: 150px" />
+    <MudSelect T="string" @bind-Value="_group" Label="Групувати" Style="min-width: 140px">
+        <MudSelectItem T="string" Value="@("day")">за днями</MudSelectItem>
+        <MudSelectItem T="string" Value="@("week")">за тижнями</MudSelectItem>
+        <MudSelectItem T="string" Value="@("month")">за місяцями</MudSelectItem>
+    </MudSelect>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync" Disabled="_busy" data-test="show">Показати</MudButton>
+</MudPaper>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true" data-test="error">@_error</MudAlert>
+}
+else if (_report is not null)
+{
+    <MudText Typo="Typo.h6" Class="mb-1">@_report.Title</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">@_report.DateFrom.ToString("dd.MM.yyyy") – @_report.DateTo.ToString("dd.MM.yyyy")</MudText>
+    <MudSimpleTable Dense="true" Hover="true" Elevation="0" data-test="report">
+        <thead><tr>@foreach (var column in _report.Columns) { <th>@column</th> }</tr></thead>
+        <tbody>
+            @foreach (var row in _report.Rows)
+            {
+                <tr>@foreach (var cell in row) { <td>@cell</td> }</tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    @if (_report.Rows.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mt-2">За цей період даних немає.</MudText>
+    }
+    @if (_report.Cut)
+    {
+        <MudText Typo="Typo.caption" Class="mt-2" data-test="cut">Показано перші @_report.Rows.Count рядків. Звузьте період, щоб побачити решту.</MudText>
+    }
+}
+
+@code {
+    private static readonly (string Kind, string Name)[] Kinds =
+    [
+        ("sales-orders", "Продажі за період"),
+        ("sales-returns", "Повернення за період"),
+        ("sales-shipping", "Доставка за період"),
+        ("sales-coupons", "Купони"),
+        ("products-purchased", "Куплені товари"),
+        ("customer-orders", "Замовлення покупців"),
+        ("customer-transactions", "Баланс покупців"),
+        ("customer-activity", "Дії покупців"),
+        ("customer-searches", "Пошук на вітрині"),
+        ("statistics", "Лічильники OpenCart"),
+    ];
+
+    private string _kind = Kinds[0].Kind;
+    private string _group = "day";
+    private DateTime? _from;
+    private DateTime? _to;
+    private StandardReportDto? _report;
+    private string? _error;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            _report = await Api.StandardAsync(
+                _kind, _from is { } f ? DateOnly.FromDateTime(f) : null, _to is { } t ? DateOnly.FromDateTime(t) : null, _group);
+            _error = null;
+            // Сервер підставляє типовий період (30 днів), показуємо його в полях.
+            (_from, _to) = (_report.DateFrom.ToDateTime(TimeOnly.MinValue), _report.DateTo.ToDateTime(TimeOnly.MinValue));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

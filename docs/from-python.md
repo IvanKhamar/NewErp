@@ -30,9 +30,9 @@ How to use this file:
 | 26 | Low-stock alerts: a daily SMS (`stock.alertPhones`, `alertTime`), `POST /stock/alerts/low-stock`, home panel | ab43938 | DONE: `feat/py-alerts-matching`, 2026-11-05; home panel `LowStockPanel` |
 | 27 | Consumables for the sewing plan `GET /production/plan/materials?scope=orders|minimum|all` | f672a8c | DONE here (Python ported it from .NET); `scope=minimum|all` DONE: `feat/py-alerts-matching`, 2026-11-05 |
 | 28 | Automatic bank payment matching after import and `POST /payments/bank/auto-match`; `autoLinked` | ddbc1c9 | DONE: `feat/py-alerts-matching`, 2026-11-05 |
-| 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | TODO |
-| 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | TODO |
-| 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | TODO |
+| 29 | A read-only check of the schema and the integrations against the real database and keys | 412e69a | DONE: `feat/py-reports`, 2026-11-05; `tools/NewErp.SchemaCheck --integrations` (the schema part was already there) |
+| 30 | UTM report `GET /reports/utm`, `GET /orders/{id}/remarketing` (dd_remarketing_orders) | 2435c3c | DONE: `feat/py-reports`, 2026-11-05 |
+| 31 | Reports `/reports/online`, `/product-views`, `/rewards`, `/taxes` | 6015add | DONE: `feat/py-reports`, 2026-11-05 |
 | 32 | "Different customers from one IP" (`sharedIp`) in the customer risk check | 6761c0f | DONE: `feat/py-security`, 2026-11-05 |
 | 33 | The login throttle shared between instances (Redis); client IP only from trusted proxies | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; `ConnectionStrings:Redis`, `TrustedProxies` |
 | 34 | Login CSRF: a double-submit token on the login form | 167f2a3 | DONE: `feat/py-security`, 2026-11-05; no token here: login takes only JSON, which another site cannot send without CORS (test `Login_TakesOnlyJson`) |
@@ -118,7 +118,7 @@ How to use this file:
 
 ## 69–71. Status lists, banners and SEO addresses, standard reports — Python e3b53bd
 
-- **Status:** TODO
+- **Status:** 71 DONE: `feat/py-reports`, 2026-11-05. 69, 70 TODO
 - **Contract:** `/admin/status-lists/{order-statuses|return-statuses|return-reasons|return-actions|stock-statuses}`,
   `/catalog/banners`, `/catalog/seo-urls`, `GET /reports/standard/{kind}?from=&to=&group=day|week|month`.
 - **Security:** a used status can only be renamed; colours `#rrggbb`; banner links only the shop or https; SEO

@@ -70,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<IReturnStore, ReturnStore>();
         services.AddScoped<ICustomerStore, CustomerStore>();
         services.AddScoped<IReportStore, ReportStore>();
+        services.AddScoped<IRemarketingStore, RemarketingStore>();
+        services.AddScoped<IStoreReportStore, StoreReportStore>();
+        services.AddScoped<IStandardReportStore, StandardReportStore>();
         services.AddScoped<ILocationStore, LocationStore>();
         services.AddSingleton<ILocationSpreadsheet, LocationSpreadsheet>();
         services.AddSingleton<IStocktakingSheet, StocktakingSheet>();

@@ -10,6 +10,7 @@ public partial class ErpDbContext
     {
         ConfigureCatalog(modelBuilder);
         ConfigureCoupons(modelBuilder);
+        ConfigureReports(modelBuilder);
         ConfigureStock(modelBuilder);
         ConfigureProduction(modelBuilder);
         ConfigureSms(modelBuilder);

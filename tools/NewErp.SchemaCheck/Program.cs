@@ -9,6 +9,7 @@
 using System.Text;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 using MySql.Data.MySqlClient;
 
@@ -17,7 +18,7 @@ using NewErp.SchemaCheck;
 
 Console.OutputEncoding = Encoding.UTF8;
 
-if (args.Length is not (0 or 2) || args.Length == 2 && args[0] != "--database")
+if (args is not ([] or ["--integrations"] or ["--database", _]))
 {
     Console.WriteLine("Використання: dotnet run --project tools/NewErp.SchemaCheck -- [--database <назва бази>]");
     return 2;
@@ -35,8 +36,23 @@ if (configuration.GetConnectionString(DependencyInjection.ConnectionStringName) 
     return 2;
 }
 
+// Режим --integrations: один запит лише для читання до кожного сервісу, чий ключ задано.
+if (args is ["--integrations"])
+{
+    var services = new ServiceCollection()
+        .AddLogging()
+        .AddSingleton(TimeProvider.System)
+        .AddInfrastructure(configuration)
+        .BuildServiceProvider();
+    var problems = await IntegrationsCheck.RunAsync(services, Console.Out, TimeProvider.System);
+    foreach (var problem in problems)
+        Console.WriteLine($"  ✗ {problem}");
+    Console.WriteLine(problems.Count == 0 ? "Розбіжностей немає." : $"Знайдено: {problems.Count}.");
+    return problems.Count == 0 ? 0 : 1;
+}
+
 var target = new MySqlConnectionStringBuilder(connectionString);
-if (args.Length == 2)
+if (args is ["--database", _])
     target.Database = args[1];
 // Сам рядок підключення не друкуємо: у ньому пароль.
 Console.WriteLine($"База {target.Database} на {target.Server}");

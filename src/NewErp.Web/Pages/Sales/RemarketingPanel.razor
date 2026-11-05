@@ -1,0 +1,41 @@
+@inject OrdersApi Api
+
+@* Звідки прийшло замовлення й коли пікселі вітрини надіслали події. У замовлень не з сайту даних немає, і панель про це каже. *@
+<MudPaper Class="pa-4 mb-4" Outlined="true" data-test="remarketing">
+    <MudText Typo="Typo.h6" Class="mb-2">Звідки замовлення</MudText>
+    @if (_loaded && _data is null)
+    {
+        <MudText Typo="Typo.body2">Даних немає: замовлення оформлене не на сайті або без модуля ремаркетингу.</MudText>
+    }
+    else if (_data is not null)
+    {
+        @foreach (var (name, value) in _data.Utm)
+        {
+            <MudText Typo="Typo.body2" Style="word-break: break-all"><b>@name:</b> @value</MudText>
+        }
+        @foreach (var pixel in _data.Events)
+        {
+            <MudText Typo="Typo.body2">@pixel.Name — @Fmt.Date(pixel.SentAt)</MudText>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public int OrderId { get; set; }
+
+    private OrderRemarketingDto? _data;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _data = await Api.RemarketingAsync(OrderId);
+        }
+        catch (ApiException)
+        {
+            _data = null;
+        }
+        _loaded = true;
+    }
+}
