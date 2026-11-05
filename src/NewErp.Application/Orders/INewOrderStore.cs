@@ -20,6 +20,12 @@ public interface INewOrderStore
     Task<IReadOnlyList<(int OrderId, int StatusId)>> FindCustomerOrdersAsync(
         string? phoneKey, string? firstname, string? lastname, string? email, DateTime since, CancellationToken ct);
 
+    /// <summary>Непорожні IP цих замовлень, новіші спершу (власні замовлення NewErp їх не мають).</summary>
+    Task<IReadOnlyList<string>> OrderIpsAsync(IReadOnlyList<int> orderIds, CancellationToken ct);
+
+    /// <summary>Хто оформлював замовлення з цієї адреси відтоді.</summary>
+    Task<IReadOnlyList<(string Firstname, string Lastname, string Telephone)>> OrdersFromIpAsync(string ip, DateTime since, CancellationToken ct);
+
     /// <summary>Способи доставки й оплати, які вже траплялись у замовленнях (від найчастішого).</summary>
     Task<OrderMethodsDto> ListMethodsAsync(CancellationToken ct);
 

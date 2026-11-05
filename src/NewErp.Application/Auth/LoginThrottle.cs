@@ -22,9 +22,32 @@ public sealed class LoginThrottleOptions
 /// <summary>
 /// Захист входу від підбору пароля: рахує лише невдалі спроби, тож людина з правильним паролем не впирається в обмеження.
 /// Коли спроб забагато, вхід для цього логіна чи адреси закритий до кінця вікна (навіть з правильним паролем, інакше
-/// підбір тривав би). Лічильники в пам'яті одного процесу: після перезапуску вони скидаються, і це прийнятно.
+/// підбір тривав би).
 /// </summary>
-public sealed class LoginThrottle(IOptions<LoginThrottleOptions> options, TimeProvider clock)
+public interface ILoginThrottle
+{
+    /// <summary>Скільки ще чекати, якщо вхід зараз закритий; null — можна пробувати.</summary>
+    Task<TimeSpan?> RetryAfterAsync(string? address, string? username);
+
+    Task FailedAsync(string? address, string? username);
+
+    /// <summary>Правильний вхід скидає лічильник логіна; лічильник адреси лишається, щоб перебір інших логінів не обнулявся.</summary>
+    Task SucceededAsync(string? username);
+}
+
+/// <summary>Ключі лічильників: логін без різниці в регістрі й пробілах, адреса як є.</summary>
+public static class LoginThrottleKeys
+{
+    public static string User(string? username) => "user:" + (username ?? "").Trim().ToLowerInvariant();
+
+    public static string Address(string? address) => "ip:" + (string.IsNullOrEmpty(address) ? "unknown" : address);
+}
+
+/// <summary>
+/// Лічильники в пам'яті одного процесу: після перезапуску вони скидаються. Цього досить для одного екземпляра застосунку;
+/// для кількох є RedisLoginThrottle (рядок підключення ConnectionStrings:Redis).
+/// </summary>
+public sealed class LoginThrottle(IOptions<LoginThrottleOptions> options, TimeProvider clock) : ILoginThrottle
 {
     // Межа пам'яті на випадок перебору тисяч вигаданих логінів: тоді спершу прибираємо прострочені лічильники.
     private const int MaxEntries = 10_000;
@@ -34,18 +57,17 @@ public sealed class LoginThrottle(IOptions<LoginThrottleOptions> options, TimePr
 
     private sealed record Window(int Count, DateTimeOffset Until);
 
-    /// <summary>Скільки ще чекати, якщо вхід зараз закритий; null — можна пробувати.</summary>
-    public TimeSpan? RetryAfter(string? address, string? username)
+    public Task<TimeSpan?> RetryAfterAsync(string? address, string? username)
     {
         var now = clock.GetUtcNow();
         TimeSpan? wait = null;
         foreach (var (key, max) in Keys(address, username))
             if (_failures.TryGetValue(key, out var window) && window.Until > now && window.Count >= max)
                 wait = Max(wait, window.Until - now);
-        return wait;
+        return Task.FromResult(wait);
     }
 
-    public void Failed(string? address, string? username)
+    public Task FailedAsync(string? address, string? username)
     {
         var now = clock.GetUtcNow();
         if (_failures.Count >= MaxEntries)
@@ -53,20 +75,22 @@ public sealed class LoginThrottle(IOptions<LoginThrottleOptions> options, TimePr
         foreach (var (key, _) in Keys(address, username))
             _failures.AddOrUpdate(key, _ => New(now),
                 (_, window) => window.Until <= now ? New(now) : window with { Count = window.Count + 1 });
+        return Task.CompletedTask;
     }
 
-    /// <summary>Правильний вхід скидає лічильник логіна; лічильник адреси лишається, щоб перебір інших логінів не обнулявся.</summary>
-    public void Succeeded(string? username) => _failures.TryRemove(UserKey(username), out _);
+    public Task SucceededAsync(string? username)
+    {
+        _failures.TryRemove(LoginThrottleKeys.User(username), out _);
+        return Task.CompletedTask;
+    }
 
     private Window New(DateTimeOffset now) => new(1, now.AddMinutes(_options.WindowMinutes));
 
     private IEnumerable<(string Key, int Max)> Keys(string? address, string? username)
     {
-        yield return (UserKey(username), _options.MaxFailuresPerUser);
-        yield return ("ip:" + (string.IsNullOrEmpty(address) ? "unknown" : address), _options.MaxFailuresPerAddress);
+        yield return (LoginThrottleKeys.User(username), _options.MaxFailuresPerUser);
+        yield return (LoginThrottleKeys.Address(address), _options.MaxFailuresPerAddress);
     }
-
-    private static string UserKey(string? username) => "user:" + (username ?? "").Trim().ToLowerInvariant();
 
     private void Prune(DateTimeOffset now)
     {

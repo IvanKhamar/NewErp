@@ -15,39 +15,39 @@ public class LoginThrottleTests
             _clock);
 
     [Fact]
-    public void User_IsBlockedAfterTheLimit_UntilTheWindowEnds()
+    public async Task User_IsBlockedAfterTheLimit_UntilTheWindowEnds()
     {
         for (var i = 0; i < 2; i++)
-            _throttle.Failed("10.0.0.1", "olena");
-        Assert.Null(_throttle.RetryAfter("10.0.0.1", "olena"));
+            await _throttle.FailedAsync("10.0.0.1", "olena");
+        Assert.Null(await _throttle.RetryAfterAsync("10.0.0.1", "olena"));
 
-        _throttle.Failed("10.0.0.2", " Olena "); // інша адреса й запис логіна — той самий обліковий запис
-        Assert.Equal(TimeSpan.FromMinutes(15), _throttle.RetryAfter("10.0.0.9", "OLENA"));
-        Assert.Null(_throttle.RetryAfter("10.0.0.9", "marta"));
+        await _throttle.FailedAsync("10.0.0.2", " Olena "); // інша адреса й запис логіна — той самий обліковий запис
+        Assert.Equal(TimeSpan.FromMinutes(15), await _throttle.RetryAfterAsync("10.0.0.9", "OLENA"));
+        Assert.Null(await _throttle.RetryAfterAsync("10.0.0.9", "marta"));
 
         _clock.Advance(TimeSpan.FromMinutes(15));
-        Assert.Null(_throttle.RetryAfter("10.0.0.9", "olena"));
+        Assert.Null(await _throttle.RetryAfterAsync("10.0.0.9", "olena"));
     }
 
     [Fact]
-    public void Address_IsBlockedAfterGuessingManyUsers_AndSuccessDoesNotResetIt()
+    public async Task Address_IsBlockedAfterGuessingManyUsers_AndSuccessDoesNotResetIt()
     {
         for (var i = 0; i < 5; i++)
-            _throttle.Failed("10.0.0.1", $"user{i}");
-        _throttle.Succeeded("user0");
+            await _throttle.FailedAsync("10.0.0.1", $"user{i}");
+        await _throttle.SucceededAsync("user0");
 
-        Assert.NotNull(_throttle.RetryAfter("10.0.0.1", "someone"));
-        Assert.Null(_throttle.RetryAfter("10.0.0.2", "someone"));
+        Assert.NotNull(await _throttle.RetryAfterAsync("10.0.0.1", "someone"));
+        Assert.Null(await _throttle.RetryAfterAsync("10.0.0.2", "someone"));
     }
 
     [Fact]
-    public void Success_ResetsTheUserCounter()
+    public async Task Success_ResetsTheUserCounter()
     {
-        _throttle.Failed("10.0.0.1", "olena");
-        _throttle.Failed("10.0.0.1", "olena");
-        _throttle.Succeeded("olena");
-        _throttle.Failed("10.0.0.1", "olena");
+        await _throttle.FailedAsync("10.0.0.1", "olena");
+        await _throttle.FailedAsync("10.0.0.1", "olena");
+        await _throttle.SucceededAsync("olena");
+        await _throttle.FailedAsync("10.0.0.1", "olena");
 
-        Assert.Null(_throttle.RetryAfter("10.0.0.1", "olena"));
+        Assert.Null(await _throttle.RetryAfterAsync("10.0.0.1", "olena"));
     }
 }

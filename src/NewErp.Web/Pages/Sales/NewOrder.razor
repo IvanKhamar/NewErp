@@ -39,6 +39,12 @@ else
                             <span> (№ @string.Join(", ", risk.CancelledOrderIds))</span>
                         }
                     </MudAlert>
+                    @if (risk.SharedIp is { } shared)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" data-test="shared-ip">
+                            З IP @shared.Ip замовляли @shared.UniqueClients різних клієнтів: @string.Join(", ", shared.Clients)
+                        </MudAlert>
+                    }
                 }
             </MudPaper>
 

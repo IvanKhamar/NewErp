@@ -12,6 +12,7 @@ namespace NewErp.Application.Orders;
 public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, OrderService orderService, TimeProvider clock)
 {
     private const int SearchLimit = 10;
+    private const int MaxCheckedIps = 3; // останні адреси замовлень клієнта на сайті
 
     public Task<IReadOnlyList<ProductPickDto>> SearchProductsAsync(string? term, CancellationToken ct) =>
         string.IsNullOrWhiteSpace(term) ? Task.FromResult<IReadOnlyList<ProductPickDto>>([]) : store.SearchProductsAsync(term.Trim(), SearchLimit, ct);
@@ -37,7 +38,21 @@ public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, Or
         var since = Now().AddYears(-CustomerRisk.LookbackYears);
         var found = await store.FindCustomerOrdersAsync(
             phoneKey, hasName ? firstname : null, hasName ? lastname : null, string.IsNullOrEmpty(email) ? null : email, since, ct);
-        return ToDto(CustomerRisk.From(found));
+        return ToDto(CustomerRisk.From(found)) with { SharedIp = await BusiestSharedIpAsync(found, since, ct) };
+    }
+
+    /// <summary>У ручного замовлення немає IP, тож беремо адреси попередніх замовлень клієнта на сайті й показуємо найбільш людну.</summary>
+    private async Task<SharedIpDto?> BusiestSharedIpAsync(IReadOnlyList<(int OrderId, int StatusId)> found, DateTime since, CancellationToken ct)
+    {
+        var ips = await store.OrderIpsAsync(found.Select(o => o.OrderId).ToList(), ct);
+        SharedIp? busiest = null;
+        foreach (var ip in ips.Take(MaxCheckedIps))
+        {
+            var shared = SharedIp.From(ip, await store.OrdersFromIpAsync(ip, since, ct));
+            if (shared is not null && shared.UniqueClients > (busiest?.UniqueClients ?? 0))
+                busiest = shared;
+        }
+        return busiest is null ? null : new SharedIpDto(busiest.Ip, busiest.UniqueClients, busiest.Clients);
     }
 
     public async Task<CreateOrderResult> CreateAsync(CreateOrderRequest request, int userId, CancellationToken ct)

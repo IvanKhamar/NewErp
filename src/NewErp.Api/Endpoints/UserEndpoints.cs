@@ -14,9 +14,9 @@ public static class UserEndpoints
         users.MapGet("/", (UserAdminService service, CancellationToken ct) => service.ListAsync(ct))
             .WithSummary("Усі користувачі старого сайту (dd_user): чи є доступ до NewErp, роль, останній вхід");
 
-        users.MapPost("/", async (CreateUserRequest request, UserAdminService service, CancellationToken ct) =>
+        users.MapPost("/", async (CreateUserRequest request, ClaimsPrincipal user, UserAdminService service, CancellationToken ct) =>
         {
-            var result = await service.CreateAsync(request, ct);
+            var result = await service.CreateAsync(user.GetUserId(), request, ct);
             return Results.Created($"/users/{result.UserId}", result);
         })
             .WithSummary("Новий працівник: рядок у dd_user (без входу в стару адмінку) і доступ до NewErp з тимчасовим паролем");
@@ -32,8 +32,8 @@ public static class UserEndpoints
         })
             .WithSummary("Забрати доступ до NewErp (на старому сайті користувач лишається)");
 
-        users.MapPost("/{id:int}/reset-password", (int id, ResetPasswordRequest request, UserAdminService service, CancellationToken ct) =>
-            service.ResetPasswordAsync(id, request, ct))
+        users.MapPost("/{id:int}/reset-password", (int id, ResetPasswordRequest request, ClaimsPrincipal user, UserAdminService service, CancellationToken ct) =>
+            service.ResetPasswordAsync(user.GetUserId(), id, request, ct))
             .WithSummary("Скинути пароль на тимчасовий (повертається один раз)");
     }
 }

@@ -14,11 +14,13 @@ public static class AuthEndpoints
     {
         var auth = app.MapGroup("/auth").WithTags("Вхід");
 
-        auth.MapPost("/login", async (LoginRequest request, AuthService service, LoginThrottle throttle, HttpContext http, CancellationToken ct) =>
+        // CSRF при вході (коли чужа сторінка входить у браузері жертви під своїм логіном): тіло лише JSON, а такий запит
+        // з чужого сайту браузер не надішле без дозволу CORS, якого тут немає. Тому окремий токен не потрібен.
+        auth.MapPost("/login", async (LoginRequest request, AuthService service, ILoginThrottle throttle, HttpContext http, CancellationToken ct) =>
         {
-            // За проксі тут буде адреса проксі; тоді потрібні ForwardedHeaders з переліком довірених проксі (див. README, «Безпека»).
+            // За проксі адресу клієнта дає TrustedProxies (лише від довірених проксі, див. README, «Безпека»).
             var address = http.Connection.RemoteIpAddress?.ToString();
-            if (throttle.RetryAfter(address, request.Username) is { } wait)
+            if (await throttle.RetryAfterAsync(address, request.Username) is { } wait)
             {
                 var minutes = (int)Math.Ceiling(wait.TotalMinutes);
                 http.Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
@@ -29,11 +31,11 @@ public static class AuthEndpoints
             var authenticated = await service.LoginAsync(request, ct);
             if (authenticated is null)
             {
-                throttle.Failed(address, request.Username);
+                await throttle.FailedAsync(address, request.Username);
                 return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Невірний логін або пароль");
             }
 
-            throttle.Succeeded(request.Username);
+            await throttle.SucceededAsync(request.Username);
             await http.SignInAsync(authenticated.ToPrincipal());
             return Results.Ok(authenticated.User);
         })

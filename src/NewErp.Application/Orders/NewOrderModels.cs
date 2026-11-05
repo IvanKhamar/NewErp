@@ -45,7 +45,11 @@ public sealed record CustomerPickDto(
 public sealed record CustomerRiskQuery(string? Telephone = null, string? Firstname = null, string? Lastname = null, string? Email = null);
 
 public sealed record CustomerRiskDto(
-    CustomerRiskLevel Level, int TotalOrders, int CancelledOrders, IReadOnlyList<int> CancelledOrderIds, decimal SuspicionRate, string Message);
+    CustomerRiskLevel Level, int TotalOrders, int CancelledOrders, IReadOnlyList<int> CancelledOrderIds, decimal SuspicionRate, string Message,
+    SharedIpDto? SharedIp = null);
+
+/// <summary>Різні клієнти замовляли з однієї IP-адреси попередніх замовлень цього клієнта.</summary>
+public sealed record SharedIpDto(string Ip, int UniqueClients, IReadOnlyList<string> Clients);
 
 /// <summary>Спосіб доставки чи оплати: код (як у OpenCart) і назва.</summary>
 public sealed record OrderMethodDto(string Code, string Name);

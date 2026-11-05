@@ -101,6 +101,27 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
             .ToList();
     }
 
+    public async Task<IReadOnlyList<string>> OrderIpsAsync(IReadOnlyList<int> orderIds, CancellationToken ct)
+    {
+        if (orderIds.Count == 0)
+            return [];
+        var ips = await db.DdOrders.AsNoTracking()
+            .Where(o => orderIds.Contains(o.OrderId) && o.Ip != "")
+            .OrderByDescending(o => o.DateAdded)
+            .Select(o => o.Ip)
+            .ToListAsync(ct);
+        return ips.Distinct().ToList();
+    }
+
+    public async Task<IReadOnlyList<(string Firstname, string Lastname, string Telephone)>> OrdersFromIpAsync(string ip, DateTime since, CancellationToken ct)
+    {
+        var rows = await db.DdOrders.AsNoTracking()
+            .Where(o => o.Ip == ip && o.OrderStatusId > 0 && o.DateAdded >= since)
+            .Select(o => new { o.Firstname, o.Lastname, o.Telephone })
+            .ToListAsync(ct);
+        return rows.Select(o => (o.Firstname, o.Lastname, o.Telephone)).ToList();
+    }
+
     public async Task<OrderMethodsDto> ListMethodsAsync(CancellationToken ct)
     {
         var shipping = await db.DdOrders.AsNoTracking()
