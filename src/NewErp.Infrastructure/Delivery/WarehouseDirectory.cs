@@ -44,6 +44,9 @@ public sealed class WarehouseDirectory(ErpDbContext db) : IWarehouseDirectory
             .Select(w => new WarehouseDto(w.Ref, w.Description, w.Category, w.MaxWeight))
             .FirstOrDefaultAsync(ct);
 
+    public Task<bool> CityExistsAsync(string cityRef, CancellationToken ct) =>
+        db.NovaPoshtaWarehouses.AnyAsync(w => w.CityRef == cityRef && w.Status, ct);
+
     public Task<bool> WarehouseExistsAsync(string cityRef, string warehouseRef, CancellationToken ct) =>
         db.NovaPoshtaWarehouses.AnyAsync(w => w.Ref == warehouseRef && w.CityRef == cityRef && w.Status, ct);
 

@@ -19,6 +19,9 @@ public interface IWarehouseDirectory
 
     Task<bool> WarehouseExistsAsync(string cityRef, string warehouseRef, CancellationToken ct);
 
+    /// <summary>Місто з хоча б одним робочим відділенням (довідник знає міста лише через відділення).</summary>
+    Task<bool> CityExistsAsync(string cityRef, CancellationToken ct);
+
     /// <summary>Замінює весь довідник одним записом.</summary>
     Task ReplaceAllAsync(IReadOnlyList<NovaPoshtaWarehouse> warehouses, CancellationToken ct);
 }

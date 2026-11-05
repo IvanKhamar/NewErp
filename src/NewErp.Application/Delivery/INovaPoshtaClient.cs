@@ -31,6 +31,9 @@ public interface INovaPoshtaClient
     /// <summary>PDF накладної чи маркування. Ключ API лишається на сервері, браузер отримує лише файл.</summary>
     Task<byte[]> PrintAsync(string senderId, string documentRef, ShipmentPrintKind kind, CancellationToken ct);
 
+    /// <summary>Вулиці міста, у назві яких є search (Address.getStreet), для доставки на адресу.</summary>
+    Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct);
+
     /// <summary>Увесь довідник відділень і поштоматів (Address.getWarehouses посторінково).</summary>
     Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct);
 }

@@ -81,6 +81,9 @@ public sealed class OrdersApi(HttpClient http)
 
     public Task<List<CityDto>> CitiesAsync(string search) => GetAsync<List<CityDto>>($"/delivery/cities?search={Uri.EscapeDataString(search)}");
 
+    public Task<List<StreetDto>> StreetsAsync(string cityRef, string search) =>
+        GetAsync<List<StreetDto>>($"/delivery/streets?cityRef={Uri.EscapeDataString(cityRef)}&search={Uri.EscapeDataString(search)}");
+
     public Task<List<WarehouseDto>> WarehousesAsync(string cityRef, string search) =>
         GetAsync<List<WarehouseDto>>($"/delivery/warehouses?cityRef={Uri.EscapeDataString(cityRef)}&search={Uri.EscapeDataString(search)}");
 

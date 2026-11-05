@@ -16,6 +16,7 @@ public sealed class ShipmentService(
 {
     /// <summary>Скільки підказок показувати в автодоповненні міста чи відділення.</summary>
     public const int SuggestionLimit = 20;
+    private const int MaxBuildingLength = 10, MaxFlatLength = 10; // межі Нової Пошти для BuildingNumber і Flat
 
     /// <summary>Код оплати при отриманні в OpenCart: для нього пропонуємо накладений платіж.</summary>
     public const string CashOnDeliveryPaymentCode = "cod";
@@ -89,6 +90,18 @@ public sealed class ShipmentService(
     public Task<IReadOnlyList<WarehouseDto>> SearchWarehousesAsync(string cityRef, string? search, CancellationToken ct) =>
         directory.SearchWarehousesAsync(cityRef, search?.Trim() ?? "", SuggestionLimit, ct);
 
+    /// <summary>
+    /// Вулиці для доставки на адресу. Локального довідника вулиць немає, тож питаємо API Нової Пошти: лише від двох літер
+    /// і лише для міста з довідника відділень, щоб запитів було мало.
+    /// </summary>
+    public async Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string? cityRef, string? search, CancellationToken ct)
+    {
+        var term = search?.Trim() ?? "";
+        if (string.IsNullOrEmpty(cityRef) || term.Length < 2 || !await directory.CityExistsAsync(cityRef, ct))
+            return [];
+        return await client.SearchStreetsAsync(cityRef, term, ct);
+    }
+
     /// <summary>Завантажує свіжий довідник відділень з API і замінює ним локальний (і вітрини старого сайту).</summary>
     public async Task<WarehouseRefreshResult> RefreshWarehousesAsync(CancellationToken ct)
     {
@@ -109,10 +122,20 @@ public sealed class ShipmentService(
         var lastName = Name(request.LastName, "Прізвище");
         var phone = SmsMessage.NormalizePhone(request.Phone);
 
-        if (string.IsNullOrWhiteSpace(request.CityRef) || string.IsNullOrWhiteSpace(request.WarehouseRef))
+        var door = request.ToDoor ? DoorAddress(request) : null;
+        if (door is not null)
+        {
+            if (string.IsNullOrWhiteSpace(request.CityRef) || !await directory.CityExistsAsync(request.CityRef, ct))
+                throw new DomainException("Оберіть місто з довідника.");
+        }
+        else if (string.IsNullOrWhiteSpace(request.CityRef) || string.IsNullOrWhiteSpace(request.WarehouseRef))
+        {
             throw new DomainException("Оберіть місто й відділення з довідника.");
-        if (!await directory.WarehouseExistsAsync(request.CityRef, request.WarehouseRef, ct))
+        }
+        else if (!await directory.WarehouseExistsAsync(request.CityRef, request.WarehouseRef, ct))
+        {
             throw new DomainException("Такого відділення в цьому місті немає в довіднику.");
+        }
         if (request.DeclaredCost <= 0)
             throw new DomainException("Оголошена вартість має бути більшою за нуль.");
         if (request.CashOnDelivery < 0)
@@ -127,8 +150,22 @@ public sealed class ShipmentService(
 
         return new NewShipment(
             sender.Id, point.Id, orderId, DateOnly.FromDateTime(clock.GetLocalNow().DateTime),
-            firstName, lastName, request.MiddleName?.Trim() ?? "", phone, request.CityRef, request.WarehouseRef,
-            request.DeclaredCost, request.CashOnDelivery, request.SenderPays, request.Seats);
+            firstName, lastName, request.MiddleName?.Trim() ?? "", phone, request.CityRef, door is null ? request.WarehouseRef : "",
+            request.DeclaredCost, request.CashOnDelivery, request.SenderPays, request.Seats,
+            door is not null, door?.Street ?? "", door?.Building ?? "", door?.Flat ?? "");
+    }
+
+    /// <summary>Вулиця, будинок і квартира доставки на адресу, перевірені.</summary>
+    private static (string Street, string Building, string Flat)? DoorAddress(CreateShipmentRequest request)
+    {
+        var (street, building, flat) = (request.StreetRef?.Trim() ?? "", request.Building?.Trim() ?? "", request.Flat?.Trim() ?? "");
+        if (street == "")
+            throw new DomainException("Для доставки на адресу оберіть вулицю з довідника.");
+        if (building == "")
+            throw new DomainException("Для доставки на адресу вкажіть номер будинку.");
+        if (building.Length > MaxBuildingLength || flat.Length > MaxFlatLength)
+            throw new DomainException("Номер будинку чи квартири задовгий.");
+        return (street, building, flat);
     }
 
     /// <summary>Як старий сайт: апостроф «`» Нова Пошта не приймає, замінюємо на «'».</summary>

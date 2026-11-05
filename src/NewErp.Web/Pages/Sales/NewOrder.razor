@@ -53,7 +53,19 @@ else
                 <MudAutocomplete T="ProductPickDto" @bind-Value="_productToAdd" SearchFunc="SearchProductsAsync" MinCharacters="2" DebounceInterval="300"
                                  ToStringFunc="@(p => p is null ? null : $"{p.Name} ({p.Model})")" ResetValueOnEmptyText="true" Label="Додати товар"
                                  Placeholder="Назва, модель чи №" Variant="Variant.Outlined" Margin="Margin.Dense" AdornmentIcon="@Icons.Material.Filled.Search"
-                                 OnAdornmentClick="AddProduct" data-test="product-search" />
+                                 OnAdornmentClick="AddProduct" data-test="product-search">
+                    <ItemTemplate Context="found">
+                        @found.Name (@found.Model) ·
+                        @if (found.RegularPrice is { } regular)
+                        {
+                            <s>@regular.ToString("0.##") грн</s> <b data-test="sale-price">акція @found.Price.ToString("0.##") грн</b>
+                        }
+                        else
+                        {
+                            <span>@found.Price.ToString("0.##") грн</span>
+                        }
+                    </ItemTemplate>
+                </MudAutocomplete>
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Class="mt-2" Disabled="_productToAdd is null" OnClick="AddProduct" data-test="add-product">Додати</MudButton>
 
                 <MudSimpleTable Dense="true" Elevation="0" Class="mt-2" data-test="lines">

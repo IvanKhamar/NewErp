@@ -108,5 +108,21 @@ public class NewOrderPageTests : WebTestContext
         });
     }
 
+    [Fact]
+    public void ProductSearch_ShowsTheSalePriceNextToTheOldOne()
+    {
+        var page = Render<NewOrder>();
+        page.WaitForAssertion(() => page.Find("[data-test=save]"));
+        var search = page.FindComponent<MudAutocomplete<ProductPickDto>>();
+
+        var onSale = Render(search.Instance.ItemTemplate!(new ProductPickDto(5, "Сукня", "S-1", 770, 3, [], RegularPrice: 900)));
+        var regular = Render(search.Instance.ItemTemplate!(new ProductPickDto(6, "Пояс", "P-1", 200, 3, [])));
+
+        Assert.Contains("<s>900 грн</s>", onSale.Markup);
+        Assert.Contains("акція 770 грн", onSale.Find("[data-test=sale-price]").TextContent);
+        Assert.Contains("200 грн", regular.Markup);
+        Assert.Empty(regular.FindAll("[data-test=sale-price]"));
+    }
+
     private static CustomerRiskDto Risk(CustomerRiskLevel level) => new(level, 0, 0, [], 0, "Потенційний фрод-ризик.");
 }

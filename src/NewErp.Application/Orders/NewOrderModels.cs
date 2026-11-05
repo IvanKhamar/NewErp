@@ -35,7 +35,7 @@ public sealed record CreateOrderResult(int OrderId, IReadOnlyList<string> Warnin
 public sealed record ProductOptionValueDto(int ProductOptionId, int ProductOptionValueId, string OptionName, string Value, int Quantity, decimal Price);
 
 /// <summary>Товар для додавання в замовлення. Price — базова ціна; ціна опції, якщо вона більша за 0, її замінює.</summary>
-public sealed record ProductPickDto(int Id, string Name, string Model, decimal Price, int Quantity, IReadOnlyList<ProductOptionValueDto> Options);
+public sealed record ProductPickDto(int Id, string Name, string Model, decimal Price, int Quantity, IReadOnlyList<ProductOptionValueDto> Options, decimal? RegularPrice = null);
 
 /// <summary>Контакти клієнта з його останнього замовлення.</summary>
 public sealed record CustomerPickDto(
