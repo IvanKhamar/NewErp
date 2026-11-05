@@ -79,7 +79,11 @@ public sealed record CreateShipmentRequest(
     bool SenderPays,
     IReadOnlyList<ShipmentSeat> Seats,
     string? SenderId = null,
-    string? DropoffPointId = null);
+    string? DropoffPointId = null,
+    bool ToDoor = false,
+    string? StreetRef = null,
+    string? Building = null,
+    string? Flat = null);
 
 /// <summary>Усе, що потрібно API Нової Пошти для нової ТТН (уже перевірене й з нормалізованим телефоном).</summary>
 public sealed record NewShipment(
@@ -96,9 +100,16 @@ public sealed record NewShipment(
     decimal DeclaredCost,
     decimal CashOnDelivery,
     bool SenderPays,
-    IReadOnlyList<ShipmentSeat> Seats);
+    IReadOnlyList<ShipmentSeat> Seats,
+    bool ToDoor = false,
+    string StreetRef = "",
+    string Building = "",
+    string Flat = "");
 
 public sealed record CreatedShipment(string Ref, string Number, decimal Cost);
+
+/// <summary>Вулиця міста з довідника Нової Пошти (Address.getStreet), для доставки на адресу.</summary>
+public sealed record StreetDto(string Ref, string Name);
 
 public enum ShipmentPrintKind
 {

@@ -93,6 +93,56 @@ public class NovaPoshtaClientTests
     }
 
     [Fact]
+    public async Task Create_ToTheDoor_SavesTheAddressFirst_AndPointsTheWaybillToIt()
+    {
+        var handler = new FakeHandler(
+            """{"success": true, "data": [{"Ref": "recipient-ref", "ContactPerson": {"data": [{"Ref": "contact-ref"}]}}]}""",
+            """{"success": true, "data": [{"Ref": "address-ref"}]}""",
+            """{"success": true, "data": [{"Ref": "doc-ref", "IntDocNumber": "20450123456789", "CostOnSite": 85}]}""");
+        var shipment = new NewShipment(
+            "fop-a", "kyiv", 291, new DateOnly(2026, 10, 16), "Тарас", "Шевченко", "", "380671234567", "city-kyiv", "",
+            1500, 0, false, [new ShipmentSeat(1, 31, 36, 6)], ToDoor: true, StreetRef: "street-1", Building: "22", Flat: "5");
+
+        await Client(handler).CreateAsync(shipment, CancellationToken.None);
+
+        var address = handler.Json(1);
+        Assert.Equal(("key-a", "Address", "save"), Call(address));
+        var a = address.GetProperty("methodProperties");
+        Assert.Equal(("recipient-ref", "street-1", "22", "5"), (S(a, "CounterpartyRef"), S(a, "StreetRef"), S(a, "BuildingNumber"), S(a, "Flat")));
+        var p = handler.Json(2).GetProperty("methodProperties");
+        Assert.Equal(("WarehouseDoors", "address-ref"), (S(p, "ServiceType"), S(p, "RecipientAddress")));
+    }
+
+    [Fact]
+    public async Task Create_ToABranch_IsStillWarehouseWarehouse()
+    {
+        var handler = new FakeHandler(
+            """{"success": true, "data": [{"Ref": "recipient-ref", "ContactPerson": {"data": [{"Ref": "contact-ref"}]}}]}""",
+            """{"success": true, "data": [{"Ref": "doc-ref", "IntDocNumber": "20450123456789"}]}""");
+        var shipment = new NewShipment(
+            "fop-a", "kyiv", 291, new DateOnly(2026, 10, 16), "Тарас", "Шевченко", "", "380671234567", "city-kyiv", "wh-1",
+            1500, 0, false, [new ShipmentSeat(1, 31, 36, 6)]);
+
+        await Client(handler).CreateAsync(shipment, CancellationToken.None);
+
+        var p = handler.Json(1).GetProperty("methodProperties");
+        Assert.Equal(("WarehouseWarehouse", "wh-1"), (S(p, "ServiceType"), S(p, "RecipientAddress")));
+    }
+
+    [Fact]
+    public async Task SearchStreets_JoinsTheTypeAndName()
+    {
+        var handler = new FakeHandler("""{"success": true, "data": [{"Ref": "s1", "StreetsType": "вул.", "Description": "Хрещатик"}]}""");
+
+        var streets = await Client(handler).SearchStreetsAsync("city-kyiv", "Хрещ", CancellationToken.None);
+
+        Assert.Equal([new StreetDto("s1", "вул. Хрещатик")], streets);
+        var request = handler.Json(0);
+        Assert.Equal(("key-b", "Address", "getStreet"), Call(request));
+        Assert.Equal("Хрещ", S(request.GetProperty("methodProperties"), "FindByString"));
+    }
+
+    [Fact]
     public async Task Create_WithoutCashOnDelivery_DoesNotSendAfterpayment()
     {
         var handler = new FakeHandler(

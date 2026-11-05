@@ -85,6 +85,7 @@ public sealed class NovaPoshtaClient : INovaPoshtaClient
 {
     private const int WarehousesPageSize = 500;
     private const int MaxWarehousePages = 1000; // запобіжник від нескінченного циклу
+    private const int StreetsLimit = 30; // список для вибору, а не все місто
 
     private static readonly string[] DateFormats = ["dd-MM-yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "dd.MM.yyyy HH:mm:ss", "yyyy-MM-dd", "dd-MM-yyyy", "dd.MM.yyyy"];
 
@@ -152,14 +153,31 @@ public sealed class NovaPoshtaClient : INovaPoshtaClient
         if (recipientRef == "" || contactRef == "")
             throw new DomainException("Нова Пошта не повернула отримувача чи його контактну особу.");
 
-        // 2. Сама накладна: відділення → відділення, оплата готівкою, як на старому сайті.
+        // 2. На адресу: спершу зберігаємо адресу отримувача, і накладна вказує на неї замість відділення.
+        var recipientAddress = shipment.WarehouseRef;
+        if (shipment.ToDoor)
+        {
+            var address = (await CallAsync(sender.ApiKey, "Address", "save", new
+            {
+                CounterpartyRef = recipientRef,
+                shipment.StreetRef,
+                BuildingNumber = shipment.Building,
+                shipment.Flat,
+                Note = "",
+            }, ct))[0];
+            recipientAddress = Text(address, "Ref");
+            if (recipientAddress == "")
+                throw new DomainException("Нова Пошта не зберегла адресу отримувача.");
+        }
+
+        // 3. Сама накладна: з відділення у відділення чи на адресу, оплата готівкою,як на старому сайті.
         var properties = new Dictionary<string, object>
         {
             ["PayerType"] = shipment.SenderPays ? "Sender" : "Recipient",
             ["PaymentMethod"] = "Cash",
             ["DateTime"] = shipment.ShipDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
             ["CargoType"] = "Cargo",
-            ["ServiceType"] = "WarehouseWarehouse",
+            ["ServiceType"] = shipment.ToDoor ? "WarehouseDoors" : "WarehouseWarehouse",
             ["Description"] = _options.CargoDescription,
             ["Cost"] = Number(shipment.DeclaredCost),
             ["SeatsAmount"] = shipment.Seats.Count.ToString(CultureInfo.InvariantCulture),
@@ -182,7 +200,7 @@ public sealed class NovaPoshtaClient : INovaPoshtaClient
             ["ContactRecipient"] = contactRef,
             ["RecipientsPhone"] = shipment.Phone,
             ["CityRecipient"] = shipment.CityRef,
-            ["RecipientAddress"] = shipment.WarehouseRef,
+            ["RecipientAddress"] = recipientAddress,
         };
         // Накладений платіж через «контроль оплати», як на старому сайті.
         if (shipment.CashOnDelivery > 0)
@@ -210,6 +228,15 @@ public sealed class NovaPoshtaClient : INovaPoshtaClient
         if (!response.IsSuccessStatusCode || pdf.Length < 4 || pdf[0] != '%' || pdf[1] != 'P' || pdf[2] != 'D' || pdf[3] != 'F')
             throw new DomainException("Нова Пошта не віддала PDF для друку. Перевірте, чи ТТН не видалена.");
         return pdf;
+    }
+
+    public async Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct)
+    {
+        var data = await CallAsync(_options.TrackingKey!, "Address", "getStreet", new { CityRef = cityRef, FindByString = search }, ct);
+        return data.EnumerateArray()
+            .Select(item => new StreetDto(Text(item, "Ref"), $"{Text(item, "StreetsType")} {Text(item, "Description")}".Trim()))
+            .Take(StreetsLimit)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct)
@@ -323,4 +350,16 @@ public sealed class StubNovaPoshtaClient(bool fakeDocuments = false) : INovaPosh
 
     public Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NovaPoshtaWarehouse>>([]);
+
+    /// <summary>З тестовими ТТН — дві вигадані вулиці будь-якого міста, щоб доставку на адресу можна було спробувати локально.</summary>
+    public Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct)
+    {
+        if (!fakeDocuments)
+            return Task.FromResult<IReadOnlyList<StreetDto>>([]);
+        string[] names = ["вул. Хрещатик", "вул. Січових Стрільців"];
+        return Task.FromResult<IReadOnlyList<StreetDto>>(names
+            .Select((name, i) => new StreetDto($"{cityRef}-street-{i + 1}", name))
+            .Where(s => s.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .ToList());
+    }
 }

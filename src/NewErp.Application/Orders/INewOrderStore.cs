@@ -1,3 +1,4 @@
+using NewErp.Domain.Catalog;
 using NewErp.Domain.Orders;
 
 namespace NewErp.Application.Orders;
@@ -19,6 +20,9 @@ public interface INewOrderStore
     /// </summary>
     Task<IReadOnlyList<(int OrderId, int StatusId)>> FindCustomerOrdersAsync(
         string? phoneKey, string? firstname, string? lastname, string? email, DateTime since, CancellationToken ct);
+
+    /// <summary>Перша акція товару, що діє цього дня (за пріоритетом, потім за ціною), як обирав старий сайт.</summary>
+    Task<IReadOnlyDictionary<int, SpecialPrice>> CurrentSpecialsAsync(IReadOnlyList<int> productIds, DateOnly today, CancellationToken ct);
 
     /// <summary>Непорожні IP цих замовлень, новіші спершу (власні замовлення NewErp їх не мають).</summary>
     Task<IReadOnlyList<string>> OrderIpsAsync(IReadOnlyList<int> orderIds, CancellationToken ct);

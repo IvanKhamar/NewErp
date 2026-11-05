@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 using NewErp.Application.Orders;
+using NewErp.Domain.Catalog;
 using NewErp.Domain.Orders;
 using NewErp.Infrastructure.Persistence;
 using NewErp.Infrastructure.Persistence.Legacy;
@@ -10,6 +11,9 @@ namespace NewErp.Infrastructure.Orders;
 
 public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options) : INewOrderStore
 {
+    // Перша дата, яку приймає MySQL: збережена нульова дата менша за неї, а саму 0000-00-00 у запиті суворий режим не прийме.
+    private static readonly DateOnly FirstValidDate = new(1000, 1, 1);
+
     private readonly int _languageId = options.Value.LanguageId;
 
     // id України в довіднику країн стандартного OpenCart; беремо, лише якщо в базі ще немає жодного замовлення.
@@ -99,6 +103,24 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
                 || (email != null && Same(o.Email, email)))
             .Select(o => (o.OrderId, o.OrderStatusId))
             .ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<int, SpecialPrice>> CurrentSpecialsAsync(IReadOnlyList<int> productIds, DateOnly today, CancellationToken ct)
+    {
+        if (productIds.Count == 0)
+            return new Dictionary<int, SpecialPrice>();
+        // Як старий сайт: день початку вже діє, день кінця — ні. «Без межі» в OpenCart — 0000-00-00: така дата менша за будь-яку справжню.
+        var rows = await db.ProductSpecials.AsNoTracking()
+            .Where(s => productIds.Contains(s.ProductId)
+                && (s.DateStart < FirstValidDate || s.DateStart <= today)
+                && (s.DateEnd < FirstValidDate || s.DateEnd > today))
+            .OrderBy(s => s.ProductId).ThenBy(s => s.Priority).ThenBy(s => s.Price)
+            .Select(s => new { s.ProductId, s.Price, s.Percent }) // лише ці колонки: нульову дату не можна прочитати в DateOnly
+            .ToListAsync(ct);
+        var specials = new Dictionary<int, SpecialPrice>();
+        foreach (var row in rows)
+            specials.TryAdd(row.ProductId, new SpecialPrice(row.Price, row.Percent));
+        return specials;
     }
 
     public async Task<IReadOnlyList<string>> OrderIpsAsync(IReadOnlyList<int> orderIds, CancellationToken ct)

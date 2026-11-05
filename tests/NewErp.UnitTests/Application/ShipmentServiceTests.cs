@@ -77,6 +77,55 @@ public class ShipmentServiceTests
         Assert.True(_repository.Saved);
     }
 
+    private static CreateShipmentRequest ToDoor(string? street = "street-1", string? building = "22", string? flat = "5") =>
+        Request(warehouseRef: "") with { ToDoor = true, StreetRef = street, Building = building, Flat = flat };
+
+    [Fact]
+    public async Task Create_ToTheDoor_NeedsNoBranch_AndPassesTheAddress()
+    {
+        await _service.CreateAsync(1, ToDoor(building: " 22 "), 7, CancellationToken.None);
+
+        var sent = _client.Created!;
+        Assert.Equal((true, "street-1", "22", "5", ""), (sent.ToDoor, sent.StreetRef, sent.Building, sent.Flat, sent.WarehouseRef));
+    }
+
+    [Theory]
+    [InlineData(null, "22", "", "Для доставки на адресу оберіть вулицю з довідника.")]
+    [InlineData("street-1", " ", "", "Для доставки на адресу вкажіть номер будинку.")]
+    [InlineData("street-1", "12345678901", "", "Номер будинку чи квартири задовгий.")]
+    [InlineData("street-1", "22", "12345678901", "Номер будинку чи квартири задовгий.")]
+    public async Task Create_ToTheDoor_BadAddress_IsRefused(string? street, string? building, string? flat, string message)
+    {
+        var error = await Assert.ThrowsAsync<DomainException>(() => _service.CreateAsync(1, ToDoor(street, building, flat), 7, CancellationToken.None));
+
+        Assert.Equal(message, error.Message);
+    }
+
+    [Fact]
+    public async Task Create_ToTheDoor_NeedsACityOfTheDirectory()
+    {
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.CreateAsync(1, ToDoor() with { CityRef = "unknown" }, 7, CancellationToken.None));
+
+        Assert.Equal("Оберіть місто з довідника.", error.Message);
+    }
+
+    [Fact]
+    public async Task Create_ToABranch_IgnoresTheAddressFields()
+    {
+        await _service.CreateAsync(1, Request() with { StreetRef = "street-1", Building = "22" }, 7, CancellationToken.None);
+
+        Assert.Equal((false, "", "wh-1"), (_client.Created!.ToDoor, _client.Created.StreetRef, _client.Created.WarehouseRef));
+    }
+
+    [Theory]
+    [InlineData("city-kyiv", "Хр", 1)]
+    [InlineData("city-kyiv", " Х ", 0)] // від двох літер
+    [InlineData("unknown", "Хр", 0)] // лише місто з довідника
+    [InlineData(null, "Хр", 0)]
+    public async Task SearchStreets_AsksTheApiOnlyWhenItIsWorthIt(string? cityRef, string search, int found) =>
+        Assert.Equal(found, (await _service.SearchStreetsAsync(cityRef, search, CancellationToken.None)).Count);
+
     [Fact]
     public async Task Create_ChosenSender_IsUsed()
     {

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Time.Testing;
 
 using NewErp.Application.Orders;
+using NewErp.Domain.Catalog;
 using NewErp.Domain.Common;
 using NewErp.Domain.Orders;
 
@@ -135,6 +136,25 @@ public class NewOrderServiceTests
     }
 
     [Fact]
+    public async Task SearchProducts_GivesTheSalePrice_AndKeepsTheRegularOne()
+    {
+        _store.Specials[5] = new SpecialPrice(1100, 0);
+
+        var found = await _service.SearchProductsAsync(" Сукня ", CancellationToken.None);
+
+        Assert.Equal((1100m, 1500m), (found[0].Price, found[0].RegularPrice));
+        Assert.Equal(new DateOnly(2026, 10, 18), _store.SpecialsDay);
+    }
+
+    [Fact]
+    public async Task SearchProducts_NoSale_HasNoRegularPrice()
+    {
+        var found = await _service.SearchProductsAsync("Пояс", CancellationToken.None);
+
+        Assert.Equal((200m, null), (found[0].Price, found[0].RegularPrice));
+    }
+
+    [Fact]
     public async Task CheckRisk_ShowsTheBusiestOfTheLastThreeIps()
     {
         _store.CustomerOrders = [(1, 22)];
@@ -184,6 +204,16 @@ public class NewOrderServiceTests
             LastRiskQuery = (phoneKey, firstname, lastname, email);
             LastSince = since;
             return Task.FromResult(CustomerOrders);
+        }
+
+        public Dictionary<int, SpecialPrice> Specials { get; } = [];
+
+        public DateOnly? SpecialsDay { get; private set; }
+
+        public Task<IReadOnlyDictionary<int, SpecialPrice>> CurrentSpecialsAsync(IReadOnlyList<int> productIds, DateOnly today, CancellationToken ct)
+        {
+            SpecialsDay = today;
+            return Task.FromResult<IReadOnlyDictionary<int, SpecialPrice>>(Specials);
         }
 
         public IReadOnlyList<string> Ips { get; set; } = [];

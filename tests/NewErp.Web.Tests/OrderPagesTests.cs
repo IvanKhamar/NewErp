@@ -145,6 +145,39 @@ public class OrderPagesTests : WebTestContext
     }
 
     [Fact]
+    public void ShipmentDialog_SendsTheAddress_ForCourierDelivery()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        var city = new CityDto("city-konotop", "Конотоп");
+        Api.Respond("/orders/291/shipment/form", HttpStatusCode.OK, new ShipmentFormDto(
+            "Немира", "Скиба", "+380678708466", "Конотоп", city, "", null, 13200, 0,
+            [new SenderOption("test", "Тестовий відправник", true)], [new DropoffPointOption("test", "Тестове відділення", true)],
+            SeatPreset.All, CanCreate: true, TestMode: true));
+        Api.Respond("/orders/291/shipment", HttpStatusCode.OK, new ShipmentDto(
+            5, 291, "novaposhta", "00123456789012", 0, "", 0, ShipmentTone.Info, false, "", false, null, null, null), HttpMethod.Post);
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForElement("[data-test=create-shipment]").Click();
+        provider.WaitForAssertion(() => Assert.NotNull(provider.Find("[data-test=fake-warning]")));
+
+        var kind = provider.FindComponent<MudBlazor.MudRadioGroup<bool>>();
+        provider.InvokeAsync(() => kind.Instance.ValueChanged.InvokeAsync(true));
+        provider.WaitForAssertion(() => Assert.NotNull(provider.Find("[data-test=door-address]")));
+        var street = provider.FindComponent<MudBlazor.MudAutocomplete<StreetDto>>();
+        provider.InvokeAsync(() => street.Instance.ValueChanged.InvokeAsync(new StreetDto("s1", "вул. Хрещатик")));
+        var building = provider.FindComponents<MudBlazor.MudTextField<string>>().Single(f => f.Instance.Label == "Будинок");
+        provider.InvokeAsync(() => building.Instance.ValueChanged.InvokeAsync("7"));
+        provider.Find("[data-test=create]").Click();
+
+        page.WaitForAssertion(() => Assert.Equal("00123456789012", page.Find("[data-test=ttn]").TextContent.Trim()));
+        var body = Api.Bodies["/orders/291/shipment"];
+        Assert.Contains("\"toDoor\":true", body);
+        Assert.Contains("\"streetRef\":\"s1\"", body);
+        Assert.Contains("\"building\":\"7\"", body);
+    }
+
+    [Fact]
     public void Card_CreatesInternationalWaybill_AndHidesNovaPoshtaPrinting()
     {
         Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));

@@ -8,6 +8,7 @@ public partial class ErpDbContext
 {
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
+        ConfigureCatalog(modelBuilder);
         ConfigureStock(modelBuilder);
         ConfigureProduction(modelBuilder);
         ConfigureSms(modelBuilder);

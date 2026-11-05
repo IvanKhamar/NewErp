@@ -14,8 +14,20 @@ public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, Or
     private const int SearchLimit = 10;
     private const int MaxCheckedIps = 3; // останні адреси замовлень клієнта на сайті
 
-    public Task<IReadOnlyList<ProductPickDto>> SearchProductsAsync(string? term, CancellationToken ct) =>
-        string.IsNullOrWhiteSpace(term) ? Task.FromResult<IReadOnlyList<ProductPickDto>>([]) : store.SearchProductsAsync(term.Trim(), SearchLimit, ct);
+    /// <summary>
+    /// Товари для нового замовлення. Якщо сьогодні діє акція, Price — акційна ціна, а RegularPrice — стара, як у швидкому
+    /// замовленні старого сайту; ціну рядка менеджер усе одно може змінити.
+    /// </summary>
+    public async Task<IReadOnlyList<ProductPickDto>> SearchProductsAsync(string? term, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(term))
+            return [];
+        var products = await store.SearchProductsAsync(term.Trim(), SearchLimit, ct);
+        var specials = await store.CurrentSpecialsAsync(products.Select(p => p.Id).ToList(), DateOnly.FromDateTime(Now()), ct);
+        return products
+            .Select(p => specials.TryGetValue(p.Id, out var special) ? p with { Price = special.Apply(p.Price), RegularPrice = p.Price } : p)
+            .ToList();
+    }
 
     public Task<IReadOnlyList<CustomerPickDto>> SearchCustomersAsync(string? term, CancellationToken ct) =>
         string.IsNullOrWhiteSpace(term) || term.Trim().Length < 3

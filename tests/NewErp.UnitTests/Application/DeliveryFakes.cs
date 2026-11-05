@@ -46,6 +46,9 @@ internal sealed class FakeNovaPoshtaClient : INovaPoshtaClient
     public Task<byte[]> PrintAsync(string senderId, string documentRef, ShipmentPrintKind kind, CancellationToken ct) =>
         Task.FromResult("%PDF"u8.ToArray());
 
+    public Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<StreetDto>>([new StreetDto("street-1", "вул. Хрещатик")]);
+
     public Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NovaPoshtaWarehouse>>(Warehouses);
 }
@@ -125,6 +128,8 @@ internal sealed class FakeWarehouseDirectory : IWarehouseDirectory
 
     public Task<WarehouseDto?> FindWarehouseAsync(string cityRef, string name, CancellationToken ct) =>
         Task.FromResult(cityRef == Kyiv.Ref && name == Branch1.Name ? Branch1 : null);
+
+    public Task<bool> CityExistsAsync(string cityRef, CancellationToken ct) => Task.FromResult(cityRef == Kyiv.Ref);
 
     public Task<bool> WarehouseExistsAsync(string cityRef, string warehouseRef, CancellationToken ct) =>
         Task.FromResult(cityRef == Kyiv.Ref && warehouseRef == Branch1.Ref);

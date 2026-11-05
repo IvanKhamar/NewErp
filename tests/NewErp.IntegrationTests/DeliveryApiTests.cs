@@ -110,6 +110,32 @@ public class DeliveryApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [MySqlFact]
+    public async Task CourierDelivery_NeedsAStreetAndABuilding_ButNoBranch()
+    {
+        var client = await factory.LoginAsync(ApiFactory.Manager);
+        var streets = await client.GetFromJsonAsync<List<StreetDto>>($"/delivery/streets?cityRef={ApiFactory.KyivRef}&search=Хрещ");
+        Assert.Equal([new StreetDto($"{ApiFactory.KyivRef}-street-1", "вул. Хрещатик")], streets);
+        Assert.Empty((await client.GetFromJsonAsync<List<StreetDto>>("/delivery/streets?cityRef=unknown-city&search=Хрещ"))!);
+        Assert.Empty((await client.GetFromJsonAsync<List<StreetDto>>($"/delivery/streets?cityRef={ApiFactory.KyivRef}&search=Х"))!);
+
+        var url = $"/orders/{ApiFactory.ShippingOrderId}/shipment";
+        object Request(string? street, string building) => new
+        {
+            firstName = "Тарас", lastName = "Клієнт", phone = "0670000005", cityRef = ApiFactory.KyivRef, toDoor = true,
+            streetRef = street, building, flat = "5", declaredCost = 1200, seats = new[] { new { weight = 1, width = 30, length = 30, height = 10 } },
+        };
+
+        var noBuilding = await client.PostAsJsonAsync(url, Request(streets![0].Ref, " "));
+        Assert.Equal(HttpStatusCode.BadRequest, noBuilding.StatusCode);
+        Assert.Contains("Для доставки на адресу вкажіть номер будинку.", await noBuilding.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(url, Request(null, "22"))).StatusCode);
+
+        var created = await client.PostAsJsonAsync(url, Request(streets[0].Ref, "22")); // відділення для адреси не потрібне
+        created.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(url)).StatusCode);
+    }
+
+    [MySqlFact]
     public async Task Shipment_ClosedBranch_Rejected()
     {
         var client = await factory.LoginAsync(ApiFactory.Manager);

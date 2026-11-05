@@ -57,6 +57,10 @@ public static class DeliveryEndpoints
         delivery.MapGet("/cities", (string? search, ShipmentService service, CancellationToken ct) => service.SearchCitiesAsync(search, ct))
             .WithSummary("Міста з довідника, назва яких починається з search");
 
+        delivery.MapGet("/streets", (string? cityRef, string? search, ShipmentService service, CancellationToken ct) =>
+                service.SearchStreetsAsync(cityRef, search, ct))
+            .WithSummary("Вулиці міста з довідника Нової Пошти для доставки на адресу (search — від двох літер)");
+
         delivery.MapGet("/warehouses", (string cityRef, string? search, ShipmentService service, CancellationToken ct) =>
                 service.SearchWarehousesAsync(cityRef, search, ct))
             .WithSummary("Робочі відділення й поштомати міста, у назві яких є search");

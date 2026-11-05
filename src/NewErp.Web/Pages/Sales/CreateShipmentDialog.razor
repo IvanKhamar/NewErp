@@ -51,10 +51,26 @@
                                  Label="Місто" Variant="Variant.Outlined" Margin="Margin.Dense" MinCharacters="2" DebounceInterval="300"
                                  HelperText="@CityHelper" ResetValueOnEmptyText="true" data-test="city" />
                 <MudAutocomplete T="WarehouseDto" @bind-Value="_warehouse" SearchFunc="SearchWarehousesAsync" ToStringFunc="@(w => w?.Name)"
-                                 Label="Відділення чи поштомат" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_city is null"
+                                 Label="Відділення чи поштомат" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(_city is null || _toDoor)"
                                  DebounceInterval="300" HelperText="@WarehouseHelper" ResetValueOnEmptyText="true" MaxItems="null"
                                  Style="min-width: 22rem" data-test="warehouse" />
             </div>
+
+            <MudRadioGroup T="bool" @bind-Value="_toDoor" Class="mb-2" data-test="delivery-kind">
+                <MudRadio T="bool" Value="false" Color="Color.Primary" Dense="true">У відділення чи поштомат</MudRadio>
+                <MudRadio T="bool" Value="true" Color="Color.Primary" Dense="true" data-test="to-door">Кур'єром на адресу</MudRadio>
+            </MudRadioGroup>
+            @if (_toDoor)
+            {
+                @* Вулиця — з довідника Нової Пошти для обраного міста; відділення тоді не потрібне. *@
+                <div class="d-flex flex-wrap gap-3 mb-3" data-test="door-address">
+                    <MudAutocomplete T="StreetDto" @bind-Value="_street" SearchFunc="SearchStreetsAsync" ToStringFunc="@(s => s?.Name)"
+                                     Label="Вулиця" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_city is null" MinCharacters="2"
+                                     DebounceInterval="400" ResetValueOnEmptyText="true" Style="min-width: 18rem" data-test="street" />
+                    <MudTextField @bind-Value="_building" Label="Будинок" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="10" data-test="building" />
+                    <MudTextField @bind-Value="_flat" Label="Квартира" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="10" data-test="flat" />
+                </div>
+            }
 
             <MudText Typo="Typo.subtitle2" Class="mb-1">Оплата</MudText>
             <div class="d-flex flex-wrap align-center gap-3 mb-3">
@@ -119,6 +135,10 @@
     private string _phone = "";
     private CityDto? _city;
     private WarehouseDto? _warehouse;
+    private bool _toDoor;
+    private StreetDto? _street;
+    private string _building = "";
+    private string _flat = "";
     private decimal _declaredCost;
     private decimal _cashOnDelivery;
     private bool _senderPays;
@@ -153,7 +173,7 @@
     private void CityChanged(CityDto? city)
     {
         if (city?.Ref != _city?.Ref)
-            _warehouse = null; // відділення іншого міста вже не підходить
+            (_warehouse, _street) = (null, null); // відділення й вулиця іншого міста вже не підходять
         _city = city;
     }
 
@@ -162,6 +182,9 @@
 
     private async Task<IEnumerable<WarehouseDto>> SearchWarehousesAsync(string search, CancellationToken ct) =>
         _city is null ? [] : await Api.WarehousesAsync(_city.Ref, search ?? "");
+
+    private async Task<IEnumerable<StreetDto>> SearchStreetsAsync(string search, CancellationToken ct) =>
+        _city is null || string.IsNullOrWhiteSpace(search) ? [] : await Api.StreetsAsync(_city.Ref, search);
 
     private void AddSeat(ShipmentSeat seat) => _seats.Add(new SeatRow(seat));
 
@@ -173,7 +196,8 @@
         {
             var shipment = await Api.CreateShipmentAsync(OrderId, new CreateShipmentRequest(
                 _firstName, _lastName, _middleName, _phone, _city?.Ref ?? "", _warehouse?.Ref ?? "",
-                _declaredCost, _cashOnDelivery, _senderPays, _seats.Select(s => s.ToSeat()).ToList(), _senderId, _dropoffPointId));
+                _declaredCost, _cashOnDelivery, _senderPays, _seats.Select(s => s.ToSeat()).ToList(), _senderId, _dropoffPointId,
+                _toDoor, _street?.Ref, _building, _flat));
             Dialog.Close(DialogResult.Ok(shipment));
         }
         catch (ApiException e)
