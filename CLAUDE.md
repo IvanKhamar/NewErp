@@ -43,7 +43,7 @@ dotnet tool restore && dotnet ef ...  # dotnet-ef закріплено в dotnet
 - Справжньої бази OpenCart немає, і персональних даних клієнтів не використовуємо. Працюємо з локальною MySQL 8 `newerp_dev`, створеною з `db/schema.sql` (структура з `install/opencart.sql` старого сайту, префікс `dd_`), `db/reconstructed.sql` (наша реконструкція власних таблиць старої ERP) і `db/erp.sql` (нові таблиці `erp_*`). Дані лише вигадані, з `tools/NewErp.DevSeed`.
 - Провайдер EF Core: `MySql.EntityFrameworkCore` (Oracle), бо Pomelo ще не підтримує EF Core 10. Класи `dd_*` згенеровано scaffold у `Infrastructure/Persistence/Legacy`, руками їх не правимо; таблиці `erp_*` і реконструйовані `dd_stock_*` описано вручну в `ErpDbContext.<Модуль>.cs` (Stock, Production, Auth).
 - Де старий сайт уже має таблиці для модуля (наприклад, StockTrack: `dd_stock_*`), пишемо в них, а не в нові `erp_*`. Структуру відновлюємо за PHP-кодом старого сайту (`F:\PROJECTS\VIDRO\Vidro_OpenCart_WebSite`, лише читаємо, `config.php` не відкриваємо) і кладемо в `db/reconstructed.sql` з позначкою «звірити».
-- Працюємо database-first (`dotnet ef dbcontext scaffold`), таблиці OpenCart міграціями не змінюємо.
+- Працюємо database-first (`dotnet ef dbcontext scaffold`), таблиці `dd_*` можна змінювати, коли цього потребує функція (рішення від 2026-11-06), зміну записуємо в `db/*.sql` усіх репозиторіїв.
 - Таблиць і колонок, яких немає в `db/schema.sql`, не вигадуємо мовчки. Кожну реконструкцію позначаємо як нашу.
 - Нові власні таблиці створюємо лише з префіксом `erp_`.
 - Паролі й рядки підключення зберігаємо лише в `dotnet user-secrets`, ніколи в `appsettings.json`.
