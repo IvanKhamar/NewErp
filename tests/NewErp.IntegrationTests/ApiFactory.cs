@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NewErp.Application.Auth;
 using NewErp.Domain.Cashbox;
 using NewErp.Domain.Delivery;
+using NewErp.Application;
 using NewErp.Domain.Payments;
 using NewErp.Domain.Stock;
 using NewErp.Infrastructure.Auth;
@@ -22,6 +23,9 @@ namespace NewErp.IntegrationTests;
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    /// <summary>Час, який бачить застосунок (Київ), а не годинник машини: на сервері в UTC їхні дати різняться вночі.</summary>
+    public static DateTime BusinessNow => new BusinessClock().GetLocalNow().DateTime;
+
     private string? _connectionString;
 
     public const int ActiveUserId = 1;
@@ -148,11 +152,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             OrderId = CategoryOrderId, OrderProductId = 2, ProductOptionId = 51, ProductOptionValueId = 502, Name = "Розмір", Value = "M", Type = "radio",
         });
-        db.ErpOrderManagers.Add(new ErpOrderManager { OrderId = 2, UserId = ActiveUserId, AssignedByUserId = ActiveUserId, AssignedAt = DateTime.Now });
+        db.ErpOrderManagers.Add(new ErpOrderManager { OrderId = 2, UserId = ActiveUserId, AssignedByUserId = ActiveUserId, AssignedAt = BusinessNow });
 
         var shipment = new ShipmentDocument(2, WaitingTtn, 70m);
-        var tomorrow = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
-        shipment.ApplyTracking(new TrackingInfo(WaitingTtn, "Прибув у відділення", 7, "Київ, відділення 1", false, DateTime.Now, null, tomorrow));
+        var tomorrow = DateOnly.FromDateTime(BusinessNow).AddDays(1);
+        shipment.ApplyTracking(new TrackingInfo(WaitingTtn, "Прибув у відділення", 7, "Київ, відділення 1", false, BusinessNow, null, tomorrow));
         db.ShipmentDocuments.Add(shipment);
 
         var shippingOrder = Order(ShippingOrderId, Pending, 1200m, new DateTime(2026, 8, 1, 12, 0, 0));
@@ -164,7 +168,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             new NovaPoshtaWarehouse("wh-kyiv-3", "Відділення №3", "Branch", KyivRef, "Київ", 30, working: false),
             new NovaPoshtaWarehouse("wh-kovel-1", "Відділення №1", "Branch", "city-kovel", "Ковель", 30, working: true));
 
-        db.Cashiers.Add(new Cashier("Олена Каса", "", "", null, 0, 0, isActive: true, DateTime.Now));
+        db.Cashiers.Add(new Cashier("Олена Каса", "", "", null, 0, 0, isActive: true, BusinessNow));
         db.BankPayments.Add(new BankPayment(BankAppCode, "UA00", 2000m, 5000m, "Оплата за замовлення 2", "Тарас Клієнт2",
             new DateOnly(2026, 10, 3), new TimeOnly(10, 0)));
 
@@ -205,7 +209,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Code = "",
         Ip = "",
         Status = active,
-        DateAdded = DateTime.Now,
+        DateAdded = BusinessNow,
     };
 
     internal static DdProduct Product(int id, string model, decimal price) => new()

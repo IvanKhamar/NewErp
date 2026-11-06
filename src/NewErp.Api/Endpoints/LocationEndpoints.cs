@@ -39,8 +39,8 @@ public static class LocationEndpoints
         })
         .WithSummary("Видалити склад чи пункт видачі");
 
-        locations.MapGet("/export.xlsx", async (LocationService service, CancellationToken ct) =>
-                Results.File(await service.ExportAsync(ct), Xlsx, $"sklady-{DateTime.Now:yyyy-MM-dd}.xlsx"))
+        locations.MapGet("/export.xlsx", async (LocationService service, TimeProvider clock, CancellationToken ct) =>
+                Results.File(await service.ExportAsync(ct), Xlsx, $"sklady-{clock.GetLocalNow():yyyy-MM-dd}.xlsx"))
             .WithSummary("Вивантажити довідник у Excel (колонки як у старого сайту: ID, Назва, Опис, Контакт, Телефон, Місто, Адреса, Тип)");
 
         // Файл приходить сирим тілом запиту (application/octet-stream), а не формою: так не потрібна антифорджері-форма,

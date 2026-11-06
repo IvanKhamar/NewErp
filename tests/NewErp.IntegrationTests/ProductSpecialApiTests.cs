@@ -24,7 +24,7 @@ public class ProductSpecialApiTests(ApiFactory factory) : IClassFixture<ApiFacto
     [MySqlFact]
     public async Task Search_GivesTheFirstActiveSpecial_AndKeepsTheRegularPrice()
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = DateOnly.FromDateTime(ApiFactory.BusinessNow);
         ProductSpecial Special(int priority, decimal price, decimal percent, DateOnly start, DateOnly end) => new()
         {
             ProductId = ApiFactory.CategoryProductId, CustomerGroupId = 1, Priority = priority, Price = price, Percent = percent,

@@ -78,8 +78,8 @@ public static class StockEndpoints
 
     private static void MapStocktaking(RouteGroupBuilder stocktaking)
     {
-        stocktaking.MapGet("/sheet.xlsx", async (int? categoryId, int? warehouseId, StocktakingService service, CancellationToken ct) =>
-                Results.File(await service.SheetAsync(categoryId, warehouseId, ct), Xlsx, $"inventaryzatsiia-{DateTime.Now:yyyy-MM-dd}.xlsx"))
+        stocktaking.MapGet("/sheet.xlsx", async (int? categoryId, int? warehouseId, StocktakingService service, TimeProvider clock, CancellationToken ct) =>
+                Results.File(await service.SheetAsync(categoryId, warehouseId, ct), Xlsx, $"inventaryzatsiia-{clock.GetLocalNow():yyyy-MM-dd}.xlsx"))
             .WithSummary("Аркуш для підрахунку: ID, Назва, Категорія, Од., За обліком (у вибраному місці), порожній стовпчик «Фактично»");
 
         // Файл приходить сирим тілом запиту, як імпорт складів (див. LocationEndpoints).

@@ -82,7 +82,7 @@ public class MarketingApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private async Task SetBirthdayTodayAsync()
     {
-        var today = DateTime.Now;
+        var today = ApiFactory.BusinessNow;
         using var scope = factory.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ErpDbContext>().DdOrders.Where(o => o.OrderId == 2)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.BirthdayDay, today.Day).SetProperty(o => o.BirthdayMonth, today.Month));
