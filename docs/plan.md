@@ -17,4 +17,4 @@ All three versions should use one MySQL: the Docker one from NewErpPython (`F:\P
 ## Rule change: `dd_*` tables may be changed (2026-11-06)
 
 `dd_` is only the prefix of the old project, so these tables may be changed when a feature needs it. A change goes into
-`db/*.sql` of all three repos. The old storefront reads the same tables, so say in the PR what the change means for it.
+`db/*.sql` of all three repos. No real shop runs on these tables.
