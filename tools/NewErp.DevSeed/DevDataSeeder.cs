@@ -3,6 +3,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+using NewErp.Application;
 using NewErp.Application.Auth;
 using NewErp.Application.Production;
 using NewErp.Domain.Cashbox;
@@ -51,12 +52,16 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         "Спідниця міді", "Жакет класичний", "Футболка базова", "Кардиган в'язаний",
     ];
 
+    private static readonly BusinessClock Clock = new();
+
+    private static DateTime Today => Clock.GetLocalNow().Date;
+
     private readonly Random _random = new(seed);
 
     public async Task<string> SeedAsync(int orderCount)
     {
         Randomizer.Seed = new Random(seed); // однаковий seed = однакові дані при кожному запуску
-        var now = DateTime.Today;
+        var now = Today;
 
         foreach (var (id, name, color) in Statuses)
             db.DdOrderStatuses.Add(new DdOrderStatus { OrderStatusId = id, LanguageId = LanguageId, Name = name, Color = color });
@@ -295,7 +300,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         var erpOptions = Options.Create(new ErpOptions { LanguageId = LanguageId });
         var service = new ProductionService(
             new ProductionRepository(db, erpOptions), new StorefrontStock(db, erpOptions, new PreOrderStore(db, erpOptions)),
-            new SewnLocationRepository(db), new LocationStore(db), TimeProvider.System);
+            new SewnLocationRepository(db), new LocationStore(db), Clock);
         var warnings = 0;
         foreach (var model in db.ProductionModels.Include(m => m.Sizes).ToList())
         {
@@ -337,7 +342,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
             {
                 ProductId = FirstProductId + i, Model = $"VD-{FirstProductId + i}", Price = 900 + i * 150, Quantity = 10, Status = true,
                 Shipping = true, Subtract = true, Sku = "", Upc = "", Ean = "", Jan = "", Isbn = "", Mpn = "", Location = "",
-                DateAvailable = DateTime.Today, DateAdded = DateTime.Today, DateModified = DateTime.Today,
+                DateAvailable = Today, DateAdded = Today, DateModified = Today,
             });
             db.DdProductDescriptions.Add(new DdProductDescription
             {
@@ -369,7 +374,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
         for (var i = Products.Length - 2; i < Products.Length; i++)
         {
             var value = optionValues[(FirstProductId + i, largest)];
-            (value.Quantity, value.PreOrderQuantity, value.DateAvailable) = (i == Products.Length - 1 ? -2 : 0, 5, DateTime.Today.AddDays(14));
+            (value.Quantity, value.PreOrderQuantity, value.DateAvailable) = (i == Products.Length - 1 ? -2 : 0, 5, Today.AddDays(14));
         }
         await db.SaveChangesAsync();
 
@@ -448,7 +453,7 @@ public sealed class DevDataSeeder(ErpDbContext db, int seed)
     /// </summary>
     private async Task<int> SeedMarketingAsync()
     {
-        var today = DateTime.Today;
+        var today = Today;
         var orders = await db.DdOrders.Where(o => o.OrderStatusId > 0).OrderBy(o => o.OrderId).ToListAsync();
         var birthdays = 0;
         for (var i = 0; i < orders.Count; i += 7)

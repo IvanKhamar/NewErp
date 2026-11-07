@@ -4,6 +4,11 @@ using System.Net.Http.Json;
 
 using ClosedXML.Excel;
 
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+
+using NewErp.Application;
+using NewErp.Application.Auth;
 using NewErp.Application.Production;
 using NewErp.Application.Stock;
 
@@ -13,6 +18,25 @@ namespace NewErp.IntegrationTests;
 public class StocktakingApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private sealed record Created(int Id);
+
+    // Дата в майбутньому: кука входу, виписана за цим годинником, не застаріє для клієнта тесту.
+    private sealed class NightOfNovember6 : BusinessClock
+    {
+        public override DateTimeOffset GetUtcNow() => new(2036, 11, 6, 23, 30, 0, TimeSpan.Zero);
+    }
+
+    [MySqlFact]
+    public async Task Sheet_FileName_HasTheKyivDate_WhenUtcIsStillTheDayBefore()
+    {
+        var app = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<TimeProvider>(new NightOfNovember6())));
+        var client = app.CreateClient();
+        (await client.PostAsJsonAsync("/auth/login", new LoginRequest(ApiFactory.Storekeeper, ApiFactory.Password))).EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/stock/stocktaking/sheet.xlsx");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("inventaryzatsiia-2036-11-07.xlsx", response.Content.Headers.ContentDisposition?.FileName);
+    }
 
     [MySqlFact]
     public async Task Sheet_Preview_Apply_WritesDifferencesToLog()

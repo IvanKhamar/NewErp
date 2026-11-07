@@ -24,7 +24,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<TimeProvider>(new BusinessClock());
         services.AddScoped<OrderService>();
         services.AddScoped<NewOrderService>();
         services.AddScoped<ReturnService>();

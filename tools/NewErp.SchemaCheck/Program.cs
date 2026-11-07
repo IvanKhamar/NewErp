@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using MySql.Data.MySqlClient;
 
+using BusinessClock = NewErp.Application.BusinessClock;
 using NewErp.Infrastructure;
 using NewErp.SchemaCheck;
 
@@ -41,10 +42,10 @@ if (args is ["--integrations"])
 {
     var services = new ServiceCollection()
         .AddLogging()
-        .AddSingleton(TimeProvider.System)
+        .AddSingleton<TimeProvider>(new BusinessClock())
         .AddInfrastructure(configuration)
         .BuildServiceProvider();
-    var problems = await IntegrationsCheck.RunAsync(services, Console.Out, TimeProvider.System);
+    var problems = await IntegrationsCheck.RunAsync(services, Console.Out, new BusinessClock());
     foreach (var problem in problems)
         Console.WriteLine($"  ✗ {problem}");
     Console.WriteLine(problems.Count == 0 ? "Розбіжностей немає." : $"Знайдено: {problems.Count}.");

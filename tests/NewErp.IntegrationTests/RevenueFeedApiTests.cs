@@ -24,7 +24,7 @@ public class RevenueFeedApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var feed = (await response.Content.ReadFromJsonAsync<RevenueFeedDto>())!;
         Assert.Equal(7, feed.Days.Count);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.Now), feed.Days[^1].Date);
+        Assert.Equal(DateOnly.FromDateTime(ApiFactory.BusinessNow), feed.Days[^1].Date);
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/feeds/revenue.json?token={ApiFactory.FeedToken}")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/feeds/revenue.json?token={ApiFactory.FeedToken}&days=1000")).StatusCode);
