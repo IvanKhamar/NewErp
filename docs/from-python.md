@@ -186,3 +186,20 @@ Things to know when continuing:
 - **Mapping changes:** `stock`/`min_stock`/`quantity`/`stock_before`/`stock_after` are `decimal(10,2)` and `price` is `decimal(15,2)`; `dd_product_order_snapshot_item` has its own auto-increment `id`, so `(snapshot_id, product_id)` is no longer the key; a NULL snapshot `note` reads as "". Foreign keys run from items to categories and suppliers, `ON DELETE SET NULL`.
 - **Tests to port:** `tests/test_reconstructed_schema.py` (8 tests: 2 decimals in the domain and through the API, the half-up write-off, the name lengths, the foreign key, partner lengths, a snapshot that restores the order). Update the existing tests that send 3-decimal quantities to consumables.
 - **Python files:** `db/reconstructed.sql`, `src/newerp/domain/stock.py`, `src/newerp/domain/production.py`, `src/newerp/domain/partners.py`, `src/newerp/infrastructure/stock/mapping.py`, `src/newerp/infrastructure/models/catalog.py`, `src/newerp/infrastructure/catalog/sort.py`.
+
+## 83. Customers' photos in reviews — Python IvanKhamar/NewErpPython#7
+
+- **Status:** TODO (after item 51, reviews moderation)
+- **Table:** copy the "Фото у відгуках покупців" section (`dd_review_image`) from the Python repo's `db/reconstructed.sql`. Its DDL comes from the user's script in `Vidro_DB`, which also holds real data: copy only the DDL.
+- **Contract:**
+  - `GET /catalog/reviews`: each review gets `images: [{id, path, status}]`, with `status` `pending`, `published` or `rejected` (DB 0, 1, 2), ordered by `sort_order` then `image_id`, every status listed.
+  - `PUT /catalog/reviews/{reviewId}/images/{imageId}` with body `{"status": ...}` returns 204; an unknown status returns 400; a photo that is missing or belongs to another review returns 404 "Фото {imageId} у відгуку {reviewId} немає.".
+  - `DELETE /catalog/reviews/{reviewId}/images/{imageId}` returns 204, with the same 404.
+  - `DELETE /catalog/reviews/{id}` also deletes the review's photos.
+  - Same roles as the review endpoints.
+- **Rules:** a file is deleted only when the picture folder setting is set and the path is inside `review_photos/`: it starts with `review_photos/`, has no `..` and no backslash, and the resolved path stays in the folder. Missing file: fine. A failed delete only logs a warning. The rows go first.
+- **Web:** the reviews moderation page shows each photo with "Опублікувати", "Відхилити" and "Видалити"; images come from the storefront's `image/` URL only when the store address is https, else the path is shown.
+- **Security:** audit log for status changes and deletes; never a file outside `review_photos/`.
+- **Tests to port:** `tests/test_review_photos.py` (18).
+- **Python files:** `src/newerp/application/catalog/feedback.py`, `src/newerp/infrastructure/catalog/feedback.py`, `src/newerp/infrastructure/catalog/pictures.py`, `src/newerp/api/catalog.py`, `src/newerp/web/content.py`, `src/newerp/web/templates/content/_tab.html`.
+- **Nova Poshta senders and drop-off points** (`dd_np_senders`, `dd_np_dropoff_points` in the same scripts): Python keeps them in settings (`NEWERP_NOVA_POSHTA__SENDERS`, `__DROPOFF_POINTS`), because a sender's API key is a secret. Check that this repo does the same; don't create those tables.
