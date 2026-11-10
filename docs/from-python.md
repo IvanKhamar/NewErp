@@ -29,7 +29,7 @@ API, tests and Blazor pages for each group, one branch and one PR per group. Ite
 | 3 | `feat/py-coupons` | 25 | merged |
 | 4 | `feat/py-alerts-matching` | 26, 27, 28 | merged |
 | 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
-| 6 | `feat/py-order-tools` | 35–42 | TODO |
+| 6 | `feat/py-order-tools` | 35–42 | merged (#41) |
 | 7 | `feat/py-product-form` | 43–45, 75, 76 | TODO |
 | 8 | `feat/py-catalog-lists` | 46–52 | TODO |
 | 9 | `feat/py-customers` | 53, 54 | TODO |
@@ -66,7 +66,7 @@ Things to know when continuing:
 
 ## 35–42. Orders: the old admin's order page tools — Python 67f29fb
 
-- **Status:** TODO
+- **Status:** DONE (NewErp #41, 2026-11-10; also `GET /orders/print?ids=` for the Blazor print pages, recorded for Java and Python)
 - **Contract:** `GET/PUT /orders/{id}/customer` (customer, address, methods; the rules of a new order);
   `GET /orders/{id}/shipping-check?statusId=` (before 21 "Чекає на відправку" and 22 "Відправлено": waybill, SMS with it
   to the order phone); `GET /orders/discrepancies?days=`; `PUT /orders/{id}/shipping-date` (`dd_order.date_shipping`,
