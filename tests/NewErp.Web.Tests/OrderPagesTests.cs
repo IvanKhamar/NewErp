@@ -14,17 +14,21 @@ namespace NewErp.Web.Tests;
 
 public class OrderPagesTests : WebTestContext
 {
+    private readonly Bunit.TestDoubles.BunitAuthorizationContext _auth;
+
     public OrderPagesTests()
     {
         Services.AddScoped<OrdersApi>();
-        var auth = AddAuthorization();
-        auth.SetAuthorized("Менеджер");
-        auth.SetRoles("Manager");
+        _auth = AddAuthorization();
+        _auth.SetAuthorized("Менеджер");
+        _auth.SetRoles("Manager");
         Api.Respond("/orders/statuses", HttpStatusCode.OK, new List<OrderStatusDto> { new(24, "1) Уточнюємо", "#48f9f9"), new(18, "2) Прийнято", "#ffff00") });
         Api.Respond("/orders/sources", HttpStatusCode.OK, new List<LookupItem>());
         Api.Respond("/orders/managers", HttpStatusCode.OK, new List<LookupItem> { new(1, "Марта") });
         Api.Respond("/orders/291/sms", HttpStatusCode.OK, new List<SmsDto>());
         Api.Respond("/orders/291/shipment", HttpStatusCode.NoContent); // ТТН ще немає
+        Api.Respond("/orders/291/shipping-check", HttpStatusCode.OK, new ShippingCheckDto(291, 18, "Немира Скиба", "+380678708466", "", []));
+        Api.Respond("/orders/291/credits", HttpStatusCode.OK, new OrderCreditsDto(291, 0, 0, false, 0, 0, false));
     }
 
     [Fact]
@@ -260,6 +264,136 @@ public class OrderPagesTests : WebTestContext
         var real = Render<OrderCard>(p => p.Add(c => c.Id, 291));
         real.WaitForElement("[data-test=send-sms]");
         Assert.Empty(real.FindAll("[data-test=sms-stub]"));
+    }
+
+    // ── Інструменти сторінки замовлення (пункти 35–42) ──
+
+    [Fact]
+    public void ChangeStatus_AsksToConfirm_AShippingProblem()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/291/shipping-check", HttpStatusCode.OK, new ShippingCheckDto(291, 18, "Немира Скиба", "+380678708466", "",
+            [new ShippingIssueDto("danger", "ТТН для цього замовлення не створена")]));
+        Api.Respond("/orders/291/status", HttpStatusCode.OK, new ChangeOrderStatusResult([]));
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => Assert.Equal("1) Уточнюємо", page.Find("[data-test=status]").TextContent.Trim()));
+        var select = page.FindComponent<MudBlazor.MudSelect<int>>();
+        page.InvokeAsync(() => select.Instance.ValueChanged.InvokeAsync(18));
+
+        page.Find("[data-test=change-status]").Click();
+        provider.WaitForAssertion(() => Assert.Contains("ТТН для цього замовлення не створена", provider.Markup));
+        provider.FindAll("button").Single(b => b.TextContent.Contains("Скасувати")).Click();
+        Assert.DoesNotContain("/orders/291/status", Api.Requests); // скасували — статус не чіпаємо
+
+        page.Find("[data-test=change-status]").Click();
+        provider.WaitForAssertion(() => Assert.Contains("ТТН для цього замовлення не створена", provider.Markup));
+        provider.FindAll("button").Single(b => b.TextContent.Trim() == "Змінити").Click();
+        page.WaitForAssertion(() => Assert.Contains("\"statusId\":18", Api.Bodies["/orders/291/status"]));
+    }
+
+    [Fact]
+    public void Card_GivesAnInvoiceNumber_AndAddsRewardPoints()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/291/invoice", HttpStatusCode.OK, new InvoiceDto("INV-2026-7"), HttpMethod.Post);
+        Api.Respond("/orders/291/credits", HttpStatusCode.OK, new OrderCreditsDto(291, 77, 15, false, 0, 0, false));
+        Api.Respond("/orders/291/reward", HttpStatusCode.OK, new OrderCreditsDto(291, 77, 15, true, 0, 0, false), HttpMethod.Post);
+
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => page.Find("[data-test=create-invoice]"));
+        Assert.Empty(page.FindAll("[data-test=add-commission]")); // замовлення не від партнера
+        Assert.Contains("orders/print/invoice?ids=291", page.Find("[data-test=print-invoice]").GetAttribute("href"));
+
+        page.Find("[data-test=create-invoice]").Click();
+        page.WaitForAssertion(() => Assert.Contains("/orders/291/invoice", Api.Requests));
+        page.Find("[data-test=add-reward]").Click();
+        page.WaitForAssertion(() => Assert.Contains("нараховано", page.Find("[data-test=credits]").TextContent));
+        Assert.NotEmpty(page.FindAll("[data-test=remove-reward]"));
+    }
+
+    [Fact]
+    public void Card_EditsTheCustomer_InADialog()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        Api.Respond("/orders/new/methods", HttpStatusCode.OK, new OrderMethodsDto(
+            [new("novaposhta_warehouse.novaposhta_warehouse", "Нова Пошта")], [new("cod", "Накладений платіж")]));
+        Api.Respond("/orders/291/customer", HttpStatusCode.OK, new OrderCustomerDto(291, "Немира", "Скиба", "+380678708466", "", "",
+            "novaposhta_warehouse.novaposhta_warehouse", "Нова Пошта", "Конотоп", "", "Відділення №1", "", "", "cod", "Накладений платіж", ""), HttpMethod.Get);
+        Api.Respond("/orders/291/customer", HttpStatusCode.NoContent, method: HttpMethod.Put);
+
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => page.Find("[data-test=edit-customer]"));
+        page.Find("[data-test=edit-customer]").Click();
+
+        provider.WaitForAssertion(() => provider.Find("[data-test=save-customer]"));
+        provider.Find("[data-test=save-customer]").Click();
+        page.WaitForAssertion(() => Assert.True(Api.Bodies.ContainsKey("/orders/291/customer")));
+        // Кирилицю JSON екранує (Н…), тож тіло читаємо назад у запит.
+        var sent = System.Text.Json.JsonSerializer.Deserialize<UpdateOrderCustomerRequest>(Api.Bodies["/orders/291/customer"],
+            System.Text.Json.JsonSerializerOptions.Web)!;
+        Assert.Equal(("Нова Пошта", "Накладений платіж", "Конотоп"), (sent.ShippingMethod, sent.PaymentMethod, sent.City));
+    }
+
+    [Fact]
+    public void DeleteButton_IsOnlyForTheAdmin()
+    {
+        Api.Respond("/orders/291", HttpStatusCode.OK, Order(statusId: 24));
+        var page = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        page.WaitForAssertion(() => page.Find("[data-test=edit-customer]"));
+        Assert.Empty(page.FindAll("[data-test=delete-order]"));
+
+        _auth.SetRoles("Admin");
+        Api.Respond("/orders/291", HttpStatusCode.OK, new ChangeOrderStatusResult([]), HttpMethod.Delete);
+        var provider = Render<MudBlazor.MudDialogProvider>();
+        var admin = Render<OrderCard>(p => p.Add(c => c.Id, 291));
+        admin.WaitForAssertion(() => admin.Find("[data-test=delete-order]"));
+        admin.Find("[data-test=delete-order]").Click();
+        provider.WaitForAssertion(() => Assert.Contains("не можна скасувати", provider.Markup));
+        provider.FindAll("button").Single(b => b.TextContent.Trim() == "Видалити").Click();
+        admin.WaitForAssertion(() => Assert.EndsWith("/orders", Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri));
+    }
+
+    [Fact]
+    public void PrintPage_ShowsOnePagePerOrder_AndTheInvoiceTotals()
+    {
+        var store = new PrintStoreDto("Vidro", "Київ", "+380000000000", "shop@example.test");
+        Api.Respond("/orders/print", HttpStatusCode.OK, new List<PrintOrderDto>
+        {
+            new(291, "INV-1", DateTime.Now, "Немира Скиба", "+380678708466", "", "Нова Пошта", "Конотоп, Відділення №1", "Накладений платіж", "",
+                "UAH", store, [new PrintLineDto("Сукня лляна", "VD-1", "Розмір: M", 2, 4400, 8800)], [new PrintTotalDto("Разом", 8800)]),
+            new(292, null, DateTime.Now, "Ольга Перевірка", "", "", "Самовивіз", "", "Готівка", "", "UAH", store, [], []),
+        });
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("orders/print/invoice?ids=291&ids=292");
+
+        var page = Render<OrderPrint>(p => p.Add(c => c.Kind, "invoice"));
+
+        page.WaitForAssertion(() => Assert.Equal(2, page.FindAll("[data-test=page]").Count));
+        Assert.Contains("Розмір: M", page.Markup);
+        Assert.Contains("Рахунок № INV-1", page.Markup);
+        Assert.Contains("/orders/print?ids=291&ids=292", Api.Urls);
+
+        var other = Render<OrderPrint>(p => p.Add(c => c.Kind, "other"));
+        Assert.NotEmpty(other.FindAll("[data-test=unknown-kind]"));
+    }
+
+    [Fact]
+    public void Discrepancies_ShowTheThreeGroups()
+    {
+        Api.Respond("/orders/discrepancies", HttpStatusCode.OK, new List<DiscrepancyGroupDto>
+        {
+            new("Стара ТТН", [new DiscrepancyDto(291, "Немира Скиба", "warning", "ТТН створена 01.11 10:00")]),
+            new("Відправлено", []),
+            new("Чекає на відправку", []),
+        });
+
+        var page = Render<Discrepancies>();
+
+        page.WaitForAssertion(() => Assert.Equal(3, page.FindAll("[data-test=group]").Count));
+        Assert.Contains("ТТН створена 01.11 10:00", page.Find("[data-test=item]").TextContent);
+        Assert.Contains("/orders/discrepancies?days=3", Api.Urls);
     }
 
     private static OrderDetails Order(int statusId) => new(

@@ -130,7 +130,9 @@ public sealed class OrderQueries(ErpDbContext db, IOptions<ErpOptions> options) 
             manager?.UserId,
             manager?.Name,
             products,
-            history.Select(h => new OrderStatusHistoryEntry(h.DateAdded, h.OldStatusId, h.NewStatusId, statusNames.GetValueOrDefault(h.NewStatusId), h.UserId, h.UserName)).ToList());
+            history.Select(h => new OrderStatusHistoryEntry(h.DateAdded, h.OldStatusId, h.NewStatusId, statusNames.GetValueOrDefault(h.NewStatusId), h.UserId, h.UserName)).ToList(),
+            await ShippingDateAsync(orderId, ct),
+            o.InvoiceNo > 0 ? $"{o.InvoicePrefix}{o.InvoiceNo}" : null);
     }
 
     public async Task<IReadOnlyList<OrderStatusDto>> ListStatusesAsync(CancellationToken ct) =>
@@ -155,4 +157,59 @@ public sealed class OrderQueries(ErpDbContext db, IOptions<ErpOptions> options) 
             .OrderBy(s => s.OrderSourceId)
             .Select(s => new LookupItem(s.OrderSourceId, s.Name))
             .ToListAsync(ct);
+
+    /// <summary>
+    /// dd_order.date_shipping. Колонки немає в моделі DdOrder: старий сайт міг записати '0000-00-00', який не прочитати
+    /// жодним типом дати, тож вона читається окремо, а нульова дата стає null.
+    /// </summary>
+    private async Task<DateOnly?> ShippingDateAsync(int orderId, CancellationToken ct)
+    {
+        var day = await db.Database
+            .SqlQuery<DateTime?>($"SELECT CASE WHEN date_shipping < '1000-01-01' THEN NULL ELSE date_shipping END AS Value FROM dd_order WHERE order_id = {orderId}")
+            .FirstOrDefaultAsync(ct);
+        return day is { } value ? DateOnly.FromDateTime(value) : null;
+    }
+
+    private static readonly string[] StoreSettings = ["config_name", "config_address", "config_telephone", "config_email"];
+
+    public async Task<IReadOnlyList<PrintOrderDto>> PrintAsync(IReadOnlyList<int> orderIds, CancellationToken ct)
+    {
+        var settings = await db.DdSettings.AsNoTracking()
+            .Where(s => s.StoreId == 0 && s.Code == "config" && StoreSettings.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+        var store = new PrintStoreDto(settings.GetValueOrDefault("config_name", ""), settings.GetValueOrDefault("config_address", ""),
+            settings.GetValueOrDefault("config_telephone", ""), settings.GetValueOrDefault("config_email", ""));
+
+        var orders = await db.DdOrders.AsNoTracking().Where(o => orderIds.Contains(o.OrderId)).ToDictionaryAsync(o => o.OrderId, ct);
+        var ids = orders.Keys.ToList();
+        var options = (await db.DdOrderOptions.AsNoTracking().Where(x => ids.Contains(x.OrderId)).OrderBy(x => x.OrderOptionId).ToListAsync(ct))
+            .ToLookup(x => x.OrderProductId, x => $"{x.Name}: {x.Value}");
+        var lines = (await db.DdOrderProducts.AsNoTracking().Where(p => ids.Contains(p.OrderId)).OrderBy(p => p.OrderProductId).ToListAsync(ct))
+            .ToLookup(p => p.OrderId, p => new PrintLineDto(p.Name, p.Model, string.Join(", ", options[p.OrderProductId]), p.Quantity, p.Price, p.Total));
+        var totals = (await db.DdOrderTotals.AsNoTracking().Where(t => ids.Contains(t.OrderId)).OrderBy(t => t.SortOrder).ToListAsync(ct))
+            .ToLookup(t => t.OrderId, t => new PrintTotalDto(t.Title, t.Value));
+
+        static string Address(Persistence.Legacy.DdOrder o)
+        {
+            var house = string.Join(", ", new[] { o.ShippingHouse, o.ShippingFlat.Length > 0 ? $"кв. {o.ShippingFlat}" : "" }.Where(p => p.Length > 0));
+            return string.Join(", ", new[] { o.ShippingCity, o.ShippingAddress1, o.ShippingAddress2, house }
+                .Select(p => p.Trim()).Where(p => p.Length > 0));
+        }
+
+        return orderIds.Distinct().Where(orders.ContainsKey).Select(id => orders[id]).Select(o => new PrintOrderDto(
+            o.OrderId,
+            o.InvoiceNo > 0 ? $"{o.InvoicePrefix}{o.InvoiceNo}" : null,
+            o.DateAdded,
+            $"{o.Firstname} {o.Lastname}".Trim(),
+            o.Telephone,
+            o.Email,
+            o.ShippingMethod,
+            Address(o),
+            o.PaymentMethod,
+            o.Comment,
+            o.CurrencyCode,
+            store,
+            lines[o.OrderId].ToList(),
+            totals[o.OrderId].ToList())).ToList();
+    }
 }

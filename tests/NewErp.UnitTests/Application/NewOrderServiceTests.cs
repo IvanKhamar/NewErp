@@ -23,7 +23,7 @@ public class NewOrderServiceTests
         _store.Products[5] = new ProductPickDto(5, "Сукня лляна", "SL-01", 1500, 3,
             [new(50, 501, "Розмір", "S", 1, 0), new(50, 502, "Розмір", "M", 2, 1600)]);
         _store.Products[6] = new ProductPickDto(6, "Пояс", "P-01", 200, 10, []);
-        _service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, []), clock);
+        _service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [], new RecordingAudit()), clock, new RecordingAudit());
     }
 
     private static CreateOrderRequest Request(params NewOrderLineRequest[] lines) => new(
@@ -81,7 +81,7 @@ public class NewOrderServiceTests
     {
         _store.Compositions[700] = new OrderCompositionDto(700, 24, [], 0, 0, 0, 0);
         var clock = new FakeTimeProvider();
-        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)]), clock);
+        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)], new RecordingAudit()), clock, new RecordingAudit());
 
         var result = await service.UpdateCompositionAsync(700,
             new UpdateOrderCompositionRequest([new(5, 501, 2, 1500), new(6, null, 1, 200)], ShippingCost: 50, Discount: 100, Prepayment: 300), 2, default);
@@ -100,7 +100,7 @@ public class NewOrderServiceTests
     {
         _store.Compositions[701] = new OrderCompositionDto(701, 0, [], 0, 0, 0, 0);
         var clock = new FakeTimeProvider();
-        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)]), clock);
+        var service = new NewOrderService(_store, _orders, new OrderService(_orders, clock, [new RecordingHandler(_store.Calls)], new RecordingAudit()), clock, new RecordingAudit());
 
         await service.UpdateCompositionAsync(701, new UpdateOrderCompositionRequest([new(6, null, 1, 200)]), 2, default);
         Assert.Equal(["replace"], _store.Calls);
@@ -251,6 +251,10 @@ public class NewOrderServiceTests
         }
 
         public Task<decimal> VoucherPaidAsync(int orderId, CancellationToken ct) => Task.FromResult(0m);
+
+        public Task<OrderCustomerDto?> GetCustomerAsync(int orderId, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task UpdateCustomerAsync(int orderId, UpdateOrderCustomerRequest request, DateTime now, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class RecordingHandler(List<string> calls) : IOrderStatusHandler

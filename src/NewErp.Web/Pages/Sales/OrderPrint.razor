@@ -1,0 +1,135 @@
+@page "/orders/print/{Kind}"
+@layout PrintLayout
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+@inject IJSRuntime Js
+
+@* Рахунок і пакувальний лист замовлень (кнопки друку старої адмінки, пункт 39): ?ids=1&ids=2, кожне замовлення — окрема сторінка. *@
+<PageTitle>@Title — NewErp</PageTitle>
+
+@if (!IsKnownKind)
+{
+    <MudAlert Severity="Severity.Error" data-test="unknown-kind">Невідомий документ: оберіть рахунок або пакувальний лист.</MudAlert>
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_orders is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_orders.Count == 0)
+{
+    <MudAlert Severity="Severity.Warning">Таких замовлень немає.</MudAlert>
+}
+else
+{
+    <div class="d-print-none mb-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintAsync">Друкувати</MudButton>
+    </div>
+    @foreach (var order in _orders)
+    {
+        <section class="page" style="break-after: page; font-family: Arial, sans-serif; font-size: 12px" data-test="page">
+            <table style="width: 100%; margin-bottom: 12px">
+                <tr>
+                    <td><b style="font-size: 16px">@order.Store.Name</b><br />@order.Store.Address<br />@order.Store.Telephone<br />@order.Store.Email</td>
+                    <td style="text-align: right; vertical-align: top">
+                        <b style="font-size: 16px">@Title</b><br />
+                        Замовлення №@order.Id від @order.DateAdded.ToString("dd.MM.yyyy")
+                        @if (IsInvoice && order.Invoice is { } invoice)
+                        {
+                            <br />
+                            <span>Рахунок № @invoice</span>
+                        }
+                    </td>
+                </tr>
+            </table>
+            <table style="width: 100%; margin-bottom: 12px">
+                <tr>
+                    <td style="vertical-align: top"><b>Покупець</b><br />@order.Customer<br />@order.Telephone<br />@order.Email</td>
+                    <td style="vertical-align: top"><b>Доставка</b><br />@order.ShippingMethod<br />@order.ShippingAddress</td>
+                    <td style="vertical-align: top"><b>Оплата</b><br />@order.PaymentMethod</td>
+                </tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse" border="1" cellpadding="4">
+                <thead>
+                    <tr>
+                        <th style="text-align: left">Товар</th>
+                        <th style="text-align: left">Артикул</th>
+                        <th>К-сть</th>
+                        @if (IsInvoice)
+                        {
+                            <th style="text-align: right">Ціна</th>
+                            <th style="text-align: right">Сума</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in order.Lines)
+                    {
+                        <tr>
+                            <td>
+                                @line.Name
+                                @if (line.Options.Length > 0)
+                                {
+                                    <br />
+                                    <small>@line.Options</small>
+                                }
+                            </td>
+                            <td>@line.Model</td>
+                            <td style="text-align: center">@line.Quantity</td>
+                            @if (IsInvoice)
+                            {
+                                <td style="text-align: right">@Fmt.Money(line.Price)</td>
+                                <td style="text-align: right">@Fmt.Money(line.Total)</td>
+                            }
+                        </tr>
+                    }
+                    @if (IsInvoice)
+                    {
+                        @foreach (var total in order.Totals)
+                        {
+                            <tr><td colspan="4" style="text-align: right"><b>@total.Title</b></td><td style="text-align: right">@Fmt.Money(total.Value)</td></tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            @if (!string.IsNullOrWhiteSpace(order.Comment))
+            {
+                <p style="white-space: pre-line"><b>Коментар:</b> @order.Comment</p>
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public string Kind { get; set; } = "";
+
+    [SupplyParameterFromQuery(Name = "ids")] public int[]? Ids { get; set; }
+
+    private List<PrintOrderDto>? _orders;
+    private string? _error;
+
+    private bool IsKnownKind => Kind is "invoice" or "shipping";
+
+    private bool IsInvoice => Kind == "invoice";
+
+    private string Title => IsInvoice ? "Рахунок" : "Пакувальний лист";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!IsKnownKind)
+            return;
+        try
+        {
+            _orders = await Api.PrintAsync(Ids ?? []);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+}

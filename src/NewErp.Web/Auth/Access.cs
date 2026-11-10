@@ -15,4 +15,5 @@ public static class Access
     public const string Users = Roles.Admin;
     public const string Finance = $"{Roles.Admin},{Roles.Manager}";
     public const string FinanceSetup = Roles.Admin;
+    public const string OrderDelete = Roles.Admin;
 }

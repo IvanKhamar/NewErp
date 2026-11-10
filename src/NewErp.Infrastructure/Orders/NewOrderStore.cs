@@ -353,4 +353,37 @@ public sealed class NewOrderStore(ErpDbContext db, IOptions<ErpOptions> options)
     }
 
     private static bool Same(string a, string b) => string.Equals(a.Trim(), b, StringComparison.OrdinalIgnoreCase);
+
+    public Task<OrderCustomerDto?> GetCustomerAsync(int orderId, CancellationToken ct) =>
+        db.DdOrders.AsNoTracking()
+            .Where(o => o.OrderId == orderId)
+            .Select(o => new OrderCustomerDto(o.OrderId, o.Firstname, o.Lastname, o.Telephone, o.Email, o.Instagram,
+                o.ShippingCode, o.ShippingMethod, o.ShippingCity, o.ShippingAddress1, o.ShippingAddress2, o.ShippingHouse,
+                o.ShippingFlat, o.PaymentCode, o.PaymentMethod, o.Comment))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task UpdateCustomerAsync(int orderId, UpdateOrderCustomerRequest r, DateTime now, CancellationToken ct)
+    {
+        static string Text(string? value) => (value ?? "").Trim();
+
+        var order = await db.DdOrders.FirstAsync(o => o.OrderId == orderId, ct);
+        order.Firstname = order.ShippingFirstname = order.PaymentFirstname = Text(r.Firstname);
+        order.Lastname = order.ShippingLastname = order.PaymentLastname = Text(r.Lastname);
+        order.Telephone = Text(r.Telephone);
+        order.Email = Text(r.Email);
+        order.Instagram = Text(r.Instagram);
+        order.ShippingCode = Text(r.ShippingCode);
+        order.ShippingMethod = Text(r.ShippingMethod);
+        order.PaymentCode = Text(r.PaymentCode);
+        order.PaymentMethod = Text(r.PaymentMethod);
+        order.Comment = Text(r.Comment);
+        order.ShippingHouse = Text(r.House);
+        order.ShippingFlat = Text(r.Flat);
+        // Як у новому замовленні, адреса оплати — та сама, що доставки.
+        order.ShippingCity = order.PaymentCity = Text(r.City);
+        order.ShippingAddress1 = order.PaymentAddress1 = Text(r.Address1);
+        order.ShippingAddress2 = order.PaymentAddress2 = Text(r.Address2);
+        order.DateModified = now;
+        await db.SaveChangesAsync(ct);
+    }
 }

@@ -113,6 +113,37 @@ public sealed class OrdersApi(HttpClient http)
         GetAsync<CustomerRiskDto>($"/orders/customer-risk?telephone={Uri.EscapeDataString(telephone)}&firstname={Uri.EscapeDataString(firstname)}" +
             $"&lastname={Uri.EscapeDataString(lastname)}&email={Uri.EscapeDataString(email)}");
 
+    // ── Інструменти сторінки замовлення (пункти 35–42) ──
+
+    public Task<ShippingCheckDto> ShippingCheckAsync(int id, int statusId) =>
+        GetAsync<ShippingCheckDto>($"/orders/{id}/shipping-check?statusId={statusId}");
+
+    public Task<List<DiscrepancyGroupDto>> DiscrepanciesAsync(int days) => GetAsync<List<DiscrepancyGroupDto>>($"/orders/discrepancies?days={days}");
+
+    public Task<OrderCustomerDto> CustomerAsync(int id) => GetAsync<OrderCustomerDto>($"/orders/{id}/customer");
+
+    public async Task UpdateCustomerAsync(int id, UpdateOrderCustomerRequest request) =>
+        await EnsureAsync(await http.PutAsJsonAsync($"/orders/{id}/customer", request));
+
+    public async Task SetShippingDateAsync(int id, DateOnly? day) =>
+        await EnsureAsync(await http.PutAsJsonAsync($"/orders/{id}/shipping-date", new ShippingDateRequest(day)));
+
+    public async Task<InvoiceDto> CreateInvoiceAsync(int id) => await ReadAsync<InvoiceDto>(await http.PostAsync($"/orders/{id}/invoice", null));
+
+    public Task<List<PrintOrderDto>> PrintAsync(IEnumerable<int> ids) =>
+        GetAsync<List<PrintOrderDto>>("/orders/print?" + string.Join("&", ids.Select(id => $"ids={id}")));
+
+    public Task<OrderCreditsDto> CreditsAsync(int id) => GetAsync<OrderCreditsDto>($"/orders/{id}/credits");
+
+    /// <param name="kind">reward (бонусні бали) або commission (комісія партнера).</param>
+    public async Task<OrderCreditsDto> ChangeCreditAsync(int id, string kind, bool add) =>
+        await ReadAsync<OrderCreditsDto>(add ? await http.PostAsync($"/orders/{id}/{kind}", null) : await http.DeleteAsync($"/orders/{id}/{kind}"));
+
+    public async Task<ChangeOrderStatusResult> DeleteAsync(int id) => await ReadAsync<ChangeOrderStatusResult>(await http.DeleteAsync($"/orders/{id}"));
+
+    public async Task<ShippingCostDto> ShippingCostAsync(ShippingCostRequest request) =>
+        await ReadAsync<ShippingCostDto>(await http.PostAsJsonAsync("/orders/new/shipping-cost", request));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

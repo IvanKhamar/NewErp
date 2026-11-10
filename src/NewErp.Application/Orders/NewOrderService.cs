@@ -9,7 +9,7 @@ namespace NewErp.Application.Orders;
 /// Швидке створення замовлення менеджером (замовлення за дзвінком чи із соцмереж), як форма «Швидке замовлення»
 /// старого сайту, і перевірка, чи не скасовував клієнт попередні замовлення.
 /// </summary>
-public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, OrderService orderService, TimeProvider clock)
+public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, OrderService orderService, TimeProvider clock, IAuditLog audit)
 {
     private const int SearchLimit = 10;
     private const int MaxCheckedIps = 3; // останні адреси замовлень клієнта на сайті
@@ -100,6 +100,62 @@ public sealed class NewOrderService(INewOrderStore store, IOrderStore orders, Or
 
     public async Task<OrderCompositionDto> GetCompositionAsync(int orderId, CancellationToken ct) =>
         await store.GetCompositionAsync(orderId, ct) ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
+
+    public async Task<OrderCustomerDto> GetCustomerAsync(int orderId, CancellationToken ct) =>
+        await store.GetCustomerAsync(orderId, ct) ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
+
+    /// <summary>Ті самі правила, що й для нового замовлення: ім'я або телефон, спосіб доставки й оплати (пункт 35).</summary>
+    public async Task UpdateCustomerAsync(int orderId, UpdateOrderCustomerRequest request, int userId, CancellationToken ct)
+    {
+        CheckCustomerLengths(request);
+        var current = await GetCustomerAsync(orderId, ct);
+        if (string.IsNullOrWhiteSpace(request.Firstname) && string.IsNullOrWhiteSpace(request.Telephone))
+            throw new DomainException("Вкажіть ім'я або телефон клієнта.");
+        if (string.IsNullOrWhiteSpace(request.ShippingMethod))
+            throw new DomainException("Необхідний спосіб доставки.");
+        if (string.IsNullOrWhiteSpace(request.PaymentMethod))
+            throw new DomainException("Необхідний спосіб оплати.");
+        if (!await orders.IsActiveUserAsync(userId, ct))
+            throw new DomainException($"Користувача {userId} не знайдено або його вимкнено.");
+
+        await store.UpdateCustomerAsync(orderId, request, clock.GetLocalNow().DateTime, ct);
+        // Лише назви змінених полів, без самих даних покупця.
+        var changed = CustomerFields(request).Zip(CustomerFields(current))
+            .Where(pair => (pair.First.Value ?? "") != pair.Second.Value).Select(pair => pair.First.Name);
+        audit.Record($"order customer changed: order {orderId}, fields {string.Join(", ", changed)}, by user {userId}");
+    }
+
+    private static readonly (string Name, int Max)[] CustomerLimits =
+    [
+        ("firstname", 32), ("lastname", 32), ("telephone", 32), ("email", 96), ("instagram", 128), ("shippingCode", 128),
+        ("shippingMethod", 128), ("city", 128), ("address1", 128), ("address2", 128), ("house", 32), ("flat", 32),
+        ("paymentCode", 128), ("paymentMethod", 128), ("comment", 4000),
+    ];
+
+    private static void CheckCustomerLengths(UpdateOrderCustomerRequest request)
+    {
+        foreach (var ((name, value), (_, max)) in CustomerFields(request).Zip(CustomerLimits))
+        {
+            if ((value?.Length ?? 0) > max)
+                throw new DomainException($"Поле {name}: не довше {max} символів.");
+        }
+    }
+
+    private static IEnumerable<(string Name, string? Value)> CustomerFields(UpdateOrderCustomerRequest r) =>
+    [
+        ("firstname", r.Firstname), ("lastname", r.Lastname), ("telephone", r.Telephone), ("email", r.Email), ("instagram", r.Instagram),
+        ("shippingCode", r.ShippingCode), ("shippingMethod", r.ShippingMethod), ("city", r.City), ("address1", r.Address1),
+        ("address2", r.Address2), ("house", r.House), ("flat", r.Flat), ("paymentCode", r.PaymentCode), ("paymentMethod", r.PaymentMethod),
+        ("comment", r.Comment),
+    ];
+
+    private static IEnumerable<(string Name, string Value)> CustomerFields(OrderCustomerDto c) =>
+    [
+        ("firstname", c.Firstname), ("lastname", c.Lastname), ("telephone", c.Telephone), ("email", c.Email), ("instagram", c.Instagram),
+        ("shippingCode", c.ShippingCode), ("shippingMethod", c.ShippingMethod), ("city", c.City), ("address1", c.Address1),
+        ("address2", c.Address2), ("house", c.House), ("flat", c.Flat), ("paymentCode", c.PaymentCode), ("paymentMethod", c.PaymentMethod),
+        ("comment", c.Comment),
+    ];
 
     /// <summary>
     /// Нові товари, розміри, кількість і суми замовлення (форма «Швидке замовлення» старого сайту для наявного замовлення).

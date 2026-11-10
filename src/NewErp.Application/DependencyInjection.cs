@@ -27,6 +27,8 @@ public static class DependencyInjection
         services.AddSingleton<TimeProvider>(new BusinessClock());
         services.AddScoped<OrderService>();
         services.AddScoped<NewOrderService>();
+        services.AddScoped<ShippingCheckService>();
+        services.AddScoped<OrderCreditService>();
         services.AddScoped<ReturnService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<ReportService>();

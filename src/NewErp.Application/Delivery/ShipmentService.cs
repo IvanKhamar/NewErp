@@ -1,6 +1,8 @@
 using NewErp.Application.Common;
+using NewErp.Application.Orders;
 using NewErp.Domain.Common;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Orders;
 using NewErp.Domain.Sms;
 
 namespace NewErp.Application.Delivery;
@@ -188,4 +190,29 @@ public sealed class ShipmentService(
     /// <summary>ТТН, створені на старому сайті, не мають запису про відправника — для них беремо типового.</summary>
     private string SenderOf(StoredShipment stored) =>
         stored.SenderId ?? Pick(client.Senders, null, s => s.Id, s => s.IsDefault, "відправника").Id;
+
+    /// <summary>
+    /// Вартість доставки нового замовлення за тарифом Нової Пошти, як кнопка швидкого замовлення старого сайту (пункт 41).
+    /// Лише читання: нічого не створює.
+    /// </summary>
+    public async Task<ShippingCostDto> EstimateCostAsync(ShippingCostRequest request, CancellationToken ct)
+    {
+        var lines = request.Lines ?? [];
+        if (lines.Count > MaxCostLines || lines.Any(l => l.Quantity is < 1 or > 1000) || request.Cost is < 0 or > 10_000_000)
+            throw new DomainException("Перевірте товари, кількість (1–1000) і оголошену вартість.");
+        if (!ShippingChecks.NovaPoshtaShippingCodes.Contains(request.ShippingCode))
+            throw new DomainException("Вартість доставки рахується лише для Нової Пошти.");
+        var name = (request.City ?? "").Trim();
+        var city = await directory.FindCityAsync(name, ct)
+            ?? throw new DomainException($"Міста «{name}» немає в довіднику Нової Пошти.");
+        var items = await repository.ParcelItemsAsync(lines.Select(l => (l.ProductId, l.Quantity)).ToList(), ct);
+        if (items.Count == 0)
+            throw new DomainException("Додайте товари, щоб порахувати доставку.");
+
+        var cost = await client.DocumentPriceAsync(city.Ref, request.ShippingCode == ShippingChecks.NovaPoshtaDoorCode,
+            Parcel.Weight(items), Parcel.Volume(items), request.Cost, DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct);
+        return new ShippingCostDto(cost);
+    }
+
+    private const int MaxCostLines = 100;
 }

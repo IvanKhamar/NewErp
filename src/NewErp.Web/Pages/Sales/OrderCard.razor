@@ -44,8 +44,33 @@ else
                         {
                             <tr><td>Коментар</td><td style="white-space: pre-line">@_order.Comment</td></tr>
                         }
+                        <tr>
+                            <td>Рахунок</td>
+                            <td data-test="invoice">
+                                @if (_order.Invoice is { } invoice)
+                                {
+                                    @invoice
+                                }
+                                else
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="CreateInvoiceAsync" Disabled="_busy" data-test="create-invoice">Надати номер рахунку</MudButton>
+                                }
+                            </td>
+                        </tr>
                     </tbody>
                 </MudSimpleTable>
+                <div class="d-flex align-center flex-wrap gap-2 mt-3">
+                    @* Планова дата відправки: її бачить список виробництва (пункт 38). *@
+                    <MudDatePicker Date="@_order.DateShipping?.ToDateTime(TimeOnly.MinValue)" DateChanged="SetShippingDateAsync" Label="Планова відправка"
+                                   Clearable="true" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 12rem"
+                                   Disabled="_busy" data-test="shipping-date" />
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditCustomerAsync" Disabled="_busy"
+                               data-test="edit-customer">Змінити покупця</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Print" Href="@OrderRoutes.Print("invoice", [Id])"
+                               data-test="print-invoice">Рахунок</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Inventory" Href="@OrderRoutes.Print("shipping", [Id])"
+                               data-test="print-shipping">Пакувальний лист</MudButton>
+                </div>
             </MudPaper>
 
             <div class="d-flex align-center mb-2">
@@ -232,6 +257,7 @@ else
                 <LiqPayPanel OrderId="Id" Total="_order.Total" />
             </AuthorizeView>
             <VoucherPanel OrderId="Id" OnChanged="LoadAsync" />
+            <OrderCreditsPanel OrderId="Id" />
             <AuthorizeView Roles="@Access.Orders" Context="remarketingContext">
                 <RemarketingPanel OrderId="Id" />
             </AuthorizeView>
@@ -254,6 +280,12 @@ else
                     </MudPaper>
                 }
             </MudPaper>
+
+            @* Видалення не скасувати: лише адміністратор, і сервер відмовить, якщо на замовлення щось посилається. *@
+            <AuthorizeView Roles="@Access.OrderDelete" Context="deleteContext">
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever" Class="mt-4"
+                           OnClick="DeleteOrderAsync" Disabled="_busy" data-test="delete-order">Видалити замовлення</MudButton>
+            </AuthorizeView>
         </MudItem>
     </MudGrid>
 }
@@ -319,8 +351,71 @@ else
     }
 
     // Зміна статусу може списати чи повернути пошиті вироби; про нестачу склад повідомляє в warnings.
-    private Task ChangeStatusAsync() => RunAsync("Статус змінено.", async () =>
-        _warnings = (await Api.ChangeStatusAsync(Id, _newStatusId)).Warnings.ToList());
+    // Перед «Відправлено» й «Чекає на відправку» сервер перевіряє ТТН і SMS; знайдене показуємо й питаємо (пункт 36).
+    private async Task ChangeStatusAsync()
+    {
+        try
+        {
+            var check = await Api.ShippingCheckAsync(Id, _newStatusId);
+            if (check.Issues.Count > 0)
+            {
+                var confirmed = await Dialogs.ShowMessageBoxAsync(
+                    "Перевірте відправку",
+                    string.Join(Environment.NewLine, check.Issues.Select(i => (i.Level == "danger" ? "⛔ " : "⚠ ") + i.Text)) + Environment.NewLine + "Все одно змінити статус?",
+                    yesText: "Змінити", cancelText: "Скасувати");
+                if (confirmed != true)
+                    return;
+            }
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+            return;
+        }
+
+        await RunAsync("Статус змінено.", async () => _warnings = (await Api.ChangeStatusAsync(Id, _newStatusId)).Warnings.ToList());
+    }
+
+    private async Task EditCustomerAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<EditCustomerDialog>("Покупець і доставка",
+            new DialogParameters<EditCustomerDialog> { { d => d.OrderId, Id } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Дані покупця збережено.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private Task SetShippingDateAsync(DateTime? day) =>
+        RunAsync("Дату відправки збережено.", () => Api.SetShippingDateAsync(Id, day is { } d ? DateOnly.FromDateTime(d) : null));
+
+    private Task CreateInvoiceAsync() => RunAsync(null, async () =>
+        Snackbar.Add($"Рахунок: {(await Api.CreateInvoiceAsync(Id)).Invoice}", Severity.Success));
+
+    private async Task DeleteOrderAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Видалити замовлення?", $"Замовлення №{Id} буде видалено назавжди разом із товарами. Це не можна скасувати.",
+            yesText: "Видалити", cancelText: "Залишити");
+        if (confirmed != true)
+            return;
+        _busy = true;
+        try
+        {
+            var result = await Api.DeleteAsync(Id);
+            Snackbar.Add($"Замовлення №{Id} видалено.", Severity.Success);
+            foreach (var warning in result.Warnings)
+                Snackbar.Add(warning, Severity.Warning);
+            Navigation.NavigateTo("orders");
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+            _busy = false;
+        }
+    }
 
     private Task AssignManagerAsync() => RunAsync("Менеджера призначено.", () => Api.AssignManagerAsync(Id, _managerId!.Value));
 
