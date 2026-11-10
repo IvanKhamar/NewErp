@@ -1,4 +1,5 @@
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Orders;
 
 namespace NewErp.Application.Delivery;
 
@@ -31,4 +32,7 @@ public interface IShipmentRepository
     Task DeleteAsync(int documentId, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
+
+    /// <summary>(id товару, кількість) з вагою з каталогу в кг і розмірами в см; невідомих товарів немає.</summary>
+    Task<IReadOnlyList<ParcelItem>> ParcelItemsAsync(IReadOnlyList<(int ProductId, int Quantity)> lines, CancellationToken ct);
 }

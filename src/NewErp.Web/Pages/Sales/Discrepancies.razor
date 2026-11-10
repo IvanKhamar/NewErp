@@ -1,0 +1,70 @@
+@page "/orders/discrepancies"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject OrdersApi Api
+
+@* Розбіжності статусу й ТТН за останні дні (кнопка «Розбіжності» старої адмінки, пункт 37). *@
+<PageTitle>Розбіжності — NewErp</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+<div class="d-flex align-center flex-wrap gap-3 mb-3">
+    <MudText Typo="Typo.h4">Розбіжності статусу й ТТН</MudText>
+    <MudSpacer />
+    <MudNumericField T="int" Value="_days" ValueChanged="DaysChanged" Label="За днів" Min="1" Max="30" Variant="Variant.Outlined" Margin="Margin.Dense"
+                     Style="max-width: 8rem" data-test="days" />
+</div>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_groups is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    @foreach (var group in _groups)
+    {
+        <MudPaper Class="pa-4 mb-3" Outlined="true" data-test="group">
+            <MudText Typo="Typo.h6" Class="mb-2">@group.Title</MudText>
+            @if (group.Items.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Немає.</MudText>
+            }
+            @foreach (var item in group.Items)
+            {
+                <MudAlert Severity="@(item.Level == "danger" ? Severity.Error : Severity.Warning)" Dense="true" Class="mb-1" data-test="item">
+                    <MudLink Href="@OrderRoutes.Order(item.OrderId)">№@item.OrderId</MudLink> · @item.Customer · @item.Text
+                </MudAlert>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private int _days = 3;
+    private List<DiscrepancyGroupDto>? _groups;
+    private string? _error;
+    private readonly List<BreadcrumbItem> _breadcrumbs = [new("Замовлення", href: "orders"), new("Розбіжності", href: null, disabled: true)];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task DaysChanged(int days)
+    {
+        _days = days;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _groups = await Api.DiscrepanciesAsync(_days);
+            _error = null;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+}

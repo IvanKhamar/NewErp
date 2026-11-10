@@ -20,10 +20,11 @@ public class OrderServiceTests
         _store.Statuses.UnionWith([1, 5, 7]);
         _store.ActiveUsers.UnionWith([1, 2]);
         _handler = new FakeStatusHandler(_store);
-        _service = new OrderService(_store, _clock, [_handler]);
+        _service = new OrderService(_store, _clock, [_handler], _audit);
     }
 
     private readonly FakeStatusHandler _handler;
+    private readonly RecordingAudit _audit = new();
 
     [Fact]
     public async Task ChangeStatus_RunsHandlersBeforeSavingAndReturnsTheirWarnings()
@@ -56,13 +57,42 @@ public class OrderServiceTests
         /// <summary>Скільки змін статусу вже було збережено в момент виклику обробника.</summary>
         public int SavedChangesSeen { get; private set; } = -1;
 
+        public OrderStatusChange? LastChange { get; private set; }
+
         public Task<IReadOnlyList<string>> OnStatusChangingAsync(OrderStatusChange change, CancellationToken ct)
         {
             if (Fail)
                 throw new InvalidOperationException("Збій обробника");
+            LastChange = change;
             SavedChangesSeen = store.SavedChanges.Count;
             return Task.FromResult(Warnings);
         }
+    }
+
+    [Fact]
+    public async Task Delete_IsRefused_WhileSomethingPointsToTheOrder()
+    {
+        _store.Blockers.AddRange(["є ТТН", "є фіскальний чек"]);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => _service.DeleteAsync(100, userId: 1, CancellationToken.None));
+
+        Assert.Equal("Замовлення не можна видалити: є ТТН; є фіскальний чек. Скасуйте його статусом.", error.Message);
+        Assert.Empty(_store.Deleted);
+        Assert.Null(_handler.LastChange);
+    }
+
+    [Fact]
+    public async Task Delete_LeavesTheStatusFirst_SoHandlersGiveBackWhatTheOrderHeld()
+    {
+        _handler.Warnings = ["Повернено 1 виріб"];
+
+        var result = await _service.DeleteAsync(100, userId: 1, CancellationToken.None);
+
+        Assert.Equal(["Повернено 1 виріб"], result.Warnings);
+        Assert.Equal((1, 0), (_handler.LastChange!.OldStatusId, _handler.LastChange.NewStatusId));
+        Assert.Equal([100], _store.Deleted);
+        Assert.Equal("order deleted: order 100, status 1, by user 1", Assert.Single(_audit.Lines));
+        await Assert.ThrowsAsync<NotFoundException>(() => _service.DeleteAsync(100, userId: 1, CancellationToken.None));
     }
 
     [Fact]
@@ -134,6 +164,22 @@ public class OrderServiceTests
         public Task SaveManagerAsync(int orderId, int managerId, int assignedByUserId, DateTime assignedAt, CancellationToken ct)
         {
             Managers[orderId] = (managerId, assignedByUserId);
+            return Task.CompletedTask;
+        }
+
+        public List<string> Blockers { get; } = [];
+        public List<int> Deleted { get; } = [];
+
+        public Task SaveShippingDateAsync(int orderId, DateOnly? day, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<string> CreateInvoiceNoAsync(int orderId, CancellationToken ct) => Task.FromResult("INV-1");
+
+        public Task<IReadOnlyList<string>> DeleteBlockersAsync(int orderId, CancellationToken ct) => Task.FromResult<IReadOnlyList<string>>(Blockers);
+
+        public Task DeleteAsync(int orderId, CancellationToken ct)
+        {
+            Deleted.Add(orderId);
+            Orders.Remove(orderId);
             return Task.CompletedTask;
         }
     }

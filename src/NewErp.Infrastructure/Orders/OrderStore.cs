@@ -56,4 +56,53 @@ public sealed class OrderStore(ErpDbContext db) : IOrderStore
 
         await db.SaveChangesAsync(ct);
     }
+
+    public Task SaveShippingDateAsync(int orderId, DateOnly? day, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE dd_order SET date_shipping = {day?.ToDateTime(TimeOnly.MinValue)} WHERE order_id = {orderId}", ct);
+
+    public async Task<string> CreateInvoiceNoAsync(int orderId, CancellationToken ct)
+    {
+        var prefix = await db.DdOrders.Where(o => o.OrderId == orderId).Select(o => o.InvoicePrefix).FirstAsync(ct);
+        // Одна інструкція, тож два натискання водночас не візьмуть той самий номер (MyISAM блокує для неї таблицю).
+        // Підзапит до тієї самої таблиці MySQL не дозволяє в UPDATE, тому похідна таблиця t.
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE dd_order SET invoice_no = (SELECT n FROM (SELECT COALESCE(MAX(invoice_no), 0) + 1 AS n FROM dd_order
+            WHERE invoice_prefix = {prefix}) t) WHERE order_id = {orderId} AND invoice_no = 0
+            """, ct);
+        var number = await db.DdOrders.AsNoTracking().Where(o => o.OrderId == orderId).Select(o => o.InvoiceNo).FirstAsync(ct);
+        return $"{prefix}{number}";
+    }
+
+    public async Task<IReadOnlyList<string>> DeleteBlockersAsync(int orderId, CancellationToken ct)
+    {
+        var blockers = new List<string>();
+        if (await db.ShipmentDocuments.AnyAsync(d => d.OrderId == orderId && d.Number != "", ct))
+            blockers.Add("є ТТН");
+        if (await db.Cheques.AnyAsync(c => c.OrderId == orderId, ct))
+            blockers.Add("є фіскальний чек");
+        if (await db.BankPayments.AnyAsync(p => p.OrderId == orderId, ct))
+            blockers.Add("до нього прив'язана банківська оплата");
+        if (await db.DdReturns.AnyAsync(r => r.OrderId == orderId, ct))
+            blockers.Add("є повернення");
+        if (await db.DdVouchers.AnyAsync(v => v.OrderId == orderId, ct))
+            blockers.Add("у ньому куплено подарунковий сертифікат");
+        if (await db.DdOrderTotals.AnyAsync(t => t.OrderId == orderId && t.Code == "voucher", ct))
+            blockers.Add("його оплачено сертифікатом");
+        return blockers;
+    }
+
+    public async Task DeleteAsync(int orderId, CancellationToken ct)
+    {
+        // MyISAM: кожне видалення окреме. Рядок замовлення — останнім, тож після збою замовлення ще є
+        // (без частини рядків), і його можна видалити знову.
+        await db.DdOrderOptions.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrderProducts.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrderTotals.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.ErpOrderManagers.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.CustomerRewards.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.CustomerTransactions.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+        await db.DdOrders.Where(x => x.OrderId == orderId).ExecuteDeleteAsync(ct);
+    }
 }

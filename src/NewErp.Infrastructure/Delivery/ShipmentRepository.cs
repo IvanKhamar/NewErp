@@ -2,12 +2,26 @@ using Microsoft.EntityFrameworkCore;
 
 using NewErp.Application.Delivery;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Orders;
 using NewErp.Infrastructure.Persistence;
 
 namespace NewErp.Infrastructure.Delivery;
 
 public sealed class ShipmentRepository(ErpDbContext db) : IShipmentRepository
 {
+    public async Task<IReadOnlyList<ParcelItem>> ParcelItemsAsync(IReadOnlyList<(int ProductId, int Quantity)> lines, CancellationToken ct)
+    {
+        var ids = lines.Select(l => l.ProductId).Distinct().ToList();
+        var sizes = await db.DdProducts.AsNoTracking()
+            .Where(p => ids.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.Weight, p.Length, p.Width, p.Height })
+            .ToDictionaryAsync(p => p.ProductId, ct);
+        // Магазин зберігає вагу в грамах (старий сайт ділив її на 1000 для Нової Пошти).
+        return [.. lines.Where(l => sizes.ContainsKey(l.ProductId))
+            .Select(l => (l.Quantity, Size: sizes[l.ProductId]))
+            .Select(x => new ParcelItem(x.Quantity, x.Size.Weight / 1000, x.Size.Length, x.Size.Width, x.Size.Height))];
+    }
+
     public async Task<ShipmentDto?> GetForOrderAsync(int orderId, CancellationToken ct)
     {
         // Одна ТТН на замовлення; якщо їх кілька (перестворювали), показуємо останню, як і старий сайт.

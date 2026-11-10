@@ -5,7 +5,7 @@ using NewErp.Domain.Orders;
 namespace NewErp.Application.Orders;
 
 /// <summary>Сценарії зміни замовлення: статус і відповідальний менеджер.</summary>
-public sealed class OrderService(IOrderStore store, TimeProvider clock, IEnumerable<IOrderStatusHandler> handlers)
+public sealed class OrderService(IOrderStore store, TimeProvider clock, IEnumerable<IOrderStatusHandler> handlers, IAuditLog audit)
 {
     public async Task<ChangeOrderStatusResult> ChangeStatusAsync(int orderId, ChangeOrderStatusRequest request, int userId, CancellationToken ct)
     {
@@ -62,6 +62,47 @@ public sealed class OrderService(IOrderStore store, TimeProvider clock, IEnumera
 
         await store.SaveManagerAsync(orderId, request.ManagerId, userId, Now(), ct);
     }
+
+    public async Task SetShippingDateAsync(int orderId, ShippingDateRequest request, CancellationToken ct)
+    {
+        await RequireOrderAsync(orderId, ct);
+        await store.SaveShippingDateAsync(orderId, request.DateShipping, ct);
+    }
+
+    /// <summary>Номер рахунку: наступний за префіксом замовлення, один раз; замовлення, що вже має номер, його зберігає.</summary>
+    public async Task<InvoiceDto> CreateInvoiceAsync(int orderId, CancellationToken ct)
+    {
+        await RequireOrderAsync(orderId, ct);
+        return new InvoiceDto(await store.CreateInvoiceNoAsync(orderId, ct));
+    }
+
+    /// <summary>
+    /// Видаляє замовлення, на яке ніщо не посилається. Як на старому сайті, воно спершу виходить зі свого статусу,
+    /// тож обробники повертають те, що воно тримало (пошиті вироби, розхідники); їхні попередження повертаються.
+    /// </summary>
+    public async Task<ChangeOrderStatusResult> DeleteAsync(int orderId, int userId, CancellationToken ct)
+    {
+        var statusId = await RequireOrderAsync(orderId, ct);
+        await RequireActiveUserAsync(userId, ct);
+        var blockers = await store.DeleteBlockersAsync(orderId, ct);
+        if (blockers.Count > 0)
+            throw new DomainException("Замовлення не можна видалити: " + string.Join("; ", blockers) + ". Скасуйте його статусом.");
+
+        var warnings = new List<string>();
+        if (statusId > 0)
+        {
+            var leave = new OrderStatusChange(orderId, statusId, 0, userId, Now());
+            foreach (var handler in handlers)
+                warnings.AddRange(await handler.OnStatusChangingAsync(leave, ct));
+        }
+
+        await store.DeleteAsync(orderId, ct);
+        audit.Record($"order deleted: order {orderId}, status {statusId}, by user {userId}");
+        return new ChangeOrderStatusResult(warnings);
+    }
+
+    private async Task<int> RequireOrderAsync(int orderId, CancellationToken ct) =>
+        await store.GetStatusIdAsync(orderId, ct) ?? throw new NotFoundException($"Замовлення {orderId} не знайдено.");
 
     private async Task RequireActiveUserAsync(int userId, CancellationToken ct)
     {

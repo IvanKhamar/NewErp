@@ -107,6 +107,9 @@ else
                         }
                     </MudSelect>
                     <MudNumericField @bind-Value="_shippingCost" Label="Вартість доставки, грн" Min="0" Format="0.##" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    @* Тариф Нової Пошти за вагою й розміром товарів, як кнопка швидкого замовлення старого сайту. *@
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Calculate" OnClick="EstimateShippingAsync"
+                               Disabled="@(_saving || _city is null || _lines.Count == 0)" data-test="shipping-cost">Порахувати</MudButton>
                 </div>
                 <div class="d-flex flex-wrap gap-3 mt-2">
                     <MudAutocomplete T="CityDto" Value="_city" ValueChanged="CityChanged" SearchFunc="SearchCitiesAsync" ToStringFunc="@(c => c?.Name)"
@@ -225,6 +228,21 @@ else
         _statusId = _statuses.FirstOrDefault()?.Id ?? 0;
         _shipping = _methods.Shipping.FirstOrDefault();
         _payment = _methods.Payment.FirstOrDefault();
+    }
+
+    private async Task EstimateShippingAsync()
+    {
+        try
+        {
+            var request = new ShippingCostRequest(_city?.Name ?? "", _shipping?.Code ?? "",
+                _lines.Select(l => new ShippingCostLine(l.Product.Id, l.Quantity)).ToList(), SubTotal);
+            _shippingCost = (await Api.ShippingCostAsync(request)).Cost;
+            _error = null;
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
     }
 
     private async Task<IEnumerable<CustomerPickDto>> SearchCustomersAsync(string text, CancellationToken ct) => await Api.CustomersAsync(text);

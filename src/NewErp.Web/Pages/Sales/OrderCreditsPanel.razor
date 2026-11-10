@@ -1,0 +1,82 @@
+@inject OrdersApi Api
+@inject ISnackbar Snackbar
+
+@* Бонусні бали клієнта й комісія партнера за замовлення: нарахувати чи зняти, як кнопки старої адмінки (пункт 40). *@
+<MudPaper Class="pa-4 mb-4" Outlined="true" data-test="credits">
+    <MudText Typo="Typo.h6" Class="mb-2">Бонусні бали й комісія</MudText>
+    @if (_credits is null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@(_error ?? "Завантаження…")</MudText>
+    }
+    else
+    {
+        <div class="d-flex align-center flex-wrap gap-2 mb-2">
+            <MudText Typo="Typo.body2">
+                Бонусні бали: <b>@_credits.RewardPoints</b>
+                @(_credits.CustomerId == 0 ? " (замовлення без облікового запису клієнта)" : _credits.RewardAdded ? " — нараховано" : " — не нараховано")
+            </MudText>
+            <MudSpacer />
+            @if (_credits.RewardAdded)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => ChangeAsync("reward", false))" data-test="remove-reward">Зняти</MudButton>
+            }
+            else if (_credits.CustomerId != 0 && _credits.RewardPoints > 0)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => ChangeAsync("reward", true))" data-test="add-reward">Нарахувати</MudButton>
+            }
+        </div>
+        <div class="d-flex align-center flex-wrap gap-2">
+            <MudText Typo="Typo.body2">
+                Комісія партнера: <b>@Fmt.Money(_credits.Commission)</b>
+                @(_credits.AffiliateId == 0 ? " (замовлення не від партнера)" : _credits.CommissionAdded ? " — нараховано" : " — не нараховано")
+            </MudText>
+            <MudSpacer />
+            @if (_credits.CommissionAdded)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => ChangeAsync("commission", false))" data-test="remove-commission">Зняти</MudButton>
+            }
+            else if (_credits.AffiliateId != 0 && _credits.Commission > 0)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => ChangeAsync("commission", true))" data-test="add-commission">Нарахувати</MudButton>
+            }
+        </div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int OrderId { get; set; }
+
+    private OrderCreditsDto? _credits;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _credits = await Api.CreditsAsync(OrderId);
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task ChangeAsync(string kind, bool add)
+    {
+        _busy = true;
+        try
+        {
+            _credits = await Api.ChangeCreditAsync(OrderId, kind, add);
+            Snackbar.Add(add ? "Нараховано." : "Знято.", Severity.Success);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

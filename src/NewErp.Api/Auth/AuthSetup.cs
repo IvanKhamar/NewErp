@@ -15,6 +15,9 @@ public static class Policies
     public const string Users = nameof(Users);
     public const string Finance = nameof(Finance);
     public const string FinanceSetup = nameof(FinanceSetup);
+
+    /// <summary>Видалення замовлення не скасувати: лише адміністратор, і лише замовлення, на яке ніщо не посилається.</summary>
+    public const string OrderDelete = nameof(OrderDelete);
 }
 
 public static class AuthSetup
@@ -63,7 +66,8 @@ public static class AuthSetup
             .AddPolicy(Policies.Users, p => p.RequireRole(Roles.Admin))
             // Каса й банк: чеки й зміни — менеджери, налаштування касирів — лише адмін.
             .AddPolicy(Policies.Finance, p => p.RequireRole(Roles.Admin, Roles.Manager))
-            .AddPolicy(Policies.FinanceSetup, p => p.RequireRole(Roles.Admin));
+            .AddPolicy(Policies.FinanceSetup, p => p.RequireRole(Roles.Admin))
+            .AddPolicy(Policies.OrderDelete, p => p.RequireRole(Roles.Admin));
 
         return services;
     }

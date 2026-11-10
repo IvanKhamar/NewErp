@@ -67,6 +67,8 @@ public static class DependencyInjection
 
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IOrderStore, OrderStore>();
+        services.AddScoped<IShippingCheckStore, ShippingCheckStore>();
+        services.AddScoped<IOrderCreditStore, OrderCreditStore>();
         services.AddScoped<IReturnStore, ReturnStore>();
         services.AddScoped<ICustomerStore, CustomerStore>();
         services.AddScoped<IReportStore, ReportStore>();

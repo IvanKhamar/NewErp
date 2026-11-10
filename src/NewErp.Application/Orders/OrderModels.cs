@@ -47,7 +47,9 @@ public sealed record OrderDetails(
     int? ManagerId,
     string? ManagerName,
     IReadOnlyList<OrderProductLine> Products,
-    IReadOnlyList<OrderStatusHistoryEntry> StatusHistory);
+    IReadOnlyList<OrderStatusHistoryEntry> StatusHistory,
+    DateOnly? DateShipping = null,
+    string? Invoice = null);
 
 /// <summary>Хто змінює статус, сервер бере з сесії, а не з тіла запиту, тому підробити його не можна.</summary>
 public sealed record ChangeOrderStatusRequest(int StatusId);

@@ -1,0 +1,132 @@
+@inject OrdersApi Api
+
+@* Покупець, адреса й способи доставки та оплати наявного замовлення (форма замовлення старої адмінки, пункт 35).
+   Ті самі правила, що й для нового замовлення; повертає Ok(true), коли збережено. *@
+<MudDialog>
+    <DialogContent>
+        @if (_form is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2" data-test="error">@_error</MudAlert>
+            }
+            <div class="d-flex flex-wrap gap-3">
+                <MudTextField @bind-Value="_form.Firstname" Label="Ім'я" MaxLength="32" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="firstname" />
+                <MudTextField @bind-Value="_form.Lastname" Label="Прізвище" MaxLength="32" Variant="Variant.Outlined" Margin="Margin.Dense" data-test="lastname" />
+                <MudTextField @bind-Value="_form.Telephone" Label="Телефон" MaxLength="32" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_form.Email" Label="Email" MaxLength="96" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_form.Instagram" Label="Instagram" MaxLength="128" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+            <div class="d-flex flex-wrap gap-3 mt-2">
+                <MudSelect T="string" @bind-Value="_form.ShippingCode" Label="Спосіб доставки" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Style="min-width: 16rem" data-test="shipping">
+                    @foreach (var method in Shipping)
+                    {
+                        <MudSelectItem T="string" Value="method.Code">@method.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_form.City" Label="Місто" MaxLength="128" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_form.Address1" Label="Вулиця" MaxLength="128" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_form.Address2" Label="Відділення чи адреса" MaxLength="128" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_form.House" Label="Будинок" MaxLength="32" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" />
+                <MudTextField @bind-Value="_form.Flat" Label="Квартира" MaxLength="32" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 8rem" />
+            </div>
+            <MudSelect T="string" @bind-Value="_form.PaymentCode" Label="Спосіб оплати" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                       data-test="payment">
+                @foreach (var method in Payment)
+                {
+                    <MudSelectItem T="string" Value="method.Code">@method.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_form.Comment" Label="Коментар" Lines="3" MaxLength="4000" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Скасувати</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_form is null || _saving)" data-test="save-customer">Зберегти</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public required IMudDialogInstance Dialog { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    private sealed class Form
+    {
+        public string Firstname { get; set; } = "";
+        public string Lastname { get; set; } = "";
+        public string Telephone { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Instagram { get; set; } = "";
+        public string ShippingCode { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Address1 { get; set; } = "";
+        public string Address2 { get; set; } = "";
+        public string House { get; set; } = "";
+        public string Flat { get; set; } = "";
+        public string PaymentCode { get; set; } = "";
+        public string Comment { get; set; } = "";
+    }
+
+    private Form? _form;
+    private OrderCustomerDto? _current;
+    private OrderMethodsDto _methods = new([], []);
+    private string? _error;
+    private bool _saving;
+
+    // Спосіб із самого замовлення лишається у списку, навіть якщо його вже немає серед відомих.
+    private IEnumerable<OrderMethodDto> Shipping => WithCurrent(_methods.Shipping, _current?.ShippingCode, _current?.ShippingMethod);
+
+    private IEnumerable<OrderMethodDto> Payment => WithCurrent(_methods.Payment, _current?.PaymentCode, _current?.PaymentMethod);
+
+    private static IEnumerable<OrderMethodDto> WithCurrent(IReadOnlyList<OrderMethodDto> known, string? code, string? name) =>
+        string.IsNullOrEmpty(code) || known.Any(m => m.Code == code) ? known : [new OrderMethodDto(code, name ?? code), .. known];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var methods = Api.MethodsAsync();
+            var c = _current = await Api.CustomerAsync(OrderId);
+            _methods = await methods;
+            _form = new Form
+            {
+                Firstname = c.Firstname, Lastname = c.Lastname, Telephone = c.Telephone, Email = c.Email, Instagram = c.Instagram,
+                ShippingCode = c.ShippingCode, City = c.City, Address1 = c.Address1, Address2 = c.Address2, House = c.House, Flat = c.Flat,
+                PaymentCode = c.PaymentCode, Comment = c.Comment,
+            };
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var f = _form!;
+        var shipping = Shipping.FirstOrDefault(m => m.Code == f.ShippingCode);
+        var payment = Payment.FirstOrDefault(m => m.Code == f.PaymentCode);
+        _saving = true;
+        try
+        {
+            await Api.UpdateCustomerAsync(OrderId, new UpdateOrderCustomerRequest(
+                f.Firstname, f.Lastname, f.Telephone, f.Email, f.Instagram, f.ShippingCode, shipping?.Name ?? "", f.City, f.Address1,
+                f.Address2, f.House, f.Flat, f.PaymentCode, payment?.Name ?? "", f.Comment));
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiException e)
+        {
+            _error = e.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -50,4 +50,10 @@ public interface INewOrderStore
 
     /// <summary>Скільки замовлення сплачено сертифікатами (з плюсом), за його рядками підсумку voucher.</summary>
     Task<decimal> VoucherPaidAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Покупець, адреса й способи замовлення або null, якщо замовлення немає.</summary>
+    Task<OrderCustomerDto?> GetCustomerAsync(int orderId, CancellationToken ct);
+
+    /// <summary>Замінює покупця, адресу й способи; адреса оплати — та сама, що доставки.</summary>
+    Task UpdateCustomerAsync(int orderId, UpdateOrderCustomerRequest request, DateTime now, CancellationToken ct);
 }

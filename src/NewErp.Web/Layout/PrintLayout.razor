@@ -1,0 +1,10 @@
+@inherits LayoutComponentBase
+
+@* Макет без меню для сторінок друку: на папір іде лише сам документ. *@
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudSnackbarProvider />
+
+<div style="max-width: 210mm; margin: 0 auto; padding: 8mm; background: #fff; color: #000">
+    @Body
+</div>

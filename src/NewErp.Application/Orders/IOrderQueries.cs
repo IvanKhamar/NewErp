@@ -15,4 +15,7 @@ public interface IOrderQueries
 
     /// <summary>Кого можна призначити відповідальним: активні користувачі старого сайту (як і там, будь-хто з dd_user).</summary>
     Task<IReadOnlyList<LookupItem>> ListManagersAsync(CancellationToken ct);
+
+    /// <summary>Рахунок і пакувальний лист цих замовлень, у тому самому порядку; невідомих id немає.</summary>
+    Task<IReadOnlyList<PrintOrderDto>> PrintAsync(IReadOnlyList<int> orderIds, CancellationToken ct);
 }

@@ -72,5 +72,7 @@ public class LiqPayServiceTests
         public Task<IReadOnlyList<LookupItem>> ListSourcesAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<LookupItem>> ListManagersAsync(CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PrintOrderDto>> PrintAsync(IReadOnlyList<int> orderIds, CancellationToken ct) => throw new NotSupportedException();
     }
 }

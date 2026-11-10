@@ -239,6 +239,26 @@ public sealed class NovaPoshtaClient : INovaPoshtaClient
             .ToList();
     }
 
+    public async Task<decimal> DocumentPriceAsync(string cityRef, bool toDoor, decimal weight, decimal volume, decimal cost, DateOnly day, CancellationToken ct)
+    {
+        var point = _options.DropoffPoints.FirstOrDefault(p => p.IsDefault) ?? _options.DropoffPoints.FirstOrDefault()
+            ?? throw new DomainException("У налаштуваннях Нової Пошти немає місця відправки.");
+        var data = await CallAsync(_options.TrackingKey!, "InternetDocument", "getDocumentPrice", new
+        {
+            CitySender = point.CityRef,
+            CityRecipient = cityRef,
+            Weight = Number(weight),
+            VolumeGeneral = Number(volume),
+            ServiceType = toDoor ? "WarehouseDoors" : "WarehouseWarehouse",
+            CargoType = "Parcel",
+            SeatsAmount = "1",
+            Cost = Number(cost),
+            DateTime = day.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+        }, ct);
+        return data.GetArrayLength() > 0
+            && decimal.TryParse(Text(data[0], "Cost"), NumberStyles.Number, CultureInfo.InvariantCulture, out var price) ? price : 0;
+    }
+
     public async Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct)
     {
         var result = new List<NovaPoshtaWarehouse>();
@@ -350,6 +370,14 @@ public sealed class StubNovaPoshtaClient(bool fakeDocuments = false) : INovaPosh
 
     public Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NovaPoshtaWarehouse>>([]);
+
+    /// <summary>З тестовими ТТН — вигаданий тариф: 70 за кожен початий кг, +30 на адресу, 0,5 % оголошеної вартості.</summary>
+    public Task<decimal> DocumentPriceAsync(string cityRef, bool toDoor, decimal weight, decimal volume, decimal cost, DateOnly day, CancellationToken ct)
+    {
+        if (!fakeDocuments)
+            throw new DomainException("Ключ API Нової Пошти не задано, тож вартість доставки порахувати не можна.");
+        return Task.FromResult(70 * Math.Ceiling(weight) + (toDoor ? 30 : 0) + Math.Round(cost * 0.005m, MidpointRounding.ToEven));
+    }
 
     /// <summary>З тестовими ТТН — дві вигадані вулиці будь-якого міста, щоб доставку на адресу можна було спробувати локально.</summary>
     public Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct)

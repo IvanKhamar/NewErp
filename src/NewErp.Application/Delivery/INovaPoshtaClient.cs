@@ -36,4 +36,10 @@ public interface INovaPoshtaClient
 
     /// <summary>Увесь довідник відділень і поштоматів (Address.getWarehouses посторінково).</summary>
     Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Скільки коштувала б посилка з типового місця відправки (InternetDocument.getDocumentPrice). Лише читання.
+    /// Weight у кг, volume у м³, cost — оголошена вартість.
+    /// </summary>
+    Task<decimal> DocumentPriceAsync(string cityRef, bool toDoor, decimal weight, decimal volume, decimal cost, DateOnly day, CancellationToken ct);
 }

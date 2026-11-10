@@ -1,5 +1,6 @@
 using NewErp.Application.Delivery;
 using NewErp.Domain.Delivery;
+using NewErp.Domain.Orders;
 
 namespace NewErp.UnitTests.Application;
 
@@ -49,6 +50,9 @@ internal sealed class FakeNovaPoshtaClient : INovaPoshtaClient
     public Task<IReadOnlyList<StreetDto>> SearchStreetsAsync(string cityRef, string search, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<StreetDto>>([new StreetDto("street-1", "вул. Хрещатик")]);
 
+    public Task<decimal> DocumentPriceAsync(string cityRef, bool toDoor, decimal weight, decimal volume, decimal cost, DateOnly day, CancellationToken ct) =>
+        Task.FromResult(0m);
+
     public Task<IReadOnlyList<NovaPoshtaWarehouse>> FetchWarehousesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NovaPoshtaWarehouse>>(Warehouses);
 }
@@ -56,6 +60,9 @@ internal sealed class FakeNovaPoshtaClient : INovaPoshtaClient
 /// <summary>Сховище ТТН у пам'яті.</summary>
 internal sealed class FakeShipmentRepository : IShipmentRepository
 {
+    public Task<IReadOnlyList<ParcelItem>> ParcelItemsAsync(IReadOnlyList<(int ProductId, int Quantity)> lines, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ParcelItem>>([]);
+
     public List<OpenShipment> Open { get; } = [];
 
     public Dictionary<int, OrderShippingInfo> Orders { get; } = [];
