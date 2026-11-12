@@ -1,0 +1,463 @@
+@page "/catalog/products/new"
+@page "/catalog/products/{Id:int}/edit"
+@attribute [Authorize(Roles = Access.Orders)]
+@using System.Globalization
+@inject ProductsApi Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* Уся форма товару старої адмінки (Python first, пункти 43, 45, 75, 76). Залишки лишаються за виробництвом. *@
+
+<PageTitle>@(Id is null ? "Новий товар" : $"Товар {Id}: редагування") — NewErp</PageTitle>
+
+<MudLink Href="@(Id is { } back ? ProductRoutes.Product(back) : ProductRoutes.List)" Typo="Typo.body2">
+    @(Id is null ? "← Товари" : "← Картка товару")
+</MudLink>
+
+@if (_notFound)
+{
+    <MudText Class="mt-3" data-test="not-found">Товар №@Id не знайдено.</MudText>
+}
+else if (_lookups is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <div class="d-flex align-center gap-3 mb-3">
+        <MudText Typo="Typo.h4">@(Id is null ? "Новий товар" : $"Товар №{Id}")</MudText>
+        <MudSpacer />
+        @if (Id is not null)
+        {
+            <MudButton Variant="Variant.Outlined" OnClick="CopyAsync" Disabled="_busy" data-test="copy">Копіювати товар</MudButton>
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy" data-test="save">Зберегти</MudButton>
+    </div>
+
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6">Основне</MudText>
+                <MudTextField @bind-Value="_f.Name" Label="Назва" MaxLength="255" data-test="name" />
+                <div class="d-flex gap-3">
+                    <MudTextField @bind-Value="_f.Model" Label="Модель" MaxLength="64" data-test="model" />
+                    <MudTextField @bind-Value="_f.Sku" Label="SKU (код принта)" MaxLength="64" data-test="sku" />
+                </div>
+                <div class="d-flex gap-3">
+                    <MudNumericField @bind-Value="_f.Price" Label="Ціна, грн" Min="0m" Format="0.##" data-test="price" />
+                    <MudNumericField @bind-Value="_f.Minimum" Label="Мін. кількість" Min="1" />
+                    <MudNumericField @bind-Value="_f.SortOrder" Label="Порядок" />
+                </div>
+                <div class="d-flex gap-3">
+                    <MudNumericField @bind-Value="_f.Weight" Label="Вага" Min="0m" />
+                    <MudNumericField @bind-Value="_f.Length" Label="Довжина" Min="0m" />
+                    <MudNumericField @bind-Value="_f.Width" Label="Ширина" Min="0m" />
+                    <MudNumericField @bind-Value="_f.Height" Label="Висота" Min="0m" />
+                </div>
+                <div class="d-flex gap-3">
+                    <MudNumericField @bind-Value="_f.ManufacturerId" Label="Виробник (№)" Min="0" />
+                    <MudNumericField @bind-Value="_f.StockStatusId" Label="Стан складу (№)" Min="0" />
+                </div>
+                <MudCheckBox @bind-Value="_f.Enabled" Label="Показувати на сайті" data-test="enabled" />
+                <MudCheckBox @bind-Value="_f.Subtract" Label="Віднімати зі складу" />
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6">Картинки</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudTextField @bind-Value="_f.Image" Label="Головна (catalog/…)" data-test="image" />
+                    <MudFileUpload T="IBrowserFile" FilesChanged="file => UploadAsync(file, main: true)" Accept="image/*">
+                        <CustomContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.Upload" title="Завантажити" Disabled="_busy" OnClick="@context.OpenFilePickerAsync" />
+                        </CustomContent>
+                    </MudFileUpload>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudTextField @bind-Value="_f.Images" Label="Додаткові, по одній на рядок" Lines="3" data-test="images" />
+                    <MudFileUpload T="IBrowserFile" FilesChanged="file => UploadAsync(file, main: false)" Accept="image/*">
+                        <CustomContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.Upload" title="Додати" Disabled="_busy" OnClick="@context.OpenFilePickerAsync" />
+                        </CustomContent>
+                    </MudFileUpload>
+                </div>
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6">Каталог і зв'язки</MudText>
+                <MudSelect T="int" MultiSelection="true" @bind-SelectedValues="_f.CategoryIds" Label="Категорії" ToStringFunc="Name(_categories)">
+                    @foreach (var item in _categories) { <MudSelectItem T="int" Value="item.Id">@item.Name</MudSelectItem> }
+                </MudSelect>
+                <MudSelect T="int" MultiSelection="true" @bind-SelectedValues="_f.LabelIds" Label="Мітки" ToStringFunc="Name(_lookups.Labels)">
+                    @foreach (var item in _lookups.Labels) { <MudSelectItem T="int" Value="item.Id">@item.Name</MudSelectItem> }
+                </MudSelect>
+                <MudSelect T="int" MultiSelection="true" @bind-SelectedValues="_f.FilterIds" Label="Фільтри" ToStringFunc="Name(_lookups.Filters)">
+                    @foreach (var item in _lookups.Filters) { <MudSelectItem T="int" Value="item.Id">@item.Name</MudSelectItem> }
+                </MudSelect>
+                <MudSelect T="int" MultiSelection="true" @bind-SelectedValues="_f.DownloadIds" Label="Завантаження" ToStringFunc="Name(_lookups.Downloads)">
+                    @foreach (var item in _lookups.Downloads) { <MudSelectItem T="int" Value="item.Id">@item.Name</MudSelectItem> }
+                </MudSelect>
+                <MudTextField @bind-Value="_f.Related" Label="З цим купують (номери товарів через кому)" data-test="related" />
+                <MudTextField @bind-Value="_f.RelatedColors" Label="Інші кольори (номери через кому)" />
+                <MudTextField @bind-Value="_f.RelatedVariants" Label="Варіанти (номери через кому)" />
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true" data-test="specials">
+                <div class="d-flex align-center">
+                    <MudText Typo="Typo.h6">Акційні ціни</MudText>
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" title="Додати" OnClick="() => _f.Specials.Add(new SpecialRow())" />
+                </div>
+                @foreach (var special in _f.Specials)
+                {
+                    <div class="d-flex align-center gap-2">
+                        <MudNumericField @bind-Value="special.Price" Label="Ціна" Min="0m" />
+                        <MudNumericField @bind-Value="special.Percent" Label="або %" Min="0m" Max="100m" />
+                        <MudDatePicker @bind-Date="special.Start" Label="З" Clearable="true" DateFormat="dd.MM.yyyy" />
+                        <MudDatePicker @bind-Date="special.End" Label="По" Clearable="true" DateFormat="dd.MM.yyyy" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" title="Прибрати" OnClick="() => _f.Specials.Remove(special)" />
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3 mb-3" Outlined="true" data-test="sizes">
+                <MudText Typo="Typo.h6">Розміри</MudText>
+                <MudText Typo="Typo.caption">Залишки за розмірами веде виробництво; розмір із залишком прибрати не можна.</MudText>
+                @foreach (var size in _f.Sizes)
+                {
+                    <div class="d-flex align-center gap-2">
+                        <MudCheckBox @bind-Value="size.Chosen" Label="@size.Name" Style="min-width: 90px" />
+                        <MudNumericField @bind-Value="size.Price" Label="Ціна" Min="0m" Disabled="!size.Chosen" />
+                        <MudText Typo="Typo.body2">залишок @size.Quantity</MudText>
+                    </div>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true" data-test="options">
+                <MudText Typo="Typo.h6">Опції</MudText>
+                @foreach (var option in _f.Options)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-2">@option.Name</MudText>
+                    @if (option.HasValues)
+                    {
+                        <MudCheckBox @bind-Value="option.Required" Label="Обов'язкова" Dense="true" />
+                        @foreach (var value in option.Values)
+                        {
+                            <div class="d-flex align-center gap-2">
+                                <MudCheckBox @bind-Value="value.Chosen" Label="@value.Name" Style="min-width: 120px" />
+                                <MudSelect T="string" @bind-Value="value.Prefix" Disabled="!value.Chosen" Style="max-width: 70px">
+                                    <MudSelectItem T="string" Value="@("+")">+</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("-")">−</MudSelectItem>
+                                </MudSelect>
+                                <MudNumericField @bind-Value="value.Price" Label="Ціна" Min="0m" Disabled="!value.Chosen" />
+                                <MudText Typo="Typo.body2">залишок @value.Quantity</MudText>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="d-flex align-center gap-2">
+                            <MudCheckBox @bind-Value="option.Chosen" Label="Є" />
+                            <MudCheckBox @bind-Value="option.Required" Label="Обов'язкова" Disabled="!option.Chosen" />
+                            <MudTextField @bind-Value="option.Text" Label="Текст" Disabled="!option.Chosen" />
+                        </div>
+                    }
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6">Описи</MudText>
+                <MudText Typo="Typo.caption">HTML; сервер лишає лише безпечні теги.</MudText>
+                <MudTextField @bind-Value="_f.Description" Label="Опис" Lines="6" data-test="description" />
+                <MudTextField @bind-Value="_f.TableSize" Label="Таблиця розмірів" Lines="3" />
+                <MudTextField @bind-Value="_f.Characteristics" Label="Характеристики" Lines="3" />
+                <MudTextField @bind-Value="_f.Notice" Label="Примітка" Lines="2" />
+                <MudTextField @bind-Value="_f.ModelInfo" Label="Опис фото" MaxLength="255" />
+                <MudTextField @bind-Value="_f.Tag" Label="Теги (через кому)" />
+                <MudTextField @bind-Value="_f.Variant" Label="Варіант" />
+                <MudTextField @bind-Value="_f.Color" Label="Колір" MaxLength="255" />
+                @foreach (var attr in _f.Attributes)
+                {
+                    <MudTextField @bind-Value="attr.Text" Label="@attr.Name" />
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-3 mb-3" Outlined="true">
+                <MudText Typo="Typo.h6">SEO</MudText>
+                <MudTextField @bind-Value="_f.SeoKeyword" Label="Адреса на сайті (латиницею, через -)" MaxLength="255" data-test="seo" />
+                <MudTextField @bind-Value="_f.MetaTitle" Label="Meta title" MaxLength="255" />
+                <MudTextField @bind-Value="_f.MetaDescription" Label="Meta description" MaxLength="255" />
+                <MudTextField @bind-Value="_f.MetaKeyword" Label="Meta keywords" MaxLength="255" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private ProductFormLookups? _lookups;
+    private IReadOnlyList<LookupItem> _categories = [];
+    private FormModel _f = new();
+    private DateTime? _version;
+    private bool _notFound;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _notFound = false;
+        _lookups = null;
+        try
+        {
+            var lookups = await Api.FormLookupsAsync();
+            ProductEditDto? product = Id is { } id ? await Api.GetEditAsync(id) : null;
+            Show(lookups, product);
+        }
+        catch (ApiException)
+        {
+            _notFound = true;
+        }
+    }
+
+    private void Show(ProductFormLookups lookups, ProductEditDto? product)
+    {
+        // Вимкнена категорія лишається обраною в товарі, що вже в ній.
+        _categories = [.. lookups.Categories, .. (product?.CategoryIds ?? []).Where(id => lookups.Categories.All(c => c.Id != id)).Select(id => new LookupItem(id, $"#{id} (вимкнена)"))];
+        _f = FormModel.From(lookups, product);
+        _version = product?.DateModified;
+        _lookups = lookups;
+    }
+
+    private async Task SaveAsync()
+    {
+        SaveProductRequest request;
+        try
+        {
+            request = _f.ToRequest(_version);
+        }
+        catch (FormatException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+            return;
+        }
+        await RunAsync(async () =>
+        {
+            if (Id is { } id)
+            {
+                Show(_lookups!, await Api.SaveAsync(id, request));
+                Snackbar.Add("Товар збережено.", Severity.Success);
+            }
+            else
+            {
+                var created = await Api.CreateAsync(request);
+                Snackbar.Add("Товар створено (вимкнений, доки його не ввімкнуть).", Severity.Success);
+                Navigation.NavigateTo(ProductRoutes.Edit(created.ProductId));
+            }
+        });
+    }
+
+    private Task CopyAsync() => RunAsync(async () =>
+    {
+        var copy = await Api.CopyAsync(Id!.Value);
+        Snackbar.Add($"Копія — товар №{copy.ProductId}, вимкнена, без залишку й SEO-адреси.", Severity.Success);
+        Navigation.NavigateTo(ProductRoutes.Edit(copy.ProductId));
+    });
+
+    private Task UploadAsync(IBrowserFile? file, bool main) => file is null ? Task.CompletedTask : RunAsync(async () =>
+    {
+        await using var stream = file.OpenReadStream(5 * 1024 * 1024 + 1);
+        var picture = await Api.UploadPictureAsync("products", stream, file.Name);
+        if (main)
+            _f.Image = picture.Path;
+        else
+            _f.Images = string.IsNullOrWhiteSpace(_f.Images) ? picture.Path : $"{_f.Images.TrimEnd()}\n{picture.Path}";
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        catch (IOException)
+        {
+            Snackbar.Add("Картинка завелика: не більше 5 МБ.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static Func<int, string> Name(IReadOnlyList<LookupItem> items) => id => items.FirstOrDefault(i => i.Id == id)?.Name ?? $"#{id}";
+
+    /// <summary>Те, що редагує форма; запис збирає <see cref="ToRequest"/>.</summary>
+    private sealed class FormModel
+    {
+        public string Name { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string Sku { get; set; } = "";
+        public decimal Price { get; set; }
+        public int Minimum { get; set; } = 1;
+        public bool Subtract { get; set; } = true;
+        public int StockStatusId { get; set; }
+        public int ManufacturerId { get; set; }
+        public decimal Weight { get; set; }
+        public decimal Length { get; set; }
+        public decimal Width { get; set; }
+        public decimal Height { get; set; }
+        public int SortOrder { get; set; }
+        public bool Enabled { get; set; }
+        public string Image { get; set; } = "";
+        public string Images { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Tag { get; set; } = "";
+        public string MetaTitle { get; set; } = "";
+        public string MetaDescription { get; set; } = "";
+        public string MetaKeyword { get; set; } = "";
+        public string TableSize { get; set; } = "";
+        public string Variant { get; set; } = "";
+        public string Notice { get; set; } = "";
+        public string ModelInfo { get; set; } = "";
+        public string Characteristics { get; set; } = "";
+        public string Color { get; set; } = "";
+        public string SeoKeyword { get; set; } = "";
+        public IReadOnlyCollection<int> CategoryIds { get; set; } = [];
+        public IReadOnlyCollection<int> LabelIds { get; set; } = [];
+        public IReadOnlyCollection<int> FilterIds { get; set; } = [];
+        public IReadOnlyCollection<int> DownloadIds { get; set; } = [];
+        public string Related { get; set; } = "";
+        public string RelatedColors { get; set; } = "";
+        public string RelatedVariants { get; set; } = "";
+        public List<SpecialRow> Specials { get; set; } = [];
+        public List<ChoiceRow> Sizes { get; set; } = [];
+        public List<OptionRow> Options { get; set; } = [];
+        public List<AttributeRow> Attributes { get; set; } = [];
+
+        public static FormModel From(ProductFormLookups lookups, ProductEditDto? p)
+        {
+            var sizes = (p?.Sizes ?? []).ToDictionary(s => s.OptionValueId);
+            var options = (p?.Options ?? []).ToDictionary(o => o.OptionId);
+            var attributes = (p?.Attributes ?? []).ToDictionary(a => a.AttributeId, a => a.Text);
+            return new FormModel
+            {
+                Name = p?.Name ?? "", Model = p?.Model ?? "", Sku = p?.Sku ?? "", Price = p?.Price ?? 0, Minimum = p?.Minimum ?? 1,
+                Subtract = p?.Subtract ?? true, StockStatusId = p?.StockStatusId ?? 0, ManufacturerId = p?.ManufacturerId ?? 0,
+                Weight = p?.Weight ?? 0, Length = p?.Length ?? 0, Width = p?.Width ?? 0, Height = p?.Height ?? 0, SortOrder = p?.SortOrder ?? 0,
+                Enabled = p?.Enabled ?? false, Image = p?.Image ?? "", Images = string.Join("\n", (p?.Images ?? []).Select(i => i.Image)),
+                Description = p?.Description ?? "", Tag = p?.Tag ?? "", MetaTitle = p?.MetaTitle ?? "", MetaDescription = p?.MetaDescription ?? "",
+                MetaKeyword = p?.MetaKeyword ?? "", TableSize = p?.TableSize ?? "", Variant = p?.Variant ?? "", Notice = p?.Notice ?? "",
+                ModelInfo = p?.ModelInfo ?? "", Characteristics = p?.Characteristics ?? "", Color = p?.Color ?? "", SeoKeyword = p?.SeoKeyword ?? "",
+                CategoryIds = (p?.CategoryIds ?? []).ToHashSet(), LabelIds = (p?.LabelIds ?? []).ToHashSet(),
+                FilterIds = (p?.FilterIds ?? []).ToHashSet(), DownloadIds = (p?.DownloadIds ?? []).ToHashSet(),
+                Related = string.Join(", ", p?.RelatedIds ?? []), RelatedColors = string.Join(", ", p?.RelatedColorIds ?? []),
+                RelatedVariants = string.Join(", ", p?.RelatedVariantIds ?? []),
+                Specials = [.. (p?.Specials ?? []).Select(s => new SpecialRow
+                {
+                    Group = s.CustomerGroupId, Priority = s.Priority, Price = s.Price, Percent = s.Percent,
+                    Start = s.DateStart?.ToDateTime(TimeOnly.MinValue), End = s.DateEnd?.ToDateTime(TimeOnly.MinValue),
+                })],
+                // Розмір, якого вже немає в довіднику, лишається в списку, щоб не загубитися при збереженні.
+                Sizes = [.. lookups.Sizes.Select(s => ChoiceRow.Of(s.Id, s.Name, sizes.GetValueOrDefault(s.Id))),
+                    .. sizes.Values.Where(s => lookups.Sizes.All(l => l.Id != s.OptionValueId)).Select(s => ChoiceRow.Of(s.OptionValueId, s.Name, s))],
+                Options = [.. lookups.Options.Select(o => OptionRow.Of(o, options.GetValueOrDefault(o.Id)))],
+                Attributes = [.. lookups.Attributes.Select(a => new AttributeRow { Id = a.Id, Name = a.Name, Text = attributes.GetValueOrDefault(a.Id, "") })],
+            };
+        }
+
+        public SaveProductRequest ToRequest(DateTime? version) => new()
+        {
+            DateModified = version, Name = Name, Model = Model, Sku = Sku, Price = Price, Minimum = Minimum, Subtract = Subtract,
+            StockStatusId = StockStatusId, ManufacturerId = ManufacturerId, Weight = Weight, Length = Length, Width = Width, Height = Height,
+            SortOrder = SortOrder, Enabled = Enabled, Image = Image, Description = Description, Tag = Tag, MetaTitle = MetaTitle,
+            MetaDescription = MetaDescription, MetaKeyword = MetaKeyword, TableSize = TableSize, Variant = Variant, Notice = Notice,
+            ModelInfo = ModelInfo, Characteristics = Characteristics, Color = Color, SeoKeyword = SeoKeyword,
+            CategoryIds = [.. CategoryIds], LabelIds = [.. LabelIds], FilterIds = [.. FilterIds], DownloadIds = [.. DownloadIds],
+            RelatedIds = Ids(Related), RelatedColorIds = Ids(RelatedColors), RelatedVariantIds = Ids(RelatedVariants),
+            Images = [.. Images.Split('\n').Select(i => i.Trim()).Where(i => i.Length > 0).Select((image, i) => new ProductImageDto(image, i))],
+            Specials = [.. Specials.Select(s => new ProductSpecialDto(s.Group, s.Priority, s.Price, s.Percent,
+                s.Start is { } start ? DateOnly.FromDateTime(start) : null, s.End is { } end ? DateOnly.FromDateTime(end) : null))],
+            Sizes = [.. Sizes.Where(s => s.Chosen).Select(s => new ProductSizeEditDto(s.Id, s.Name, s.Price, s.Quantity))],
+            Options = [.. Options.Where(o => o.HasValues ? o.Values.Any(v => v.Chosen) : o.Chosen).Select(o => new ProductOptionDto
+            {
+                OptionId = o.Id, Name = o.Name, Required = o.Required, Value = o.HasValues ? "" : o.Text,
+                Values = [.. o.Values.Where(v => v.Chosen).Select(v => new ProductOptionValueEditDto(v.Id, v.Name, v.Price, v.Prefix, v.Quantity))],
+            })],
+            Attributes = [.. Attributes.Where(a => !string.IsNullOrWhiteSpace(a.Text)).Select(a => new ProductAttributeDto(a.Id, a.Text))],
+        };
+
+        /// <summary>«1, 2, 3» → [1, 2, 3]; щось інше — помилка з поясненням, як у Python-версії.</summary>
+        private static IReadOnlyList<int> Ids(string text)
+        {
+            var parts = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var ids = new List<int>();
+            foreach (var part in parts)
+            {
+                if (!int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var id))
+                    throw new FormatException($"Номери товарів через кому, наприклад 12, 34 («{part}» — не номер).");
+                ids.Add(id);
+            }
+            return ids;
+        }
+    }
+
+    private sealed class SpecialRow
+    {
+        public int Group { get; set; } = 1;
+        public int Priority { get; set; } = 1;
+        public decimal Price { get; set; }
+        public decimal Percent { get; set; }
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
+    private sealed class ChoiceRow
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public bool Chosen { get; set; }
+        public decimal Price { get; set; }
+        public string Prefix { get; set; } = "+";
+        public int Quantity { get; set; }
+
+        public static ChoiceRow Of(int id, string name, ProductSizeEditDto? size) =>
+            new() { Id = id, Name = name, Chosen = size is not null, Price = size?.Price ?? 0, Quantity = size?.Quantity ?? 0 };
+    }
+
+    private sealed class OptionRow
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public bool HasValues { get; set; }
+        public bool Chosen { get; set; }
+        public bool Required { get; set; } = true;
+        public string Text { get; set; } = "";
+        public List<ChoiceRow> Values { get; set; } = [];
+
+        public static OptionRow Of(ProductOptionLookup lookup, ProductOptionDto? option)
+        {
+            var values = (option?.Values ?? []).ToDictionary(v => v.OptionValueId);
+            return new OptionRow
+            {
+                Id = lookup.Id, Name = lookup.Name, HasValues = lookup.HasValues, Chosen = option is not null,
+                Required = option?.Required ?? true, Text = option?.Value ?? "",
+                Values = [.. lookup.Values.Select(v => values.GetValueOrDefault(v.Id) is { } chosen
+                    ? new ChoiceRow { Id = v.Id, Name = v.Name, Chosen = true, Price = chosen.Price, Prefix = chosen.PricePrefix, Quantity = chosen.Quantity }
+                    : new ChoiceRow { Id = v.Id, Name = v.Name })],
+            };
+        }
+    }
+
+    private sealed class AttributeRow
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Text { get; set; } = "";
+    }
+}

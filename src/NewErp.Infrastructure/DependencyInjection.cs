@@ -96,6 +96,11 @@ public static class DependencyInjection
         services.AddScoped<IPartnerRepository, PartnerRepository>();
         services.AddScoped<IProductSortStore, ProductSortStore>();
         services.AddScoped<IProductStore, ProductStore>();
+        services.AddScoped<IProductEditStore, ProductEditStore>();
+        services.AddScoped<IProductImportStore, ProductImportStore>();
+        services.Configure<PictureOptions>(configuration.GetSection(PictureOptions.SectionName));
+        services.AddSingleton<IPictureFolder, LocalPictureFolder>();
+        services.AddSingleton<IHtmlCleaner, NewErp.Infrastructure.Content.HtmlCleaner>();
         services.AddScoped<IPreOrderStore, PreOrderStore>();
         services.AddScoped<IMarketingStore, MarketingStore>();
         services.AddScoped<IVoucherStore, VoucherStore>();

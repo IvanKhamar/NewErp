@@ -30,7 +30,7 @@ API, tests and Blazor pages for each group, one branch and one PR per group. Ite
 | 4 | `feat/py-alerts-matching` | 26, 27, 28 | merged |
 | 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
 | 6 | `feat/py-order-tools` | 35–42 | merged (#41) |
-| 7 | `feat/py-product-form` | 43–45, 75, 76 | TODO |
+| 7 | `feat/py-product-form` | 43–45, 75, 76 | merged |
 | 8 | `feat/py-catalog-lists` | 46–52 | TODO |
 | 9 | `feat/py-customers` | 53, 54 | TODO |
 | 10 | `feat/py-monobank` | 55, 56 | TODO |
@@ -79,7 +79,7 @@ Things to know when continuing:
 
 ## 43–52. Catalog — Python 9e1df9d, 157844e, 4669ad9, f644db7, dc27a5a, 9ba10d9
 
-- **Status:** TODO
+- **Status:** 43–45 DONE: `feat/py-product-form`, 2026-11-12 (the product form with attributes and downloads, the quick price edit, the CSV import, «зняти NEW»; the form's `modelInfo` is at most 255, as `db/reconstructed.sql` has it since item 72). 46–52 TODO (group 8)
 - **Contract:** `POST /catalog/products`, `GET /catalog/products/{id}/edit`, `PUT /catalog/products/{id}`
   (dateModified, 409), `POST /catalog/products/{id}/copy`, `POST /catalog/products/remove-new`,
   `GET /catalog/products/form-lookups`; `POST /catalog/products/import/preview` and `/import` (CSV);
@@ -155,13 +155,13 @@ Things to know when continuing:
 
 ## 75. Picture upload — Python 87f8bd3
 
-- **Status:** TODO
+- **Status:** DONE: `feat/py-product-form`, 2026-11-12 (setting `Pictures:ImageDir`; the picker is in the product form; the category, banner and voucher theme forms get it with groups 8, 11 and 12)
 - **Contract:** `POST /catalog/pictures/{kind}` (multipart field `file`; `kind`: products, categories, banners, vouchers) returns 201 `{"path": "catalog/<kind>/<16 hex>.<ext>"}`; a file picker next to each picture path field of the product, category, banner and voucher theme forms. Setting `NEWERP_PICTURES__IMAGE_DIR` (the storefront's image folder on a shared volume); empty: 400 with a text naming the setting.
 - **Security:** the browser's file name and type are not used; the type comes from the first bytes (JPEG, PNG, WebP, GIF only; SVG is refused because it can carry scripts); at most 5 MB; the server makes the name; an existing file is never overwritten; the path can't leave the folder; audited.
 
 ## 76. Options other than sizes in the product form — Python df5af90
 
-- **Status:** TODO
+- **Status:** DONE: `feat/py-product-form`, 2026-11-12
 - **Contract:** `options` next to `sizes` in `GET /catalog/products/{id}/edit`, `POST` and `PUT`: `{optionId, name, required, value, values: [{optionValueId, name, price, pricePrefix, quantity}]}`; `GET /catalog/products/form-lookups` gets `options: [{id, name, type, hasValues, values}]`, without the size option. `select`, `radio`, `checkbox` and `image` options have values; the others hold a text in `value`.
 - **Rules:** keep sizes and other options apart when reading (the Python form first read every option value as a size, so saving refused the product or dropped its colours). Rows are changed in place, because the lines of old orders point to them. A new non-size value has `subtract = 0`, because production keeps stock only by size and the storefront would hide it at zero. A value with stock can't be removed. An option with nothing left is removed with its `dd_product_option` row.
 - **Security:** an option or value must exist and belong together; a list option needs at least one value; `<` and `>` are refused in a text value.

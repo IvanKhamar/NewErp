@@ -22,6 +22,7 @@ else
         <MudChip T="string" Size="Size.Small" Color="@(_product.Enabled ? Color.Success : Color.Default)">@(_product.Enabled ? "увімкнено" : "вимкнено")</MudChip>
         <MudSpacer />
         <MudText Typo="Typo.h5">@Fmt.Money(_product.Price)</MudText>
+        <MudButton Variant="Variant.Outlined" Href="@ProductRoutes.Edit(_product.Id)" StartIcon="@Icons.Material.Filled.Edit" data-test="edit-all">Редагувати все</MudButton>
     </div>
     <MudGrid>
         <MudItem xs="12" md="6">
@@ -60,7 +61,7 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-3" Outlined="true">
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    Залишки за розмірами оновлює виробництво з пошитого складу; опис, фото й нові товари — в адмінці OpenCart.
+                    Залишки за розмірами оновлює виробництво з пошитого складу; опис, фото, розміри й опції — у «Редагувати все».
                 </MudText>
                 @if (_product.Sizes.Count == 0)
                 {

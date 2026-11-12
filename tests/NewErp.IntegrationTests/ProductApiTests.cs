@@ -28,7 +28,8 @@ public class ProductApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var all = (await manager.GetFromJsonAsync<PagedResult<ProductListItem>>("/catalog/products"))!;
         Assert.Equal(4, all.TotalCount);
         Assert.Equal([71, ApiFactory.CategoryProductId, 70, 72], all.Items.Select(p => p.Id)); // за назвою
-        Assert.Equal(new ProductListItem(70, "Сукня лляна", "SL-01", 1500m, true, 6, null), all.Items.Single(p => p.Id == 70));
+        Assert.Equal(new ProductListItem(70, "Сукня лляна", "SL-01", 1500m, true, 6, null), all.Items.Single(p => p.Id == 70) with { DateModified = null });
+        Assert.NotNull(all.Items[0].DateModified); // версія рядка для швидкої зміни ціни
         Assert.Equal(new[] { 70, 72 }, await Ids("?categoryId=30&enabled=true"));
         Assert.Equal(new[] { 70 }, await Ids("?labelId=1"));
         Assert.Equal(new[] { 71 }, await Ids("?enabled=false"));

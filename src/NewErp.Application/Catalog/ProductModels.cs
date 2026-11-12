@@ -6,7 +6,7 @@ namespace NewErp.Application.Catalog;
 public sealed record ProductFilter(string? Search = null, int? CategoryId = null, int? LabelId = null, bool? Enabled = null, int Page = 1, int PageSize = 20);
 
 /// <summary>Товар у списку. Quantity — залишок на вітрині, його заповнює виробництво з пошитого складу.</summary>
-public sealed record ProductListItem(int Id, string Name, string Model, decimal Price, bool Enabled, int Quantity, string? Image);
+public sealed record ProductListItem(int Id, string Name, string Model, decimal Price, bool Enabled, int Quantity, string? Image, DateTime? DateModified = null);
 
 /// <summary>Розмір товару із залишком (лише читання: залишки веде виробництво).</summary>
 public sealed record ProductSize(int OptionValueId, string Name, int Quantity);

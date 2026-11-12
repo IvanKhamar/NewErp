@@ -56,6 +56,9 @@ public static class DependencyInjection
         services.AddScoped<PartnerService>();
         services.AddScoped<ProductSortService>();
         services.AddScoped<ProductService>();
+        services.AddScoped<ProductEditService>();
+        services.AddScoped<ProductImportService>();
+        services.AddScoped<PictureService>();
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();
         services.AddScoped<VoucherService>();

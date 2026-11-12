@@ -1,0 +1,101 @@
+@page "/catalog/products/import"
+@attribute [Authorize(Roles = Access.CatalogBulk)]
+@inject ProductsApi Api
+@inject ISnackbar Snackbar
+
+@* Імпорт товарів із CSV (Python first, пункт 44): спершу перегляд, потім запис. Лише оновлює наявні товари. *@
+
+<PageTitle>Імпорт товарів — NewErp</PageTitle>
+
+<MudLink Href="@ProductRoutes.List" Typo="Typo.body2">← Товари</MudLink>
+<MudText Typo="Typo.h4" Class="mb-2">Імпорт товарів із CSV</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    UTF-8, «;» або «,» між колонками, перший рядок — назви: model або product_id і будь-які з price, weight, length, width,
+    height, sort_order, status (1 — увімкнений), sku, name. Порожня комірка лишає значення; нових товарів, залишків і
+    картинок імпорт не створює.
+</MudText>
+
+<MudFileUpload T="IBrowserFile" FilesChanged="PreviewAsync" Accept=".csv,text/csv" data-test="upload">
+    <CustomContent>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" Disabled="_busy" OnClick="@context.OpenFilePickerAsync">
+            Обрати CSV-файл
+        </MudButton>
+    </CustomContent>
+</MudFileUpload>
+
+@if (_preview is not null)
+{
+    <MudText Class="mt-3" data-test="summary">
+        Зміниться рядків: @(_preview.Rows.Count - _preview.Errors); без змін: @_preview.Unchanged; з помилками: @_preview.Errors.
+    </MudText>
+    <MudSimpleTable Dense="true" Class="mt-2" data-test="rows">
+        <thead><tr><th>Рядок</th><th>Товар</th><th>Модель</th><th>Зміни або помилка</th></tr></thead>
+        <tbody>
+            @foreach (var row in _preview.Rows)
+            {
+                <tr>
+                    <td>@row.Line</td>
+                    <td>@row.ProductId</td>
+                    <td>@row.Model</td>
+                    <td>
+                        @if (row.Error is not null)
+                        {
+                            <MudText Color="Color.Error" Typo="Typo.body2">@row.Error</MudText>
+                        }
+                        else
+                        {
+                            @string.Join("; ", row.Changes.Select(c => $"{c.Key}: {c.Value}"))
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="ApplyAsync"
+               Disabled="@(_busy || _preview.Rows.Count == _preview.Errors)" data-test="apply">Оновити товари</MudButton>
+}
+
+@code {
+    private ImportPreview? _preview;
+    private byte[]? _file;
+    private string _name = "";
+    private bool _busy;
+
+    private Task PreviewAsync(IBrowserFile? file) => file is null ? Task.CompletedTask : RunAsync(async () =>
+    {
+        // Файл читаємо один раз: той самий вміст іде і в перегляд, і в запис.
+        await using var stream = file.OpenReadStream(ProductImportService.MaxBytes + 1);
+        using var copy = new MemoryStream();
+        await stream.CopyToAsync(copy);
+        (_file, _name) = (copy.ToArray(), file.Name);
+        _preview = await Api.PreviewImportAsync(new MemoryStream(_file), _name);
+    });
+
+    private Task ApplyAsync() => RunAsync(async () =>
+    {
+        var result = await Api.ImportAsync(new MemoryStream(_file!), _name);
+        Snackbar.Add($"Оновлено товарів: {result.Updated}; рядків з помилками: {result.Errors}.", Severity.Success);
+        _preview = null;
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        catch (IOException)
+        {
+            Snackbar.Add("Файл більший за 1 МБ.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
