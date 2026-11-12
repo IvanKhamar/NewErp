@@ -16,7 +16,7 @@ public sealed class ErrorHandler(IProblemDetailsService problemDetails) : IExcep
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Не знайдено", exception.Message),
             DomainException => (StatusCodes.Status400BadRequest, "Порушено бізнес-правило", exception.Message),
-            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "Дані щойно змінив хтось інший, повторіть дію", exception.Message),
+            DbUpdateConcurrencyException or ConflictException => (StatusCodes.Status409Conflict, "Дані щойно змінив хтось інший, повторіть дію", exception.Message),
             // Тіло запиту не прочиталось (зламаний JSON, не UTF-8, не те поле). Це помилка клієнта, а не сервера.
             BadHttpRequestException => (StatusCodes.Status400BadRequest, "Некоректний запит",
                 "Не вдалося прочитати тіло запиту: перевірте, що це правильний JSON у кодуванні UTF-8."),

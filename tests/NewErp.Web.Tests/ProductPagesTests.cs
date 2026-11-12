@@ -2,6 +2,7 @@ using System.Net;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using NewErp.Application.Auth;
 using NewErp.Application.Catalog;
 using NewErp.Application.Common;
 using NewErp.Web.Api;
@@ -16,6 +17,9 @@ public class ProductPagesTests : WebTestContext
     public void List_ShowsProductsAndAsksForTheFilters()
     {
         Services.AddScoped<ProductsApi>();
+        var auth = AddAuthorization(); // кнопка імпорту — лише для адміністратора
+        auth.SetAuthorized("Марта");
+        auth.SetRoles(Roles.Manager);
         Api.Respond("/catalog/products/categories", HttpStatusCode.OK, new List<LookupItem> { new(30, "Сукні") });
         Api.Respond("/catalog/products/labels", HttpStatusCode.OK, new List<LookupItem> { new(1, "Хіт") });
         Api.Respond("/catalog/products", HttpStatusCode.OK, new PagedResult<ProductListItem>(

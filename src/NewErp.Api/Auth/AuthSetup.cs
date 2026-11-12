@@ -18,6 +18,9 @@ public static class Policies
 
     /// <summary>Видалення замовлення не скасувати: лише адміністратор, і лише замовлення, на яке ніщо не посилається.</summary>
     public const string OrderDelete = nameof(OrderDelete);
+
+    /// <summary>Масові зміни каталогу (імпорт CSV, масові ціни) — лише адміністратор, як у Python-версії.</summary>
+    public const string CatalogBulk = nameof(CatalogBulk);
 }
 
 public static class AuthSetup
@@ -67,7 +70,8 @@ public static class AuthSetup
             // Каса й банк: чеки й зміни — менеджери, налаштування касирів — лише адмін.
             .AddPolicy(Policies.Finance, p => p.RequireRole(Roles.Admin, Roles.Manager))
             .AddPolicy(Policies.FinanceSetup, p => p.RequireRole(Roles.Admin))
-            .AddPolicy(Policies.OrderDelete, p => p.RequireRole(Roles.Admin));
+            .AddPolicy(Policies.OrderDelete, p => p.RequireRole(Roles.Admin))
+            .AddPolicy(Policies.CatalogBulk, p => p.RequireRole(Roles.Admin));
 
         return services;
     }

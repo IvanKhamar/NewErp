@@ -41,7 +41,7 @@ public sealed class ProductStore(ErpDbContext db, IOptions<ErpOptions> options) 
             .OrderBy(x => x.Name).ThenBy(x => x.p.ProductId)
             .Skip((filter.Page - 1) * filter.PageSize)
             .Take(filter.PageSize)
-            .Select(x => new ProductListItem(x.p.ProductId, x.Name, x.p.Model, x.p.Price, x.p.Status, x.p.Quantity, x.p.Image))
+            .Select(x => new ProductListItem(x.p.ProductId, x.Name, x.p.Model, x.p.Price, x.p.Status, x.p.Quantity, x.p.Image, x.p.DateModified))
             .ToListAsync(ct);
         return new PagedResult<ProductListItem>(items, filter.Page, filter.PageSize, total);
     }
