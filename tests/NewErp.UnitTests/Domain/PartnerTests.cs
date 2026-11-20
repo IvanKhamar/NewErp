@@ -50,4 +50,15 @@ public class PartnerTests
     [Fact]
     public void SetProductMap_RejectsZeroPrice() =>
         Assert.Throws<DomainException>(() => Partner().SetProductMap([new ProductMapping(10, null, "", "", 0, null)]));
+
+    [Fact]
+    public void BrandAndProductArticle_FitTheRealColumns()
+    {
+        // Пункт 72: vendor_name varchar(128), external_id varchar(255), як у скриптах старого сайту.
+        var partner = new Partner(new PartnerSettings("eva", "EVA", true, "", true, new string('Б', 128), "", 5), Now);
+        partner.SetProductMap([new ProductMapping(1, null, new string('A', 255), "", null, null)]);
+
+        Assert.Equal((128, 255), (partner.VendorName.Length, partner.ProductMap[0].ExternalId.Length));
+        Assert.Throws<DomainException>(() => partner.SetProductMap([new ProductMapping(1, null, new string('A', 256), "", null, null)]));
+    }
 }

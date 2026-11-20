@@ -43,13 +43,16 @@ public class StockMovement
     /// <summary>Скільки списано чи прийнято, завжди додатне.</summary>
     public decimal Quantity { get; private set; }
 
-    public decimal StockBefore { get; private set; }
+    // stock_before, stock_after і user_id у старій таблиці можуть бути NULL (скрипт сайту, пункт 72).
+    public decimal? StockBefore { get; private set; }
 
-    public decimal StockAfter { get; private set; }
+    public decimal? StockAfter { get; private set; }
 
-    public string Comment { get; private set; } = "";
+    private string? _comment; // NULL в старій таблиці читається як ""
 
-    public int UserId { get; private set; }
+    public string Comment { get => _comment ?? ""; private set => _comment = value; }
+
+    public int? UserId { get; private set; }
 
     public string Username { get; private set; } = "";
 

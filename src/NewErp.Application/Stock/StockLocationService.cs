@@ -56,7 +56,7 @@ public sealed class StockLocationService(
         AddCreated(placement);
         stock.Add(m);
         await stock.SaveChangesAsync(ct);
-        return new StockMovementDto(m.Id, itemId, m.Delta, m.StockBefore, m.StockAfter, m.Comment, m.UserId, m.Username, m.CreatedAt);
+        return new StockMovementDto(m.Id, itemId, m.Delta, m.StockBefore ?? 0, m.StockAfter ?? 0, m.Comment, m.UserId ?? 0, m.Username, m.CreatedAt);
     }
 
     public async Task<IReadOnlyList<StockTransferDto>> TransfersAsync(int itemId, CancellationToken ct)

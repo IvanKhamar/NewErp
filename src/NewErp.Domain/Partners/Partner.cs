@@ -63,14 +63,20 @@ public partial class Partner
     public bool IsActive { get; private set; } = true;
 
     /// <summary>Довідкова адреса фіда для партнера, як на старому сайті. Сам фід віддає NewErp.</summary>
-    public string FeedUrl { get; private set; } = "";
+    private string? _feedUrl; // NULL в старій таблиці читається як ""
+
+    public string FeedUrl { get => _feedUrl ?? ""; private set => _feedUrl = value; }
 
     public bool FeedEnabled { get; private set; }
 
     /// <summary>Бренд (vendor) у фіді.</summary>
-    public string VendorName { get; private set; } = "";
+    private string? _vendorName; // NULL в старій таблиці читається як ""
 
-    public string Notes { get; private set; } = "";
+    public string VendorName { get => _vendorName ?? ""; private set => _vendorName = value; }
+
+    private string? _notes; // NULL в старій таблиці читається як ""
+
+    public string Notes { get => _notes ?? ""; private set => _notes = value; }
 
     /// <summary>Кількість, яку фід показує для кожної пропозиції.</summary>
     public int DefaultQuantity { get; private set; }
@@ -99,7 +105,7 @@ public partial class Partner
         IsActive = settings.IsActive;
         FeedUrl = Limit(settings.FeedUrl, 255, "Адреса фіда");
         FeedEnabled = settings.FeedEnabled;
-        VendorName = Limit(settings.VendorName, 64, "Бренд");
+        VendorName = Limit(settings.VendorName, 128, "Бренд");
         Notes = settings.Notes?.Trim() ?? "";
         DefaultQuantity = settings.DefaultQuantity;
         DateModified = now;
@@ -136,7 +142,7 @@ public partial class Partner
         var mappings = rows.Select(r => r with
         {
             SizeName = NormalizeSize(r.SizeName),
-            ExternalId = Limit(r.ExternalId, 64, "Артикул партнера"),
+            ExternalId = Limit(r.ExternalId, 255, "Артикул партнера"),
             ExternalName = Limit(r.ExternalName, 255, "Назва в партнера"),
         }).ToList();
         foreach (var m in mappings)
@@ -214,9 +220,13 @@ public class PartnerCategoryMap
     /// <summary>null — усі розміри категорії.</summary>
     public string? SizeName { get; private set; }
 
-    public string ExternalId { get; private set; } = "";
+    private string? _externalId; // NULL в старій таблиці читається як ""
 
-    public string ExternalName { get; private set; } = "";
+    public string ExternalId { get => _externalId ?? ""; private set => _externalId = value; }
+
+    private string? _externalName; // NULL в старій таблиці читається як ""
+
+    public string ExternalName { get => _externalName ?? ""; private set => _externalName = value; }
 
     /// <summary>Націнка до ціни розміру, %. null — без націнки.</summary>
     public decimal? PercentSupply { get; private set; }

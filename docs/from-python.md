@@ -31,7 +31,7 @@ API, tests and Blazor pages for each group, one branch and one PR per group. Ite
 | 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
 | 6 | `feat/py-order-tools` | 35–42 | merged (#41) |
 | 7 | `feat/py-product-form` | 43–45, 75, 76 | merged |
-| 8 | `feat/py-catalog-lists` | 46–52 | TODO |
+| 8 | `feat/py-catalog-lists` | 46–52 (with 72 and 83, in PRs 8a–8f) | in progress: 72 done |
 | 9 | `feat/py-customers` | 53, 54 | TODO |
 | 10 | `feat/py-monobank` | 55, 56 | TODO |
 | 11 | `feat/py-marketing` | 57–62, 77 | TODO |
@@ -180,7 +180,7 @@ Things to know when continuing:
 
 ## 72. Reconstructed tables checked against the old site's scripts — Python IvanKhamar/NewErpPython#6
 
-- **Status:** TODO
+- **Status:** DONE: `feat/py-schema-scripts`, 2026-11-20. The real columns that may be NULL (supplier phone, email, categories and notes; item `used_for`; log `comment`, `stock_before`, `stock_after`, `user_id`; partner `feed_url`, `vendor_name`, `notes`; category map `external_id`, `external_name`) are read as "" or 0, so `tools/NewErp.SchemaCheck` finds nothing against a database built from `db/*.sql`; the log's numbers and user are nullable in the domain, the API still gives numbers.
 - **Source:** the user's SQL scripts in `F:\PROJECTS\VIDRO\Vidro_DB` hold the original CREATE statements of tables we had guessed. Copy these sections from the Python repo's `db/reconstructed.sql` (after the PR is merged): "Склад розхідників" (`dd_stock_categories`, `dd_stock_suppliers`, `dd_stock_items`, `dd_stock_log`), "Партнери-перепродавці" (`dd_partner*`) and "Порядок товарів за продажами" (`dd_crosssell_*`, `dd_product_order_snapshot*`, `dd_product_manual_pin`). When items 43–52 are ported: `dd_product_description.model_info varchar(255) DEFAULT NULL` and `dd_post.date_available datetime NOT NULL DEFAULT CURRENT_TIMESTAMP`. The scripts also hold real API keys and names: copy only their DDL, never their INSERT and UPDATE lines.
 - **Contract changes:** consumables (`dd_stock_items`, `dd_stock_log` and the stock placement, stocktaking and purchase order rules that feed them) keep **2 decimals**, not 3. The existing texts become "не більше 2 знаків після коми" (the `Scale` constant of stock stocktaking and `StockPlacement`). A manual adjustment with 3 decimals gets 400 "Зміна залишку: не більше 2 знаків після коми.". A production write-off (norm × pieces) is rounded half up to 2 decimals before it is taken. Production keeps 3 decimals, because its own tables are still guesses. Longer limits: item name 255, unit 32, stock category 128, supplier 255, partner brand ("Бренд") 128, partner product article ("Артикул партнера") 255.
 - **Mapping changes:** `stock`/`min_stock`/`quantity`/`stock_before`/`stock_after` are `decimal(10,2)` and `price` is `decimal(15,2)`; `dd_product_order_snapshot_item` has its own auto-increment `id`, so `(snapshot_id, product_id)` is no longer the key; a NULL snapshot `note` reads as "". Foreign keys run from items to categories and suppliers, `ON DELETE SET NULL`.

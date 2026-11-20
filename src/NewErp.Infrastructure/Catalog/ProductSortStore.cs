@@ -216,7 +216,7 @@ public sealed class ProductSortStore(ErpDbContext db, IOptions<ErpOptions> erpOp
         await db.DdProductOrderSnapshots.AsNoTracking()
             .OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.SnapshotId)
             .Take(limit)
-            .Select(s => new SortSnapshotDto(s.SnapshotId, s.Note, s.CreatedAt))
+            .Select(s => new SortSnapshotDto(s.SnapshotId, s.Note ?? "", s.CreatedAt)) // the old site's table allows NULL notes
             .ToListAsync(ct);
 
     public async Task<bool> RestoreSnapshotAsync(int id, CancellationToken ct)

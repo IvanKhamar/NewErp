@@ -6,7 +6,7 @@ public class StockCategory
 
     public StockCategory(string name, int sortOrder = 0)
     {
-        Name = StockItem.RequireText(name, "Назва категорії", 100);
+        Name = StockItem.RequireText(name, "Назва категорії", 128);
         SortOrder = sortOrder;
     }
 

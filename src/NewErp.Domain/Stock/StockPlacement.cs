@@ -114,7 +114,7 @@ public sealed class StockPlacement
 
     internal static void RequireQuantity(decimal quantity)
     {
-        if (quantity <= 0 || decimal.Round(quantity, 3) != quantity)
-            throw new DomainException("Кількість має бути більшою за нуль, не більше 3 знаків після коми.");
+        if (quantity <= 0 || decimal.Round(quantity, Stocktaking.Scale) != quantity)
+            throw new DomainException($"Кількість має бути більшою за нуль, не більше {Stocktaking.Scale} знаків після коми.");
     }
 }

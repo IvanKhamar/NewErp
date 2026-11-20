@@ -14,7 +14,8 @@ public static class Stocktaking
     public const string CommentText = "Інвентаризація";
 
     /// <summary>Кількості зберігаються з 3 знаками після коми (decimal(12,3)).</summary>
-    public const int Scale = 3;
+    /// <summary>Розхідники зберігають два знаки після коми: dd_stock_items має decimal(10,2) (звірено зі скриптом сайту, пункт 72).</summary>
+    public const int Scale = 2;
 
     public static readonly IReadOnlyList<string> Columns = ["ID", "Назва", "Категорія", "Од.", "За обліком", "Фактично"];
 

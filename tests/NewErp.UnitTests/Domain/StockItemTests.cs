@@ -98,8 +98,56 @@ public class StockItemTests
     {
         Assert.Equal("Льон", new StockItem(null, null, "  Льон ", "м", 0).Name);
         Assert.Throws<DomainException>(() => new StockItem(1, null, "", "м", 0));
-        Assert.Throws<DomainException>(() => new StockItem(1, null, new string('x', 151), "м", 0));
+        Assert.Throws<DomainException>(() => new StockItem(1, null, new string('x', 256), "м", 0));
         Assert.Throws<DomainException>(() => new StockItem(1, null, "Льон", "м", -1));
         Assert.Throws<DomainException>(() => new StockItem(1, null, "Льон", "м", 0, price: -1));
+    }
+
+    // ═══ Пункт 72: dd_stock_items має decimal(10,2) і довші назви (звірено зі скриптом старого сайту) ═══
+
+    private static StockItem Stocked(decimal quantity)
+    {
+        var item = NewItem(min: 0);
+        item.Adjust(quantity, "Прихід", 1, "sklad", Now);
+        return item;
+    }
+
+    [Fact]
+    public void Adjust_KeepsTwoDecimalsLikeTheOldTable()
+    {
+        var item = Stocked(5);
+
+        var error = Assert.Throws<DomainException>(() => item.Adjust(0.005m, "Прихід", 1, "sklad", Now));
+
+        Assert.Equal("Зміна залишку: не більше 2 знаків після коми.", error.Message);
+        Assert.Equal(5, item.Quantity);
+    }
+
+    [Fact]
+    public void TakeUpTo_RoundsTheWriteOffHalfUpToTwoDecimals()
+    {
+        var item = Stocked(5);
+
+        var movement = item.TakeUpTo(1.125m, "Розкрій", 1, "sklad", Now);
+
+        Assert.Equal((1.13m, 3.87m), (movement!.Quantity, item.Quantity));
+    }
+
+    [Fact]
+    public void TakeUpTo_LessThanAHundredth_TakesNothing()
+    {
+        var item = Stocked(5);
+
+        Assert.Null(item.TakeUpTo(0.004m, "Розкрій", 1, "sklad", Now));
+        Assert.Equal(5, item.Quantity);
+    }
+
+    [Fact]
+    public void NameAndUnit_MayBeAsLongAsTheRealColumns()
+    {
+        var item = new StockItem(null, null, new string('Н', 255), new string('О', 32), 0);
+
+        Assert.Equal((255, 32), (item.Name.Length, item.Unit.Length));
+        Assert.Throws<DomainException>(() => new StockItem(null, null, "Льон", new string('О', 33), 0));
     }
 }
