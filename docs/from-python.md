@@ -31,7 +31,7 @@ API, tests and Blazor pages for each group, one branch and one PR per group. Ite
 | 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
 | 6 | `feat/py-order-tools` | 35–42 | merged (#41) |
 | 7 | `feat/py-product-form` | 43–45, 75, 76 | merged |
-| 8 | `feat/py-catalog-lists` | 46–52 (with 72 and 83, in PRs 8a–8f) | in progress: 72, 46–50, 52 done |
+| 8 | `feat/py-catalog-lists` | 46–52 (with 72 and 83, in PRs 8a–8f) | merged (#43–#48) |
 | 9 | `feat/py-customers` | 53, 54 | TODO |
 | 10 | `feat/py-monobank` | 55, 56 | TODO |
 | 11 | `feat/py-marketing` | 57–62, 77 | TODO |
@@ -79,7 +79,7 @@ Things to know when continuing:
 
 ## 43–52. Catalog — Python 9e1df9d, 157844e, 4669ad9, f644db7, dc27a5a, 9ba10d9
 
-- **Status:** 43–45 DONE: `feat/py-product-form`, 2026-11-12 (the product form with attributes and downloads, the quick price edit, the CSV import, «зняти NEW»; the form's `modelInfo` is at most 255, as `db/reconstructed.sql` has it since item 72).. 46 and 52 DONE: `feat/py-catalog-prices`, 2026-11-20 (page `/app/catalog/prices`, admin only; the manufacturer picker comes with item 49). 47 and 48 DONE: `feat/py-catalog-dictionaries`, 2026-11-20 (pages `/app/catalog/labels` and `/app/catalog/categories`; also `GET /catalog/categories/filters` for the category form). 49 DONE: `feat/py-catalog-references`, 2026-11-20 (page `/app/catalog/references`; value names are checked against their columns: 64 for filters and attributes, 128 for options). 50 DONE: `feat/py-catalog-content`, 2026-11-20 (page `/app/catalog/content`; the "Вміст вітрини" section of `db/reconstructed.sql`, including `dd_review` and the `dd_question` columns for item 51). 51 TODO (group 8)
+- **Status:** 43–45 DONE: `feat/py-product-form`, 2026-11-12 (the product form with attributes and downloads, the quick price edit, the CSV import, «зняти NEW»; the form's `modelInfo` is at most 255, as `db/reconstructed.sql` has it since item 72).. 46 and 52 DONE: `feat/py-catalog-prices`, 2026-11-20 (page `/app/catalog/prices`, admin only; the manufacturer picker comes with item 49). 47 and 48 DONE: `feat/py-catalog-dictionaries`, 2026-11-20 (pages `/app/catalog/labels` and `/app/catalog/categories`; also `GET /catalog/categories/filters` for the category form). 49 DONE: `feat/py-catalog-references`, 2026-11-20 (page `/app/catalog/references`; value names are checked against their columns: 64 for filters and attributes, 128 for options). 50 DONE: `feat/py-catalog-content`, 2026-11-20 (page `/app/catalog/content`; the "Вміст вітрини" section of `db/reconstructed.sql`, including `dd_review` and the `dd_question` columns for item 51). 51 DONE: `feat/py-catalog-feedback`, 2026-11-20 (tabs "Відгуки" and "Питання покупців" on `/app/catalog/content`; photo paths are listed as text, not shown as pictures: the Blazor UI has no storefront address yet). Group 8 done.
 - **Contract:** `POST /catalog/products`, `GET /catalog/products/{id}/edit`, `PUT /catalog/products/{id}`
   (dateModified, 409), `POST /catalog/products/{id}/copy`, `POST /catalog/products/remove-new`,
   `GET /catalog/products/form-lookups`; `POST /catalog/products/import/preview` and `/import` (CSV);
@@ -189,7 +189,7 @@ Things to know when continuing:
 
 ## 83. Customers' photos in reviews — Python IvanKhamar/NewErpPython#7
 
-- **Status:** TODO (after item 51, reviews moderation)
+- **Status:** DONE: `feat/py-catalog-feedback`, 2026-11-20 (with item 51). The `status` column is `tinyint(1)` with values 0–2, which the Oracle EF provider can only map to bool, so .NET reads and writes it with SQL (`CAST(status AS UNSIGNED)`).
 - **Table:** copy the "Фото у відгуках покупців" section (`dd_review_image`) from the Python repo's `db/reconstructed.sql`. Its DDL comes from the user's script in `Vidro_DB`, which also holds real data: copy only the DDL.
 - **Contract:**
   - `GET /catalog/reviews`: each review gets `images: [{id, path, status}]`, with `status` `pending`, `published` or `rejected` (DB 0, 1, 2), ordered by `sort_order` then `image_id`, every status listed.

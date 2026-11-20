@@ -14,6 +14,12 @@ public interface IPictureFolder
 
     /// <summary>Записує новий файл; наявний ніколи не перезаписує.</summary>
     Task SaveAsync(string path, byte[] content, CancellationToken ct);
+
+    /// <summary>
+    /// Видаляє файл. Файлу вже немає — гаразд; не вдалося видалити — лише попередження в журналі, запит не падає.
+    /// Шлях поза папкою — InvalidOperationException (другий замок після перевірки сервісу).
+    /// </summary>
+    Task DeleteAsync(string path, CancellationToken ct);
 }
 
 /// <summary>

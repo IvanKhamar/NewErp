@@ -1,0 +1,104 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Питання покупців про товари (пункт 51): вітрина показує питання лише з відповіддю й увімкненим статусом. *@
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+    <MudSelect T="string" Value="_state" ValueChanged="ChangeStateAsync" Label="Які" Style="max-width: 220px">
+        <MudSelectItem Value="@FeedbackService.Pending">Без відповіді</MudSelectItem>
+        <MudSelectItem Value="@FeedbackService.Published">Опубліковані</MudSelectItem>
+        <MudSelectItem Value="@FeedbackService.All">Усі</MudSelectItem>
+    </MudSelect>
+    <MudText Typo="Typo.body2">Усього: @(_questions?.TotalCount ?? 0)</MudText>
+</MudStack>
+
+<MudSimpleTable Dense="true" Hover="true" data-test="questions">
+    <thead><tr><th>Дата</th><th>Товар</th><th>Покупець</th><th>Питання</th><th>Відповідь</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var question in _questions?.Items ?? [])
+        {
+            <tr @onclick="() => Select(question)" style="cursor: pointer">
+                <td>@question.DateAdded?.ToString("dd.MM.yyyy")</td>
+                <td>@question.ProductName</td>
+                <td>@question.Name @question.Telephone @question.City</td>
+                <td>@question.Question</td>
+                <td>@question.Answer</td>
+                <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(question)" /></td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+@if (_questions is { TotalPages: > 1 })
+{
+    <MudPagination Count="_questions.TotalPages" Selected="_page" SelectedChanged="PageAsync" Class="mt-2" />
+}
+
+@if (_selected is not null)
+{
+    <MudPaper Class="pa-3 mt-3" data-test="question-form">
+        <MudText Typo="Typo.subtitle1">Питання про «@_selected.ProductName»</MudText>
+        <MudTextField @bind-Value="_question" Label="Питання" Lines="2" MaxLength="10000" />
+        <MudTextField @bind-Value="_answer" Label="Відповідь" Lines="3" MaxLength="10000" data-test="question-answer" />
+        <MudCheckBox T="bool" @bind-Value="_published" Label="Опубліковане (лише з відповіддю)" data-test="question-published" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" data-test="question-save">Зберегти</MudButton>
+    </MudPaper>
+}
+
+@code {
+    private PagedResult<QuestionDto>? _questions;
+    private string _state = FeedbackService.Pending;
+    private int _page = 1;
+    private QuestionDto? _selected;
+    private string _question = "";
+    private string _answer = "";
+    private bool _published;
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync() => _questions = await Api.QuestionsAsync(_state, _page);
+
+    private Task ChangeStateAsync(string state)
+    {
+        (_state, _page, _selected) = (state, 1, null);
+        return RunAsync(LoadAsync);
+    }
+
+    private Task PageAsync(int page)
+    {
+        _page = page;
+        return RunAsync(LoadAsync);
+    }
+
+    private void Select(QuestionDto question)
+    {
+        _selected = question;
+        (_question, _answer, _published) = (question.Question, question.Answer, question.Published);
+    }
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        await Api.UpdateQuestionAsync(_selected!.Id, new UpdateQuestionRequest(_question, _answer, _published));
+        Snackbar.Add("Збережено.", Severity.Success);
+        _selected = null;
+        await LoadAsync();
+    });
+
+    private Task DeleteAsync(QuestionDto question) => RunAsync(async () =>
+    {
+        await Api.DeleteQuestionAsync(question.Id);
+        _selected = null;
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

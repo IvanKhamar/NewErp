@@ -114,6 +114,27 @@ public sealed class CatalogApi(HttpClient http)
     public async Task<NftBlockDto> SaveNftAsync(NftBlockDto block) =>
         await ReadAsync<NftBlockDto>(await http.PutAsJsonAsync("/catalog/blocks/nft", block));
 
+    // ═══ Відгуки з фото й питання покупців (пункти 51, 83) ═══
+
+    public Task<PagedResult<ReviewDto>> ReviewsAsync(string state, int page) =>
+        GetAsync<PagedResult<ReviewDto>>($"/catalog/reviews?state={state}&page={page}&pageSize=20");
+
+    public async Task UpdateReviewAsync(int id, UpdateReviewRequest request) => await EnsureAsync(await http.PutAsJsonAsync($"/catalog/reviews/{id}", request));
+
+    public async Task DeleteReviewAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/reviews/{id}"));
+
+    public async Task SetReviewImageStatusAsync(int reviewId, int imageId, string status) =>
+        await EnsureAsync(await http.PutAsJsonAsync($"/catalog/reviews/{reviewId}/images/{imageId}", new SetReviewImageStatusRequest(status)));
+
+    public async Task DeleteReviewImageAsync(int reviewId, int imageId) => await EnsureAsync(await http.DeleteAsync($"/catalog/reviews/{reviewId}/images/{imageId}"));
+
+    public Task<PagedResult<QuestionDto>> QuestionsAsync(string state, int page) =>
+        GetAsync<PagedResult<QuestionDto>>($"/catalog/questions?state={state}&page={page}&pageSize=20");
+
+    public async Task UpdateQuestionAsync(int id, UpdateQuestionRequest request) => await EnsureAsync(await http.PutAsJsonAsync($"/catalog/questions/{id}", request));
+
+    public async Task DeleteQuestionAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/questions/{id}"));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
