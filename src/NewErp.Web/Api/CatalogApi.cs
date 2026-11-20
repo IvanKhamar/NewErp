@@ -75,6 +75,45 @@ public sealed class CatalogApi(HttpClient http)
 
     public async Task DeleteDownloadAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/downloads/{id}"));
 
+    // ═══ Вміст вітрини (пункт 50) ═══
+
+    public Task<List<InformationDto>> InformationAsync() => GetAsync<List<InformationDto>>("/catalog/information");
+
+    public async Task<InformationDto> SaveInformationAsync(InformationDto page) => page.Id == 0
+        ? await ReadAsync<InformationDto>(await http.PostAsJsonAsync("/catalog/information", page))
+        : await ReadAsync<InformationDto>(await http.PutAsJsonAsync($"/catalog/information/{page.Id}", page));
+
+    public Task<List<FaqDto>> FaqsAsync() => GetAsync<List<FaqDto>>("/catalog/faq");
+
+    public async Task<FaqDto> SaveFaqAsync(FaqDto faq) => faq.Id == 0
+        ? await ReadAsync<FaqDto>(await http.PostAsJsonAsync("/catalog/faq", faq))
+        : await ReadAsync<FaqDto>(await http.PutAsJsonAsync($"/catalog/faq/{faq.Id}", faq));
+
+    public Task<List<BlogCategoryDto>> BlogCategoriesAsync() => GetAsync<List<BlogCategoryDto>>("/catalog/blog/categories");
+
+    public async Task<BlogCategoryDto> SaveBlogCategoryAsync(BlogCategoryDto category) => category.Id == 0
+        ? await ReadAsync<BlogCategoryDto>(await http.PostAsJsonAsync("/catalog/blog/categories", category))
+        : await ReadAsync<BlogCategoryDto>(await http.PutAsJsonAsync($"/catalog/blog/categories/{category.Id}", category));
+
+    public Task<List<BlogPostDto>> BlogPostsAsync() => GetAsync<List<BlogPostDto>>("/catalog/blog/posts");
+
+    public async Task<BlogPostDto> SaveBlogPostAsync(BlogPostDto post) => post.Id == 0
+        ? await ReadAsync<BlogPostDto>(await http.PostAsJsonAsync("/catalog/blog/posts", post))
+        : await ReadAsync<BlogPostDto>(await http.PutAsJsonAsync($"/catalog/blog/posts/{post.Id}", post));
+
+    /// <summary>kind: information, faq, blog-categories, blog-posts.</summary>
+    public async Task DeleteContentAsync(string kind, int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/content/{kind}/{id}"));
+
+    public Task<AboutBlockDto> AboutAsync() => GetAsync<AboutBlockDto>("/catalog/blocks/about");
+
+    public async Task<AboutBlockDto> SaveAboutAsync(AboutBlockDto block) =>
+        await ReadAsync<AboutBlockDto>(await http.PutAsJsonAsync("/catalog/blocks/about", block));
+
+    public Task<NftBlockDto> NftAsync() => GetAsync<NftBlockDto>("/catalog/blocks/nft");
+
+    public async Task<NftBlockDto> SaveNftAsync(NftBlockDto block) =>
+        await ReadAsync<NftBlockDto>(await http.PutAsJsonAsync("/catalog/blocks/nft", block));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

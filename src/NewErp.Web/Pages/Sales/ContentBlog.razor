@@ -1,0 +1,163 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Блог вітрини: рубрики й дописи (пункт 50). HTML очищує сервер; порожня дата — допис видно одразу. *@
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudText Typo="Typo.h6">Рубрики</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="blog-categories">
+            <thead><tr><th>Рубрика</th><th>Дописів</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var category in _categories)
+                {
+                    <tr @onclick="() => _category = category" style="cursor: pointer">
+                        <td>@category.Name@(category.Enabled ? "" : " (вимкнена)")</td>
+                        <td>@category.Posts</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(StorefrontKinds.BlogCategories, category.Id)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2">
+            <MudTextField @bind-Value="CategoryName" Label="@(_category.Id == 0 ? "Нова рубрика" : "Назва рубрики")" MaxLength="255" data-test="blog-category-name" />
+            <MudCheckBox T="bool" @bind-Value="CategoryEnabled" Label="Увімкнена" />
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCategoryAsync" data-test="blog-category-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _category = new BlogCategoryDto()">Нова</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudText Typo="Typo.h6">Дописи</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="blog-posts">
+            <thead><tr><th>Допис</th><th>Видно з</th><th>Рубрики</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var post in _posts)
+                {
+                    <tr @onclick="() => _post = PostForm.Of(post)" style="cursor: pointer">
+                        <td>@post.Name@(post.Enabled ? "" : " (вимкнений)")@(post.Top ? " · угорі" : "")</td>
+                        <td>@post.DateAvailable?.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@string.Join(", ", _categories.Where(c => post.CategoryIds.Contains(c.Id)).Select(c => c.Name))</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(StorefrontKinds.BlogPosts, post.Id)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" data-test="blog-post-form">
+            <MudText Typo="Typo.subtitle1">@(_post.Id == 0 ? "Новий допис" : $"Допис «{_post.Name}»")</MudText>
+            <MudTextField @bind-Value="_post.Name" Label="Назва" MaxLength="255" data-test="blog-post-name" />
+            <MudTextField @bind-Value="_post.Description" Label="Текст (HTML)" Lines="6" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_post.Image" Label="Картинка (catalog/...)" MaxLength="255" />
+                <MudTextField @bind-Value="_post.BigImage" Label="Велика картинка (catalog/...)" MaxLength="255" />
+            </MudStack>
+            <MudTextField @bind-Value="_post.ImageAlt" Label="Підпис картинки" MaxLength="255" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_post.SeoKeyword" Label="SEO-адреса" MaxLength="255" />
+                <MudTextField @bind-Value="_post.DateAvailable" Label="Видно з (рррр-мм-дд гг:хх)" Placeholder="одразу" />
+            </MudStack>
+            <MudTextField @bind-Value="_post.MetaTitle" Label="Meta title" MaxLength="255" />
+            <MudTextField @bind-Value="_post.MetaDescription" Label="Meta description" MaxLength="255" />
+            <MudSelect T="int" Label="Рубрики" MultiSelection="true" SelectedValues="_post.CategoryIds" SelectedValuesChanged="ids => _post.CategoryIds = [.. ids]">
+                @foreach (var category in _categories)
+                {
+                    <MudSelectItem Value="category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Row="true">
+                <MudCheckBox T="bool" @bind-Value="_post.Top" Label="Угорі" />
+                <MudCheckBox T="bool" @bind-Value="_post.Enabled" Label="Увімкнений" />
+            </MudStack>
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePostAsync" data-test="blog-post-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _post = new PostForm()">Новий</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<BlogCategoryDto> _categories = [];
+    private List<BlogPostDto> _posts = [];
+    private BlogCategoryDto _category = new();
+    private PostForm _post = new();
+
+    private string CategoryName { get => _category.Name; set => _category = _category with { Name = value }; }
+    private bool CategoryEnabled { get => _category.Enabled; set => _category = _category with { Enabled = value }; }
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        _categories = await Api.BlogCategoriesAsync();
+        _posts = await Api.BlogPostsAsync();
+    }
+
+    private Task SaveCategoryAsync() => RunAsync(async () =>
+    {
+        _category = await Api.SaveBlogCategoryAsync(_category);
+        await LoadAsync();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task SavePostAsync() => RunAsync(async () =>
+    {
+        _post = PostForm.Of(await Api.SaveBlogPostAsync(_post.ToDto()));
+        await LoadAsync();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteAsync(string kind, int id) => RunAsync(async () =>
+    {
+        await Api.DeleteContentAsync(kind, id);
+        (_category, _post) = (new BlogCategoryDto(), new PostForm());
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        catch (FormatException)
+        {
+            Snackbar.Add("Дата має бути на кшталт 2026-11-20 10:00.", Severity.Error);
+        }
+    }
+
+    /// <summary>Змінна копія допису для форми; дату редагуємо текстом.</summary>
+    private sealed class PostForm
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string MetaTitle { get; set; } = "";
+        public string MetaDescription { get; set; } = "";
+        public string ImageAlt { get; set; } = "";
+        public string Image { get; set; } = "";
+        public string BigImage { get; set; } = "";
+        public bool Top { get; set; }
+        public bool Enabled { get; set; } = true;
+        public string DateAvailable { get; set; } = "";
+        public string SeoKeyword { get; set; } = "";
+        public List<int> CategoryIds { get; set; } = [];
+
+        public static PostForm Of(BlogPostDto p) => new()
+        {
+            Id = p.Id, Name = p.Name, Description = p.Description, MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription, ImageAlt = p.ImageAlt,
+            Image = p.Image, BigImage = p.BigImage, Top = p.Top, Enabled = p.Enabled, SeoKeyword = p.SeoKeyword, CategoryIds = [.. p.CategoryIds],
+            DateAvailable = p.DateAvailable?.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+        };
+
+        public BlogPostDto ToDto() => new(
+            Id, Name, Description, MetaTitle, MetaDescription, ImageAlt, Image, BigImage, Top, Enabled,
+            DateAvailable.Trim().Length == 0 ? null : DateTime.Parse(DateAvailable, System.Globalization.CultureInfo.InvariantCulture), SeoKeyword, CategoryIds);
+    }
+}

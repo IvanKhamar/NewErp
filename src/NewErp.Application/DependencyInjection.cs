@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<SizeFilterService>();
         services.AddScoped<CatalogDictionaryService>();
         services.AddScoped<CatalogReferenceService>();
+        services.AddScoped<StorefrontContentService>();
         services.AddScoped<PictureService>();
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();
