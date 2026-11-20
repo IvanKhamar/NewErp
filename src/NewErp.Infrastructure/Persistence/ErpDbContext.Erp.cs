@@ -9,6 +9,7 @@ public partial class ErpDbContext
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
         ConfigureCatalog(modelBuilder);
+        ConfigureCatalogLists(modelBuilder);
         ConfigureCoupons(modelBuilder);
         ConfigureProductForm(modelBuilder);
         ConfigureReports(modelBuilder);
