@@ -17,7 +17,9 @@ public class CatalogPricePagesTests : WebTestContext
     public CatalogPricePagesTests()
     {
         Services.AddScoped<ProductsApi>();
+        Services.AddScoped<CatalogApi>();
         Api.Respond("/catalog/products/categories", HttpStatusCode.OK, new List<LookupItem> { new(6, "Сукні"), new(7, "Сорочки") });
+        Api.Respond("/catalog/manufacturers", HttpStatusCode.OK, new List<ManufacturerDto> { new(3, "Vidro") });
         Api.Respond("/catalog/prices/preview", HttpStatusCode.OK,
             new PriceChangePreview(2, 1, [new PriceChangeRow(1, "Сукня лляна", "PR-1", 1000, 1100)]), HttpMethod.Post);
         Api.Respond("/catalog/prices/apply", HttpStatusCode.OK, new PriceChangeResult(1), HttpMethod.Post);
@@ -32,10 +34,12 @@ public class CatalogPricePagesTests : WebTestContext
         Assert.True(page.Find("button[data-test=apply]").HasAttribute("disabled")); // спершу перегляд
 
         page.Find("input[data-test=category-6]").Change(true);
+        page.Find("input[data-test=manufacturer-3]").Change(true);
         page.Find("button[data-test=preview]").Click();
         page.WaitForAssertion(() => Assert.Contains("1100 ₴", page.Find("[data-test=rows]").TextContent));
         Assert.Contains("зміниться: 1", page.Find("[data-test=summary]").TextContent);
         Assert.Contains("\"categoryIds\":[6]", Api.Bodies["/catalog/prices/preview"]);
+        Assert.Contains("\"manufacturerIds\":[3]", Api.Bodies["/catalog/prices/preview"]);
 
         page.Find("button[data-test=apply]").Click();
         page.WaitForAssertion(() => Assert.Contains("/catalog/prices/apply", Api.Bodies.Keys));

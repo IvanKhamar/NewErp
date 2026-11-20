@@ -1,0 +1,157 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Дворівневий довідник (фільтри, атрибути чи опції): групи зліва, значення обраної групи справа. *@
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudSimpleTable Dense="true" Hover="true" data-test="@($"{Kind}-groups")">
+            <thead><tr><th>Група</th><th>Порядок</th>@if (IsOptions) { <th>Тип</th> }<th>Значень</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var group in _groups)
+                {
+                    <tr @onclick="() => Select(group)" style="cursor: pointer" class="@(group.Id == _group.Id ? "mud-selected-item" : "")">
+                        <td>@group.Name</td>
+                        <td>@group.SortOrder</td>
+                        @if (IsOptions)
+                        {
+                            <td>@group.Type</td>
+                        }
+                        <td>@group.Items.Count</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteGroupAsync(group)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2">
+            <MudText Typo="Typo.subtitle1">@(_group.Id == 0 ? "Нова група" : $"Група «{_group.Name}»")</MudText>
+            <MudTextField @bind-Value="GroupName" Label="Назва" data-test="@($"{Kind}-group-name")" />
+            <MudStack Row="true">
+                <MudNumericField T="int" @bind-Value="GroupSort" Label="Порядок" />
+                @if (IsOptions)
+                {
+                    <MudSelect T="string" @bind-Value="GroupType" Label="Тип">
+                        @foreach (var type in CatalogReferenceService.OptionTypes)
+                        {
+                            <MudSelectItem Value="type">@type</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+            </MudStack>
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveGroupAsync" data-test="@($"{Kind}-group-save")">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => Select(new ReferenceGroupDto())">Нова</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="7">
+        @if (_group.Id != 0)
+        {
+            <MudText Typo="Typo.h6">Значення групи «@_group.Name»</MudText>
+            <MudSimpleTable Dense="true" Hover="true" data-test="@($"{Kind}-values")">
+                <thead><tr><th>Значення</th><th>Порядок</th>@if (IsOptions) { <th>Картинка</th> }<th>Товарів</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var value in _group.Items)
+                    {
+                        <tr @onclick="() => _value = value" style="cursor: pointer">
+                            <td>@value.Name</td>
+                            <td>@value.SortOrder</td>
+                            @if (IsOptions)
+                            {
+                                <td>@value.Image</td>
+                            }
+                            <td>@value.Products</td>
+                            <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@(value.Products > 0)" OnClick="() => DeleteValueAsync(value)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            <MudPaper Class="pa-3 mt-2">
+                <MudText Typo="Typo.subtitle1">@(_value.Id == 0 ? "Нове значення" : $"Значення «{_value.Name}»")</MudText>
+                <MudStack Row="true">
+                    <MudTextField @bind-Value="ValueName" Label="Назва" data-test="@($"{Kind}-value-name")" />
+                    <MudNumericField T="int" @bind-Value="ValueSort" Label="Порядок" />
+                </MudStack>
+                @if (IsOptions)
+                {
+                    <MudTextField @bind-Value="ValueImage" Label="Картинка (catalog/...)" />
+                }
+                <MudStack Row="true">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveValueAsync" data-test="@($"{Kind}-value-save")">Зберегти</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="() => _value = new ReferenceItemDto()">Нове</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    /// <summary>filters, attributes чи options.</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = "";
+
+    private List<ReferenceGroupDto> _groups = [];
+    private ReferenceGroupDto _group = new();
+    private ReferenceItemDto _value = new();
+
+    private bool IsOptions => Kind == "options";
+
+    // Форма редагує копію: record незмінний, тож кожне поле — with.
+    private string GroupName { get => _group.Name; set => _group = _group with { Name = value }; }
+    private int GroupSort { get => _group.SortOrder; set => _group = _group with { SortOrder = value }; }
+    private string GroupType { get => _group.Type; set => _group = _group with { Type = value }; }
+    private string ValueName { get => _value.Name; set => _value = _value with { Name = value }; }
+    private int ValueSort { get => _value.SortOrder; set => _value = _value with { SortOrder = value }; }
+    private string ValueImage { get => _value.Image; set => _value = _value with { Image = value }; }
+
+    protected override Task OnInitializedAsync() => RunAsync(async () => _groups = await Api.GroupsAsync(Kind));
+
+    private void Select(ReferenceGroupDto group)
+    {
+        _group = group;
+        _value = new ReferenceItemDto();
+    }
+
+    private Task SaveGroupAsync() => RunAsync(async () =>
+    {
+        var saved = await Api.SaveGroupAsync(Kind, _group with { Items = [] });
+        _groups = await Api.GroupsAsync(Kind);
+        Select(saved);
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteGroupAsync(ReferenceGroupDto group) => RunAsync(async () =>
+    {
+        await Api.DeleteGroupAsync(Kind, group.Id);
+        _groups = await Api.GroupsAsync(Kind);
+        Select(new ReferenceGroupDto());
+    });
+
+    private Task SaveValueAsync() => RunAsync(async () =>
+    {
+        _group = await Api.SaveValueAsync(Kind, _group.Id, _value);
+        _groups = await Api.GroupsAsync(Kind);
+        _value = new ReferenceItemDto();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteValueAsync(ReferenceItemDto value) => RunAsync(async () =>
+    {
+        await Api.DeleteValueAsync(Kind, value.Id);
+        _groups = await Api.GroupsAsync(Kind);
+        _group = _groups.FirstOrDefault(g => g.Id == _group.Id) ?? new ReferenceGroupDto();
+        _value = new ReferenceItemDto();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

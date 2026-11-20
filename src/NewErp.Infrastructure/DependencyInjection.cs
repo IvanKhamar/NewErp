@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<IPriceStore, PriceStore>();
         services.AddScoped<ISizeFilterStore, SizeFilterStore>();
         services.AddScoped<ICatalogDictionaryStore, CatalogDictionaryStore>();
+        services.AddScoped<ICatalogReferenceStore, CatalogReferenceStore>();
         services.Configure<PictureOptions>(configuration.GetSection(PictureOptions.SectionName));
         services.AddSingleton<IPictureFolder, LocalPictureFolder>();
         services.AddSingleton<IHtmlCleaner, NewErp.Infrastructure.Content.HtmlCleaner>();

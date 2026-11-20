@@ -43,6 +43,38 @@ public sealed class CatalogApi(HttpClient http)
     public async Task<CategoryRepairResult> RepairCategoriesAsync() =>
         await ReadAsync<CategoryRepairResult>(await http.PostAsync("/catalog/categories/repair", null));
 
+    // ═══ Фільтри, атрибути, опції, виробники, завантаження (пункт 49) ═══
+
+    public Task<List<ReferenceGroupDto>> GroupsAsync(string kind) => GetAsync<List<ReferenceGroupDto>>($"/catalog/references/{kind}");
+
+    public async Task<ReferenceGroupDto> SaveGroupAsync(string kind, ReferenceGroupDto group) => group.Id == 0
+        ? await ReadAsync<ReferenceGroupDto>(await http.PostAsJsonAsync($"/catalog/references/{kind}", group))
+        : await ReadAsync<ReferenceGroupDto>(await http.PutAsJsonAsync($"/catalog/references/{kind}/{group.Id}", group));
+
+    public async Task DeleteGroupAsync(string kind, int groupId) => await EnsureAsync(await http.DeleteAsync($"/catalog/references/{kind}/{groupId}"));
+
+    public async Task<ReferenceGroupDto> SaveValueAsync(string kind, int groupId, ReferenceItemDto value) => value.Id == 0
+        ? await ReadAsync<ReferenceGroupDto>(await http.PostAsJsonAsync($"/catalog/references/{kind}/{groupId}/values", value))
+        : await ReadAsync<ReferenceGroupDto>(await http.PutAsJsonAsync($"/catalog/references/{kind}/{groupId}/values/{value.Id}", value));
+
+    public async Task DeleteValueAsync(string kind, int valueId) => await EnsureAsync(await http.DeleteAsync($"/catalog/references/{kind}/values/{valueId}"));
+
+    public Task<List<ManufacturerDto>> ManufacturersAsync() => GetAsync<List<ManufacturerDto>>("/catalog/manufacturers");
+
+    public async Task<ManufacturerDto> SaveManufacturerAsync(ManufacturerDto manufacturer) => manufacturer.Id == 0
+        ? await ReadAsync<ManufacturerDto>(await http.PostAsJsonAsync("/catalog/manufacturers", manufacturer))
+        : await ReadAsync<ManufacturerDto>(await http.PutAsJsonAsync($"/catalog/manufacturers/{manufacturer.Id}", manufacturer));
+
+    public async Task DeleteManufacturerAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/manufacturers/{id}"));
+
+    public Task<List<DownloadDto>> DownloadsAsync() => GetAsync<List<DownloadDto>>("/catalog/downloads");
+
+    public async Task<DownloadDto> SaveDownloadAsync(DownloadDto download) => download.Id == 0
+        ? await ReadAsync<DownloadDto>(await http.PostAsJsonAsync("/catalog/downloads", download))
+        : await ReadAsync<DownloadDto>(await http.PutAsJsonAsync($"/catalog/downloads/{download.Id}", download));
+
+    public async Task DeleteDownloadAsync(int id) => await EnsureAsync(await http.DeleteAsync($"/catalog/downloads/{id}"));
+
     private async Task<T> GetAsync<T>(string url) => await ReadAsync<T>(await http.GetAsync(url));
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
