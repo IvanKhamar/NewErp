@@ -1,0 +1,165 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Інформаційні сторінки й FAQ вітрини (пункт 50). HTML очищує сервер. *@
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.h6">Інформаційні сторінки</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="information">
+            <thead><tr><th>Заголовок</th><th>SEO-адреса</th><th>Порядок</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var info in _pages)
+                {
+                    <tr @onclick="() => _page = Form.Of(info)" style="cursor: pointer">
+                        <td>@info.Title@(info.Enabled ? "" : " (вимкнена)")@(info.Bottom ? " · у підвалі" : "")</td>
+                        <td>@info.SeoKeyword</td>
+                        <td>@info.SortOrder</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(StorefrontKinds.Information, info.Id)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" data-test="information-form">
+            <MudText Typo="Typo.subtitle1">@(_page.Id == 0 ? "Нова сторінка" : $"Сторінка «{_page.Title}»")</MudText>
+            <MudTextField @bind-Value="_page.Title" Label="Заголовок" MaxLength="64" data-test="information-title" />
+            <MudTextField @bind-Value="_page.Description" Label="Текст (HTML)" Lines="6" />
+            <MudTextField @bind-Value="_page.SeoKeyword" Label="SEO-адреса" MaxLength="255" />
+            <MudTextField @bind-Value="_page.MetaTitle" Label="Meta title" MaxLength="255" />
+            <MudTextField @bind-Value="_page.MetaDescription" Label="Meta description" MaxLength="255" />
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudNumericField T="int" @bind-Value="_page.SortOrder" Label="Порядок" Style="max-width: 120px" />
+                <MudCheckBox T="bool" @bind-Value="_page.Bottom" Label="У підвалі" />
+                <MudCheckBox T="bool" @bind-Value="_page.Enabled" Label="Увімкнена" />
+            </MudStack>
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePageAsync" data-test="information-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _page = new Form()">Нова</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.h6">Питання й відповіді (FAQ)</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="faq">
+            <thead><tr><th>Питання</th><th>Автор</th><th>Порядок</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var faq in _faqs)
+                {
+                    <tr @onclick="() => _faq = FaqForm.Of(faq)" style="cursor: pointer">
+                        <td>@faq.Question@(faq.Enabled ? "" : " (вимкнене)")</td>
+                        <td>@faq.Author</td>
+                        <td>@faq.SortOrder</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(StorefrontKinds.Faq, faq.Id)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" data-test="faq-form">
+            <MudText Typo="Typo.subtitle1">@(_faq.Id == 0 ? "Нове питання" : "Питання")</MudText>
+            <MudTextField @bind-Value="_faq.Question" Label="Питання" MaxLength="255" data-test="faq-question" />
+            <MudTextField @bind-Value="_faq.Answer" Label="Відповідь (HTML)" Lines="4" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_faq.Author" Label="Автор" MaxLength="64" />
+                <MudTextField @bind-Value="_faq.Email" Label="E-mail" MaxLength="96" />
+            </MudStack>
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudNumericField T="int" @bind-Value="_faq.SortOrder" Label="Порядок" Style="max-width: 120px" />
+                <MudCheckBox T="bool" @bind-Value="_faq.Enabled" Label="Увімкнене" />
+            </MudStack>
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveFaqAsync" data-test="faq-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _faq = new FaqForm()">Нове</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<InformationDto> _pages = [];
+    private List<FaqDto> _faqs = [];
+    private Form _page = new();
+    private FaqForm _faq = new();
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        _pages = await Api.InformationAsync();
+        _faqs = await Api.FaqsAsync();
+    }
+
+    private Task SavePageAsync() => RunAsync(async () =>
+    {
+        _page = Form.Of(await Api.SaveInformationAsync(_page.ToDto()));
+        await LoadAsync();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task SaveFaqAsync() => RunAsync(async () =>
+    {
+        _faq = FaqForm.Of(await Api.SaveFaqAsync(_faq.ToDto()));
+        await LoadAsync();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteAsync(string kind, int id) => RunAsync(async () =>
+    {
+        await Api.DeleteContentAsync(kind, id);
+        (_page, _faq) = (new Form(), new FaqForm());
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    /// <summary>Змінна копія сторінки для форми.</summary>
+    private sealed class Form
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string MetaTitle { get; set; } = "";
+        public string MetaDescription { get; set; } = "";
+        public string MetaKeyword { get; set; } = "";
+        public string SeoKeyword { get; set; } = "";
+        public int SortOrder { get; set; }
+        public bool Bottom { get; set; }
+        public bool Enabled { get; set; } = true;
+
+        public static Form Of(InformationDto p) => new()
+        {
+            Id = p.Id, Title = p.Title, Description = p.Description, MetaTitle = p.MetaTitle, MetaDescription = p.MetaDescription,
+            MetaKeyword = p.MetaKeyword, SeoKeyword = p.SeoKeyword, SortOrder = p.SortOrder, Bottom = p.Bottom, Enabled = p.Enabled,
+        };
+
+        public InformationDto ToDto() => new(Id, Title, Description, MetaTitle, MetaDescription, MetaKeyword, SeoKeyword, SortOrder, Bottom, Enabled);
+    }
+
+    private sealed class FaqForm
+    {
+        public int Id { get; set; }
+        public string Question { get; set; } = "";
+        public string Answer { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string Email { get; set; } = "";
+        public int SortOrder { get; set; }
+        public bool Enabled { get; set; } = true;
+
+        public static FaqForm Of(FaqDto f) => new()
+        {
+            Id = f.Id, Question = f.Question, Answer = f.Answer, Author = f.Author, Email = f.Email, SortOrder = f.SortOrder, Enabled = f.Enabled,
+        };
+
+        public FaqDto ToDto() => new(Id, Question, Answer, Author, Email, SortOrder, Enabled);
+    }
+}

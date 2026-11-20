@@ -85,6 +85,7 @@ app.MapProductEndpoints();
 app.MapCatalogPriceEndpoints();
 app.MapCatalogDictionaryEndpoints();
 app.MapCatalogReferenceEndpoints();
+app.MapStorefrontContentEndpoints();
 app.MapInternationalShipmentEndpoints();
 app.MapPreOrderEndpoints();
 app.MapMarketingEndpoints();

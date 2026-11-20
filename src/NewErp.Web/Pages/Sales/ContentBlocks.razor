@@ -1,0 +1,177 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Блоки «Про нас» і NFT головної сторінки (налаштування модулів вітрини, пункт 50). Тексти інших мов сервер не чіпає. *@
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-3" data-test="about">
+            <MudText Typo="Typo.h6">«Про нас»</MudText>
+            <MudCheckBox T="bool" @bind-Value="_about.Enabled" Label="Показувати" />
+            <MudTextField @bind-Value="_about.HeadingTitle" Label="Заголовок" MaxLength="255" data-test="about-title" />
+            <MudTextField @bind-Value="_about.Subtitle" Label="Підзаголовок" MaxLength="255" />
+            <MudTextField @bind-Value="_about.Description" Label="Текст (HTML)" Lines="4" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Картинки</MudText>
+            @foreach (var item in _about.Items)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="item.ImageLeft" Label="Ліворуч" />
+                    <MudTextField @bind-Value="item.ImageRight" Label="Праворуч" />
+                    <MudTextField @bind-Value="item.ImageMobile" Label="Мобільна" />
+                    <MudNumericField T="int" @bind-Value="item.SortOrder" Label="Порядок" Style="max-width: 90px" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => _about.Items.Remove(item)" />
+                </MudStack>
+            }
+            <MudButton Variant="Variant.Text" OnClick="() => _about.Items.Add(new AboutItem())">Додати картинки</MudButton>
+            <div><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAboutAsync" Class="mt-2" data-test="about-save">Зберегти «Про нас»</MudButton></div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-3" data-test="nft">
+            <MudText Typo="Typo.h6">NFT</MudText>
+            <MudCheckBox T="bool" @bind-Value="_nft.Enabled" Label="Показувати" />
+            <MudTextField @bind-Value="_nft.HeadingTitle" Label="Заголовок" MaxLength="255" />
+            <MudTextField @bind-Value="_nft.Subtitle" Label="Підзаголовок" MaxLength="255" />
+            <MudTextField @bind-Value="_nft.Description" Label="Текст (HTML)" Lines="3" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_nft.HeadingForm" Label="Заголовок форми" MaxLength="255" />
+                <MudTextField @bind-Value="_nft.SubtitleForm" Label="Підзаголовок форми" MaxLength="255" />
+            </MudStack>
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_nft.Link" Label="Посилання (/... або https://...)" MaxLength="255" data-test="nft-link" />
+                <MudTextField @bind-Value="_nft.TextLink" Label="Текст посилання" MaxLength="255" />
+            </MudStack>
+            <MudTextField @bind-Value="_nft.Image" Label="Картинка (catalog/...)" MaxLength="255" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Картинки з посиланнями</MudText>
+            @foreach (var image in _nft.Images)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="image.Image" Label="Картинка" />
+                    <MudTextField @bind-Value="image.Link" Label="Посилання" />
+                    <MudNumericField T="int" @bind-Value="image.SortOrder" Label="Порядок" Style="max-width: 90px" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => _nft.Images.Remove(image)" />
+                </MudStack>
+            }
+            <MudButton Variant="Variant.Text" OnClick="() => _nft.Images.Add(new NftImage())">Додати картинку</MudButton>
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Кроки</MudText>
+            @foreach (var step in _nft.Items)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="step.Title" Label="Заголовок" />
+                    <MudTextField @bind-Value="step.Subtitle" Label="Підзаголовок" />
+                    <MudTextField @bind-Value="step.Description" Label="Текст (HTML)" />
+                    <MudNumericField T="int" @bind-Value="step.SortOrder" Label="Порядок" Style="max-width: 90px" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => _nft.Items.Remove(step)" />
+                </MudStack>
+            }
+            <MudButton Variant="Variant.Text" OnClick="() => _nft.Items.Add(new NftStep())">Додати крок</MudButton>
+            <div><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveNftAsync" Class="mt-2" data-test="nft-save">Зберегти NFT</MudButton></div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private About _about = new();
+    private Nft _nft = new();
+
+    protected override Task OnInitializedAsync() => RunAsync(async () =>
+    {
+        _about = About.Of(await Api.AboutAsync());
+        _nft = Nft.Of(await Api.NftAsync());
+    });
+
+    private Task SaveAboutAsync() => RunAsync(async () =>
+    {
+        _about = About.Of(await Api.SaveAboutAsync(_about.ToDto()));
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task SaveNftAsync() => RunAsync(async () =>
+    {
+        _nft = Nft.Of(await Api.SaveNftAsync(_nft.ToDto()));
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    // Змінні копії блоків для форм.
+
+    private sealed class AboutItem
+    {
+        public string ImageLeft { get; set; } = "";
+        public string ImageRight { get; set; } = "";
+        public string ImageMobile { get; set; } = "";
+        public int SortOrder { get; set; }
+    }
+
+    private sealed class About
+    {
+        public bool Enabled { get; set; }
+        public string HeadingTitle { get; set; } = "";
+        public string Subtitle { get; set; } = "";
+        public string Description { get; set; } = "";
+        public List<AboutItem> Items { get; set; } = [];
+
+        public static About Of(AboutBlockDto b) => new()
+        {
+            Enabled = b.Enabled, HeadingTitle = b.HeadingTitle, Subtitle = b.Subtitle, Description = b.Description,
+            Items = [.. b.Items.Select(i => new AboutItem { ImageLeft = i.ImageLeft, ImageRight = i.ImageRight, ImageMobile = i.ImageMobile, SortOrder = i.SortOrder })],
+        };
+
+        public AboutBlockDto ToDto() => new(Enabled, HeadingTitle, Subtitle, Description,
+            [.. Items.Select(i => new AboutItemDto(i.ImageLeft, i.ImageRight, i.ImageMobile, i.SortOrder))]);
+    }
+
+    private sealed class NftImage
+    {
+        public string Image { get; set; } = "";
+        public string Link { get; set; } = "";
+        public int SortOrder { get; set; }
+    }
+
+    private sealed class NftStep
+    {
+        public string Title { get; set; } = "";
+        public string Subtitle { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int SortOrder { get; set; }
+    }
+
+    private sealed class Nft
+    {
+        public bool Enabled { get; set; }
+        public string HeadingTitle { get; set; } = "";
+        public string Subtitle { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string HeadingForm { get; set; } = "";
+        public string SubtitleForm { get; set; } = "";
+        public string Link { get; set; } = "";
+        public string TextLink { get; set; } = "";
+        public string Image { get; set; } = "";
+        public List<NftImage> Images { get; set; } = [];
+        public List<NftStep> Items { get; set; } = [];
+
+        public static Nft Of(NftBlockDto b) => new()
+        {
+            Enabled = b.Enabled, HeadingTitle = b.HeadingTitle, Subtitle = b.Subtitle, Description = b.Description, HeadingForm = b.HeadingForm,
+            SubtitleForm = b.SubtitleForm, Link = b.Link, TextLink = b.TextLink, Image = b.Image,
+            Images = [.. b.Images.Select(i => new NftImage { Image = i.Image, Link = i.Link, SortOrder = i.SortOrder })],
+            Items = [.. b.Items.Select(i => new NftStep { Title = i.Title, Subtitle = i.Subtitle, Description = i.Description, SortOrder = i.SortOrder })],
+        };
+
+        public NftBlockDto ToDto() => new(Enabled, HeadingTitle, Subtitle, Description, HeadingForm, SubtitleForm, Link, TextLink, Image,
+            [.. Images.Select(i => new NftImageDto(i.Image, i.Link, i.SortOrder))],
+            [.. Items.Select(i => new NftItemDto(i.Title, i.Subtitle, i.Description, i.SortOrder))]);
+    }
+}
