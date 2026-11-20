@@ -27,8 +27,8 @@ public sealed class ProductEditStore(ErpDbContext db, IOptions<ErpOptions> optio
     private const int StoreId = 0;
 
     // «Без межі» для дат акції: MySQL у strict-режимі не приймає '0000-00-00'.
-    private static readonly DateOnly NoStart = new(1000, 1, 1);
-    private static readonly DateOnly NoEnd = new(9999, 12, 31);
+    internal static readonly DateOnly NoStart = new(1000, 1, 1);
+    internal static readonly DateOnly NoEnd = new(9999, 12, 31);
 
     private readonly int _languageId = options.Value.LanguageId;
 

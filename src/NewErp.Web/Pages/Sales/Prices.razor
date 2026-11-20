@@ -1,0 +1,166 @@
+@page "/catalog/prices"
+@attribute [Authorize(Roles = Access.CatalogBulk)]
+@inject ProductsApi Api
+@inject ISnackbar Snackbar
+
+@* Масові ціни (Python first, пункт 46): спершу перегляд, потім запис; і фільтри розмірів (пункт 52). *@
+
+<PageTitle>Масові ціни — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Масові ціни</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    Ціна округлюється до цілих гривень і не стає меншою за нуль. Акція — відсоток для роздрібної групи покупців,
+    безстроково. Кожна зміна потрапляє в журнал аудиту. Імпорт з CSV — на сторінці
+    <MudLink Href="@ProductRoutes.Import" Typo="Typo.body2">імпорту товарів</MudLink>.
+</MudText>
+
+<MudPaper Class="pa-4 mb-3">
+    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="3">
+        <MudSelect T="string" @bind-Value="_target" Label="Що змінюємо" Style="min-width: 200px" data-test="target">
+            <MudSelectItem Value="@("price")">Ціну</MudSelectItem>
+            <MudSelectItem Value="@("sale")">Акцію</MudSelectItem>
+        </MudSelect>
+        @if (_target == "price")
+        {
+            <MudSelect T="string" @bind-Value="_priceOperation" Label="Дія" Style="min-width: 160px" data-test="operation">
+                <MudSelectItem Value="@PriceChange.Add">Додати</MudSelectItem>
+                <MudSelectItem Value="@PriceChange.Subtract">Відняти</MudSelectItem>
+                <MudSelectItem Value="@PriceChange.Multiply">Помножити на</MudSelectItem>
+                <MudSelectItem Value="@PriceChange.Divide">Поділити на</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" @bind-Value="_unit" Label="Одиниця" Style="min-width: 140px"
+                       Disabled="@(_priceOperation is PriceChange.Multiply or PriceChange.Divide)">
+                <MudSelectItem Value="@PriceChange.Amount">гривні</MudSelectItem>
+                <MudSelectItem Value="@PriceChange.Percent">відсотки</MudSelectItem>
+            </MudSelect>
+        }
+        else
+        {
+            <MudSelect T="string" @bind-Value="_saleOperation" Label="Дія" Style="min-width: 200px" data-test="sale-operation">
+                <MudSelectItem Value="@PriceChangeService.SetPercent">Встановити відсоток</MudSelectItem>
+                <MudSelectItem Value="@PriceChangeService.Remove">Прибрати акцію</MudSelectItem>
+            </MudSelect>
+        }
+        @if (_target == "price" || _saleOperation == PriceChangeService.SetPercent)
+        {
+            <MudNumericField T="decimal" @bind-Value="_amount" Label="Число" Min="0" Style="max-width: 160px" data-test="amount" />
+        }
+    </MudStack>
+
+    <MudCheckBox T="bool" @bind-Value="_allProducts" Label="Усі товари" Class="mt-2" data-test="all" />
+    @if (!_allProducts)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mt-2">Категорії</MudText>
+        <div class="d-flex flex-wrap gap-2" data-test="categories">
+            @foreach (var category in _categories)
+            {
+                <MudCheckBox T="bool" Value="_categoryIds.Contains(category.Id)" ValueChanged="on => Toggle(category.Id, on)"
+                             Label="@category.Name" Dense="true" data-test="@($"category-{category.Id}")" />
+            }
+        </div>
+    }
+
+    <MudStack Row="true" Class="mt-3">
+        <MudButton Variant="Variant.Outlined" OnClick="PreviewAsync" Disabled="_busy" data-test="preview">Переглянути</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyAsync"
+                   Disabled="@(_busy || _preview is not { Changed: > 0 })" data-test="apply">Змінити</MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_preview is not null)
+{
+    <MudText data-test="summary">Товарів: @_preview.Total; зміниться: @_preview.Changed.</MudText>
+    @if (_preview.Rows.Count > 0)
+    {
+        <MudSimpleTable Dense="true" Class="mt-2" data-test="rows">
+            <thead><tr><th>Товар</th><th>Модель</th><th>Було</th><th>Стане</th></tr></thead>
+            <tbody>
+                @foreach (var row in _preview.Rows)
+                {
+                    <tr>
+                        <td>@row.Name</td>
+                        <td>@row.Model</td>
+                        <td>@Shown(row.Old)</td>
+                        <td>@Shown(row.New)</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        @if (_preview.Changed > _preview.Rows.Count)
+        {
+            <MudText Typo="Typo.caption">Показано перші @_preview.Rows.Count.</MudText>
+        }
+    }
+}
+
+<MudPaper Class="pa-4 mt-6">
+    <MudText Typo="Typo.h6">Фільтри розмірів</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">
+        Кожен товар отримає рівно фільтри своїх розмірів: бракуючі додаються (нове значення фільтра створюється), зайві знімаються.
+    </MudText>
+    <MudButton Variant="Variant.Outlined" OnClick="RebuildAsync" Disabled="_busy" data-test="size-filters">Перебудувати</MudButton>
+</MudPaper>
+
+@code {
+    private IReadOnlyList<LookupItem> _categories = [];
+    private readonly HashSet<int> _categoryIds = [];
+    private string _target = PriceChangeService.TargetPrice;
+    private string _priceOperation = PriceChange.Add;
+    private string _saleOperation = PriceChangeService.SetPercent;
+    private string _unit = PriceChange.Amount;
+    private decimal _amount;
+    private bool _allProducts;
+    private PriceChangePreview? _preview;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => RunAsync(async () => _categories = await Api.CategoriesAsync());
+
+    private PriceChangeRequest Request() => new(
+        _target, _target == PriceChangeService.TargetPrice ? _priceOperation : _saleOperation, _amount,
+        _priceOperation is PriceChange.Multiply or PriceChange.Divide ? PriceChange.Amount : _unit,
+        _allProducts ? [] : _categoryIds.ToList(), [], _allProducts);
+
+    private void Toggle(int id, bool on)
+    {
+        if (on)
+            _categoryIds.Add(id);
+        else
+            _categoryIds.Remove(id);
+        _preview = null;
+    }
+
+    private string Shown(decimal? value) =>
+        value is null ? "—" : _target == PriceChangeService.TargetSale ? $"{value:0.##} %" : $"{value:0.##} ₴";
+
+    private Task PreviewAsync() => RunAsync(async () => _preview = await Api.PreviewPricesAsync(Request()));
+
+    private Task ApplyAsync() => RunAsync(async () =>
+    {
+        var result = await Api.ApplyPricesAsync(Request());
+        Snackbar.Add($"Змінено товарів: {result.Changed}.", Severity.Success);
+        _preview = null;
+    });
+
+    private Task RebuildAsync() => RunAsync(async () =>
+    {
+        var result = await Api.RebuildSizeFiltersAsync();
+        Snackbar.Add($"Фільтри розмірів: нових значень {result.CreatedValues}, додано {result.Linked}, знято {result.Unlinked}.", Severity.Success);
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

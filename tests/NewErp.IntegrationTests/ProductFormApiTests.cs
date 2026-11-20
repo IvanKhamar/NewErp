@@ -232,6 +232,12 @@ public class ProductFormApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await work(scope.ServiceProvider.GetRequiredService<ErpDbContext>());
     }
 
+    internal static async Task<T> QueryAsync<T>(ApiFactory factory, Func<ErpDbContext, Task<T>> query)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await query(scope.ServiceProvider.GetRequiredService<ErpDbContext>());
+    }
+
     /// <summary>Категорія, мітки NEW і «Хіт», фільтр NEW групи «За темою» й розмір L (M є в загальному сіді).</summary>
     internal static Task SeedAsync(ApiFactory factory) => WithDbAsync(factory, async db =>
     {

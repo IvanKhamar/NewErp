@@ -5,11 +5,11 @@ namespace NewErp.Web.Tests;
 
 public class NavMenuTests : WebTestContext
 {
-    // Пункти, по яких видно розділ: склад, виробництво, замовлення, бонуси, користувачі.
-    private static readonly string[] Markers = ["Розхідники", "Моделі", "Замовлення", "Бонуси", "Користувачі"];
+    // Пункти, по яких видно розділ: склад, виробництво, замовлення, масові ціни, бонуси, користувачі.
+    private static readonly string[] Markers = ["Розхідники", "Моделі", "Замовлення", "Масові ціни", "Бонуси", "Користувачі"];
 
     [Theory]
-    [InlineData(Roles.Admin, new[] { "Розхідники", "Моделі", "Замовлення", "Бонуси", "Користувачі" })]
+    [InlineData(Roles.Admin, new[] { "Розхідники", "Моделі", "Замовлення", "Масові ціни", "Бонуси", "Користувачі" })]
     [InlineData(Roles.Storekeeper, new[] { "Розхідники", "Моделі" })]
     [InlineData(Roles.Manager, new[] { "Замовлення" })]
     public void ShowsOnlySectionsOfTheRole(string role, string[] visible)
