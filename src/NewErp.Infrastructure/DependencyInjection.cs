@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<ICatalogDictionaryStore, CatalogDictionaryStore>();
         services.AddScoped<ICatalogReferenceStore, CatalogReferenceStore>();
         services.AddScoped<IStorefrontContentStore, StorefrontContentStore>();
+        services.AddScoped<IFeedbackStore, FeedbackStore>();
         services.Configure<PictureOptions>(configuration.GetSection(PictureOptions.SectionName));
         services.AddSingleton<IPictureFolder, LocalPictureFolder>();
         services.AddSingleton<IHtmlCleaner, NewErp.Infrastructure.Content.HtmlCleaner>();

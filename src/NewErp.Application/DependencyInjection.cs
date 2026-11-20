@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<CatalogDictionaryService>();
         services.AddScoped<CatalogReferenceService>();
         services.AddScoped<StorefrontContentService>();
+        services.AddScoped<FeedbackService>();
         services.AddScoped<PictureService>();
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();

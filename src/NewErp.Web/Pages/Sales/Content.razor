@@ -1,7 +1,7 @@
 @page "/catalog/content"
 @attribute [Authorize(Roles = Access.Orders)]
 
-@* Вміст вітрини старої адмінки (Python first, пункт 50): сторінки, FAQ, блог, блоки головної. *@
+@* Вміст вітрини старої адмінки (Python first, пункти 50, 51, 83): сторінки, FAQ, блог, блоки головної, відгуки й питання. *@
 
 <PageTitle>Вміст вітрини — NewErp</PageTitle>
 
@@ -11,4 +11,6 @@
     <MudTabPanel Text="Сторінки й FAQ"><ContentPages /></MudTabPanel>
     <MudTabPanel Text="Блог"><ContentBlog /></MudTabPanel>
     <MudTabPanel Text="Головна сторінка"><ContentBlocks /></MudTabPanel>
+    <MudTabPanel Text="Відгуки"><ContentReviews /></MudTabPanel>
+    <MudTabPanel Text="Питання покупців"><ContentQuestions /></MudTabPanel>
 </MudTabs>

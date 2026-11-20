@@ -1,0 +1,153 @@
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Модерація відгуків (пункт 51) і фото в них (пункт 83). Вітрина показує текст відгуку екранованим, тож це не HTML. *@
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+    <MudSelect T="string" Value="_state" ValueChanged="ChangeStateAsync" Label="Які" Style="max-width: 220px" data-test="review-state">
+        <MudSelectItem Value="@FeedbackService.Pending">На модерації</MudSelectItem>
+        <MudSelectItem Value="@FeedbackService.Published">Опубліковані</MudSelectItem>
+        <MudSelectItem Value="@FeedbackService.All">Усі</MudSelectItem>
+    </MudSelect>
+    <MudText Typo="Typo.body2">Усього: @(_reviews?.TotalCount ?? 0)</MudText>
+</MudStack>
+
+<MudSimpleTable Dense="true" Hover="true" data-test="reviews">
+    <thead><tr><th>Дата</th><th>Товар</th><th>Автор</th><th>Оцінка</th><th>Текст</th><th>Фото</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var review in _reviews?.Items ?? [])
+        {
+            <tr @onclick="() => Select(review)" style="cursor: pointer">
+                <td>@review.DateAdded.ToString("dd.MM.yyyy")</td>
+                <td>@review.ProductName</td>
+                <td>@review.Author</td>
+                <td>@review.Rating</td>
+                <td>@review.Text@(review.Published ? "" : " · на модерації")</td>
+                <td>@review.Images.Count</td>
+                <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteAsync(review)" /></td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+@if (_reviews is { TotalPages: > 1 })
+{
+    <MudPagination Count="_reviews.TotalPages" Selected="_page" SelectedChanged="PageAsync" Class="mt-2" />
+}
+
+@if (_selected is not null)
+{
+    <MudPaper Class="pa-3 mt-3" data-test="review-form">
+        <MudText Typo="Typo.subtitle1">Відгук на «@_selected.ProductName»</MudText>
+        <MudStack Row="true">
+            <MudTextField @bind-Value="_author" Label="Автор" MaxLength="64" />
+            <MudNumericField T="int" @bind-Value="_rating" Label="Оцінка" Min="1" Max="5" Style="max-width: 100px" />
+            <MudCheckBox T="bool" @bind-Value="_published" Label="Опублікований" data-test="review-published" />
+        </MudStack>
+        <MudTextField @bind-Value="_text" Label="Текст" Lines="3" MaxLength="10000" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Class="mt-2" data-test="review-save">Зберегти</MudButton>
+
+        @if (_selected.Images.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3">Фото покупця</MudText>
+            <MudSimpleTable Dense="true" data-test="review-images">
+                <tbody>
+                    @foreach (var image in _selected.Images)
+                    {
+                        <tr>
+                            <td><code>@image.Path</code></td>
+                            <td>@StatusName(image.Status)</td>
+                            <td>
+                                <MudButton Size="Size.Small" Disabled="@(image.Status == FeedbackService.Published)" OnClick="() => SetImageAsync(image, FeedbackService.Published)">Опублікувати</MudButton>
+                                <MudButton Size="Size.Small" Disabled="@(image.Status == FeedbackService.Rejected)" OnClick="() => SetImageAsync(image, FeedbackService.Rejected)">Відхилити</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteImageAsync(image)">Видалити</MudButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    private PagedResult<ReviewDto>? _reviews;
+    private string _state = FeedbackService.Pending;
+    private int _page = 1;
+    private ReviewDto? _selected;
+    private string _author = "";
+    private string _text = "";
+    private int _rating = 5;
+    private bool _published;
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        _reviews = await Api.ReviewsAsync(_state, _page);
+        _selected = _selected is null ? null : _reviews.Items.FirstOrDefault(r => r.Id == _selected.Id);
+    }
+
+    private Task ChangeStateAsync(string state)
+    {
+        (_state, _page, _selected) = (state, 1, null);
+        return RunAsync(LoadAsync);
+    }
+
+    private Task PageAsync(int page)
+    {
+        _page = page;
+        return RunAsync(LoadAsync);
+    }
+
+    private void Select(ReviewDto review)
+    {
+        _selected = review;
+        (_author, _text, _rating, _published) = (review.Author, review.Text, review.Rating, review.Published);
+    }
+
+    private static string StatusName(string status) => status switch
+    {
+        FeedbackService.Published => "опубліковане",
+        FeedbackService.Rejected => "відхилене",
+        _ => "на модерації",
+    };
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        await Api.UpdateReviewAsync(_selected!.Id, new UpdateReviewRequest(_author, _text, _rating, _published));
+        Snackbar.Add("Збережено.", Severity.Success);
+        await LoadAsync();
+    });
+
+    private Task DeleteAsync(ReviewDto review) => RunAsync(async () =>
+    {
+        await Api.DeleteReviewAsync(review.Id);
+        _selected = null;
+        await LoadAsync();
+    });
+
+    private Task SetImageAsync(ReviewImageDto image, string status) => RunAsync(async () =>
+    {
+        await Api.SetReviewImageStatusAsync(_selected!.Id, image.Id, status);
+        Snackbar.Add("Збережено.", Severity.Success);
+        await LoadAsync();
+    });
+
+    private Task DeleteImageAsync(ReviewImageDto image) => RunAsync(async () =>
+    {
+        await Api.DeleteReviewImageAsync(_selected!.Id, image.Id);
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

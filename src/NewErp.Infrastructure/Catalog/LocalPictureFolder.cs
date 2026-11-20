@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using NewErp.Application.Catalog;
@@ -13,7 +14,7 @@ public sealed class PictureOptions
 }
 
 /// <summary>Папка картинок вітрини, коли ERP працює там, де може в неї писати (спільний том).</summary>
-public sealed class LocalPictureFolder(IOptions<PictureOptions> options) : IPictureFolder
+public sealed class LocalPictureFolder(IOptions<PictureOptions> options, ILogger<LocalPictureFolder> logger) : IPictureFolder
 {
     private readonly string? _root = string.IsNullOrWhiteSpace(options.Value.ImageDir) ? null : Path.GetFullPath(options.Value.ImageDir);
 
@@ -35,6 +36,21 @@ public sealed class LocalPictureFolder(IOptions<PictureOptions> options) : IPict
             File.Delete(target); // без недописаної картинки: цей файл створили ми
             throw;
         }
+    }
+
+    public Task DeleteAsync(string path, CancellationToken ct)
+    {
+        var target = Inside(path);
+        try
+        {
+            if (File.Exists(target)) // файлу (чи його папки) вже немає — теж гаразд
+                File.Delete(target);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Picture file {Path} was not deleted: {Error}", path, e.GetType().Name);
+        }
+        return Task.CompletedTask;
     }
 
     /// <summary>Шляхи дає сервіс, але це другий замок: шлях не може вийти за папку.</summary>

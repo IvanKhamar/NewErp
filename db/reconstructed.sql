@@ -1051,3 +1051,18 @@ ALTER TABLE `dd_question`
   ADD COLUMN `date_question` date NULL,
   ADD COLUMN `image` varchar(255) NULL;
 
+
+-- ═══ Фото у відгуках покупців (вітрина: catalog/controller/product/product.php, адмінка: admin/model/catalog/review.php) ═══
+-- DDL зі скрипту, яким таблицю створювали на сайті (Vidro_DB, UPDATE/Додавання_фото_в_відгуки_в_бд), не вгадано.
+-- image — шлях від папки image/ вітрини; вітрина кладе фото в review_photos/. status: 0 на модерації, 1 опубліковано, 2 відхилено.
+CREATE TABLE `dd_review_image` (
+  `image_id`   int(11)      NOT NULL AUTO_INCREMENT,
+  `review_id`  int(11)      NOT NULL,
+  `image`      varchar(255) NOT NULL,
+  `sort_order` tinyint(3)   NOT NULL DEFAULT 0,
+  `status`     tinyint(1)   NOT NULL DEFAULT 0,
+  `date_added` datetime     NOT NULL,
+  PRIMARY KEY (`image_id`),
+  KEY `idx_review_id`     (`review_id`),
+  KEY `idx_review_status` (`review_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

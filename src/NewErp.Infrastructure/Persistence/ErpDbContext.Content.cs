@@ -130,6 +130,45 @@ public sealed class PostToCategory
     public int PostCategoryId { get; set; }
 }
 
+public sealed class Review
+{
+    public int Id { get; set; }
+
+    public int ProductId { get; set; }
+
+    public int CustomerId { get; set; }
+
+    public string Author { get; set; } = "";
+
+    public string Text { get; set; } = "";
+
+    public int Rating { get; set; }
+
+    public bool Status { get; set; }
+
+    /// <summary>У старій базі може бути 0000-00-00: порівнювати в запиті можна, читати — ні.</summary>
+    public DateTime DateAdded { get; set; }
+
+    public DateTime DateModified { get; set; }
+}
+
+/// <summary>Рядок dd_review_image (пункт 83): фото покупця у відгуку.</summary>
+public sealed class ReviewImage
+{
+    public int Id { get; set; }
+
+    public int ReviewId { get; set; }
+
+    public string Image { get; set; } = "";
+
+    public int SortOrder { get; set; }
+
+    // status (0 — на модерації, 1 — опубліковане, 2 — відхилене) не зіставлено: провайдер бачить tinyint(1) лише як bool,
+    // тож FeedbackStore читає й пише його SQL-запитом як число.
+
+    public DateTime DateAdded { get; set; }
+}
+
 public partial class ErpDbContext
 {
     public DbSet<Information> Information => Set<Information>();
@@ -151,6 +190,10 @@ public partial class ErpDbContext
     public DbSet<PostCategoryDescription> PostCategoryDescriptions => Set<PostCategoryDescription>();
 
     public DbSet<PostToCategory> PostToCategories => Set<PostToCategory>();
+
+    public DbSet<Review> Reviews => Set<Review>();
+
+    public DbSet<ReviewImage> ReviewImages => Set<ReviewImage>();
 
     private static void ConfigureContent(ModelBuilder modelBuilder)
     {
@@ -245,6 +288,28 @@ public partial class ErpDbContext
             e.HasKey(x => new { x.PostId, x.PostCategoryId });
             e.Property(x => x.PostId).HasColumnName("post_id");
             e.Property(x => x.PostCategoryId).HasColumnName("post_category_id");
+        });
+        modelBuilder.Entity<Review>(e =>
+        {
+            e.ToTable("dd_review");
+            e.Property(x => x.Id).HasColumnName("review_id");
+            e.Property(x => x.ProductId).HasColumnName("product_id");
+            e.Property(x => x.CustomerId).HasColumnName("customer_id");
+            e.Property(x => x.Author).HasColumnName("author").HasMaxLength(64);
+            e.Property(x => x.Text).HasColumnName("text").HasColumnType("text");
+            e.Property(x => x.Rating).HasColumnName("rating");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.DateAdded).HasColumnName("date_added").HasColumnType("datetime");
+            e.Property(x => x.DateModified).HasColumnName("date_modified").HasColumnType("datetime");
+        });
+        modelBuilder.Entity<ReviewImage>(e =>
+        {
+            e.ToTable("dd_review_image");
+            e.Property(x => x.Id).HasColumnName("image_id");
+            e.Property(x => x.ReviewId).HasColumnName("review_id");
+            e.Property(x => x.Image).HasColumnName("image").HasMaxLength(255);
+            e.Property(x => x.SortOrder).HasColumnName("sort_order").HasColumnType("tinyint");
+            e.Property(x => x.DateAdded).HasColumnName("date_added").HasColumnType("datetime");
         });
     }
 }
