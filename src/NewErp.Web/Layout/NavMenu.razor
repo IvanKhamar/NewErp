@@ -32,6 +32,8 @@
         <MudNavGroup Title="Каталог" Icon="@Icons.Material.Filled.Sell">
             <MudNavLink Href="catalog/products">Товари</MudNavLink>
             <MudNavLink Href="catalog/sort">Порядок товарів</MudNavLink>
+            <MudNavLink Href="catalog/categories">Категорії</MudNavLink>
+            <MudNavLink Href="catalog/labels">Мітки й пресети</MudNavLink>
             <AuthorizeView Roles="@Access.CatalogBulk" Context="bulk">
                 <MudNavLink Href="catalog/prices">Масові ціни</MudNavLink>
             </AuthorizeView>

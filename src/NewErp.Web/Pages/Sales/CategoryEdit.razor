@@ -1,0 +1,151 @@
+@page "/catalog/categories/new"
+@page "/catalog/categories/{Id:int}"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* Форма категорії (Python first, пункт 48): HTML описів очищує сервер, дерево перебудовується після збереження. *@
+
+<PageTitle>@(Id is null ? "Нова категорія" : "Категорія") — NewErp</PageTitle>
+
+<MudLink Href="@CategoryRoutes.List" Typo="Typo.body2">← Категорії</MudLink>
+<MudText Typo="Typo.h4" Class="mb-3">@(Id is null ? "Нова категорія" : _form.Name)</MudText>
+
+@if (_loaded)
+{
+    <MudPaper Class="pa-4">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="Name" Label="Назва" MaxLength="255" Required="true" data-test="name" />
+                <MudSelect T="int" @bind-Value="ParentId" Label="Батьківська категорія" data-test="parent">
+                    <MudSelectItem Value="0">— верхній рівень —</MudSelectItem>
+                    @foreach (var category in _categories.Where(c => c.Id != Id))
+                    {
+                        <MudSelectItem Value="category.Id">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="ProductName" Label="Назва товару" MaxLength="255" />
+                <MudTextField @bind-Value="AdvertisingProductName" Label="Рекламна назва товару" MaxLength="255" />
+                <MudTextField @bind-Value="SeoKeyword" Label="SEO-адреса" MaxLength="255" HelperText="Латиниця, цифри, - і _" />
+                <MudTextField @bind-Value="Image" Label="Картинка (catalog/...)" MaxLength="255" />
+                <MudTextField @bind-Value="ImageTableSize" Label="Картинка таблиці розмірів (catalog/...)" MaxLength="255" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudStack Row="true">
+                    <MudNumericField T="int" @bind-Value="SortOrder" Label="Порядок" />
+                    <MudNumericField T="int" @bind-Value="Column" Label="Колонок у меню" Min="0" Max="10" />
+                    <MudNumericField T="int" @bind-Value="ProductionPeriod" Label="Строк виготовлення, днів" Min="0" Max="365" />
+                </MudStack>
+                <MudNumericField T="int" @bind-Value="BannerId" Label="Банер (id, 0 — без)" Min="0" />
+                <MudCheckBox T="bool" @bind-Value="Enabled" Label="Увімкнена" />
+                <MudCheckBox T="bool" @bind-Value="Top" Label="У верхньому меню" />
+                <MudSelect T="int" Label="Фільтри категорії" MultiSelection="true" SelectedValues="_form.FilterIds" SelectedValuesChanged="SetFilters"
+                           data-test="filters">
+                    @foreach (var filter in _filters)
+                    {
+                        <MudSelectItem Value="filter.Id">@filter.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="MetaTitle" Label="Meta title" MaxLength="255" />
+                <MudTextField @bind-Value="MetaDescription" Label="Meta description" MaxLength="255" />
+                <MudTextField @bind-Value="MetaKeyword" Label="Meta keywords" MaxLength="255" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Description" Label="Опис (HTML)" Lines="5" />
+                <MudTextField @bind-Value="DescriptionTableSize" Label="Опис таблиці розмірів (HTML)" Lines="4" />
+            </MudItem>
+        </MudGrid>
+        <MudStack Row="true" Class="mt-3">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy" data-test="save">Зберегти</MudButton>
+            @if (Id is not null)
+            {
+                <AuthorizeView Roles="@Access.CatalogBulk">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" Disabled="_busy" data-test="delete">Видалити категорію</MudButton>
+                </AuthorizeView>
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private CategoryFormDto _form = new();
+    private List<CategoryListItem> _categories = [];
+    private List<LookupItem> _filters = [];
+    private bool _loaded;
+    private bool _busy;
+
+    // Форма редагує копію: record незмінний, тож кожне поле — with.
+    private string Name { get => _form.Name; set => _form = _form with { Name = value }; }
+    private int ParentId { get => _form.ParentId; set => _form = _form with { ParentId = value }; }
+    private string ProductName { get => _form.ProductName; set => _form = _form with { ProductName = value }; }
+    private string AdvertisingProductName { get => _form.AdvertisingProductName; set => _form = _form with { AdvertisingProductName = value }; }
+    private string SeoKeyword { get => _form.SeoKeyword; set => _form = _form with { SeoKeyword = value }; }
+    private string Image { get => _form.Image; set => _form = _form with { Image = value }; }
+    private string ImageTableSize { get => _form.ImageTableSize; set => _form = _form with { ImageTableSize = value }; }
+    private int SortOrder { get => _form.SortOrder; set => _form = _form with { SortOrder = value }; }
+    private int Column { get => _form.Column; set => _form = _form with { Column = value }; }
+    private int ProductionPeriod { get => _form.ProductionPeriod; set => _form = _form with { ProductionPeriod = value }; }
+    private int BannerId { get => _form.BannerId; set => _form = _form with { BannerId = value }; }
+    private bool Enabled { get => _form.Enabled; set => _form = _form with { Enabled = value }; }
+    private bool Top { get => _form.Top; set => _form = _form with { Top = value }; }
+    private string MetaTitle { get => _form.MetaTitle; set => _form = _form with { MetaTitle = value }; }
+    private string MetaDescription { get => _form.MetaDescription; set => _form = _form with { MetaDescription = value }; }
+    private string MetaKeyword { get => _form.MetaKeyword; set => _form = _form with { MetaKeyword = value }; }
+    private string Description { get => _form.Description; set => _form = _form with { Description = value }; }
+    private string DescriptionTableSize { get => _form.DescriptionTableSize; set => _form = _form with { DescriptionTableSize = value }; }
+
+    protected override Task OnParametersSetAsync() => RunAsync(async () =>
+    {
+        _categories = await Api.CategoriesAsync();
+        _filters = await Api.CategoryFiltersAsync();
+        _form = Id is { } id ? await Api.CategoryAsync(id) : new CategoryFormDto();
+        _loaded = true;
+    });
+
+    private void SetFilters(IEnumerable<int> ids) => _form = _form with { FilterIds = [.. ids] };
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        // CategoryEditDto теж є формою: у запит іде лише форма, без id.
+        var saved = await Api.SaveCategoryAsync(Id, new CategoryFormDto() with
+        {
+            ParentId = _form.ParentId, Name = _form.Name, ProductName = _form.ProductName, AdvertisingProductName = _form.AdvertisingProductName,
+            Description = _form.Description, DescriptionTableSize = _form.DescriptionTableSize, MetaTitle = _form.MetaTitle,
+            MetaDescription = _form.MetaDescription, MetaKeyword = _form.MetaKeyword, SeoKeyword = _form.SeoKeyword, Image = _form.Image,
+            ImageTableSize = _form.ImageTableSize, Top = _form.Top, Column = _form.Column, SortOrder = _form.SortOrder, Enabled = _form.Enabled,
+            ProductionPeriod = _form.ProductionPeriod, BannerId = _form.BannerId, FilterIds = _form.FilterIds,
+        });
+        Snackbar.Add("Категорію збережено.", Severity.Success);
+        if (Id is null)
+            Navigation.NavigateTo(CategoryRoutes.Edit(saved.Id));
+        else
+            _form = saved;
+    });
+
+    private Task DeleteAsync() => RunAsync(async () =>
+    {
+        await Api.DeleteCategoryAsync(Id!.Value);
+        Snackbar.Add("Категорію видалено.", Severity.Success);
+        Navigation.NavigateTo(CategoryRoutes.List);
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

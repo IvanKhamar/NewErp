@@ -31,6 +31,7 @@ builder.Services.AddScoped<FinanceApi>();
 builder.Services.AddScoped<PartnersApi>();
 builder.Services.AddScoped<ProductSortApi>();
 builder.Services.AddScoped<ProductsApi>();
+builder.Services.AddScoped<CatalogApi>();
 builder.Services.AddScoped<PreOrdersApi>();
 builder.Services.AddScoped<ReturnsApi>();
 builder.Services.AddScoped<CustomersApi>();

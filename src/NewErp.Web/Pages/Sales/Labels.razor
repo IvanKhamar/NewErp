@@ -1,0 +1,151 @@
+@page "/catalog/labels"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Мітки товарів і пресети пошуку вітрини (Python first, пункт 47). *@
+
+<PageTitle>Мітки й пресети — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Мітки й пресети пошуку</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.h6">Мітки товарів</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="labels">
+            <thead><tr><th>Назва</th><th>Кольори</th><th>Порядок</th><th>Товарів</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var label in _labels)
+                {
+                    <tr @onclick="() => _label = label" style="cursor: pointer">
+                        <td>
+                            <span style="@($"background:{Safe(label.BackgroundColor)};color:{Safe(label.TextColor)};padding:0 6px")">@label.Name</span>
+                            @if (!label.Enabled)
+                            {
+                                <MudText Typo="Typo.caption" Inline="true"> (вимкнена)</MudText>
+                            }
+                        </td>
+                        <td>@label.BackgroundColor @label.TextColor</td>
+                        <td>@label.SortOrder</td>
+                        <td>@label.Products</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeleteLabelAsync(label)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" data-test="label-form">
+            <MudText Typo="Typo.subtitle1">@(_label.Id == 0 ? "Нова мітка" : $"Мітка «{_label.Name}»")</MudText>
+            <MudTextField @bind-Value="LabelName" Label="Назва" MaxLength="64" data-test="label-name" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="LabelBackground" Label="Фон (#rrggbb)" MaxLength="16" />
+                <MudTextField @bind-Value="LabelText" Label="Текст (#rrggbb)" MaxLength="16" />
+                <MudNumericField T="int" @bind-Value="LabelSort" Label="Порядок" />
+            </MudStack>
+            <MudCheckBox T="bool" @bind-Value="LabelEnabled" Label="Увімкнена" />
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveLabelAsync" data-test="label-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _label = new LabelDto()">Нова</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.h6">Пресети пошуку вітрини</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="presets">
+            <thead><tr><th>Назва</th><th>Адреса</th><th>Порядок</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var preset in _presets)
+                {
+                    <tr @onclick="() => _preset = preset" style="cursor: pointer">
+                        <td>@preset.Name@(preset.Enabled ? "" : " (вимкнений)")</td>
+                        <td>@preset.Url</td>
+                        <td>@preset.SortOrder</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => DeletePresetAsync(preset)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" data-test="preset-form">
+            <MudText Typo="Typo.subtitle1">@(_preset.Id == 0 ? "Новий пресет" : $"Пресет «{_preset.Name}»")</MudText>
+            <MudTextField @bind-Value="PresetName" Label="Назва" MaxLength="255" data-test="preset-name" />
+            <MudTextField @bind-Value="PresetUrl" Label="Адреса: /catalog?... або https://..." MaxLength="255" data-test="preset-url" />
+            <MudNumericField T="int" @bind-Value="PresetSort" Label="Порядок" />
+            <MudCheckBox T="bool" @bind-Value="PresetEnabled" Label="Увімкнений" />
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePresetAsync" data-test="preset-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _preset = new SearchPresetDto()">Новий</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<LabelDto> _labels = [];
+    private List<SearchPresetDto> _presets = [];
+    private LabelDto _label = new();
+    private SearchPresetDto _preset = new();
+
+    // Форма редагує копію: record незмінний, тож кожне поле — with.
+    private string LabelName { get => _label.Name; set => _label = _label with { Name = value }; }
+    private string LabelBackground { get => _label.BackgroundColor; set => _label = _label with { BackgroundColor = value }; }
+    private string LabelText { get => _label.TextColor; set => _label = _label with { TextColor = value }; }
+    private int LabelSort { get => _label.SortOrder; set => _label = _label with { SortOrder = value }; }
+    private bool LabelEnabled { get => _label.Enabled; set => _label = _label with { Enabled = value }; }
+    private string PresetName { get => _preset.Name; set => _preset = _preset with { Name = value }; }
+    private string PresetUrl { get => _preset.Url; set => _preset = _preset with { Url = value }; }
+    private int PresetSort { get => _preset.SortOrder; set => _preset = _preset with { SortOrder = value }; }
+    private bool PresetEnabled { get => _preset.Enabled; set => _preset = _preset with { Enabled = value }; }
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        _labels = await Api.LabelsAsync();
+        _presets = await Api.PresetsAsync();
+    }
+
+    /// <summary>У стиль іде лише колір #rrggbb (сервер інших не пропускає, але стара база може мати будь-що).</summary>
+    private static string Safe(string color) =>
+        color.Length == 7 && color[0] == '#' && color[1..].All(Uri.IsHexDigit) ? color : "transparent";
+
+    private Task SaveLabelAsync() => RunAsync(async () =>
+    {
+        _label = await Api.SaveLabelAsync(_label);
+        Snackbar.Add("Мітку збережено.", Severity.Success);
+        await LoadAsync();
+    });
+
+    private Task DeleteLabelAsync(LabelDto label) => RunAsync(async () =>
+    {
+        await Api.DeleteLabelAsync(label.Id);
+        Snackbar.Add($"Мітку «{label.Name}» видалено й знято з товарів.", Severity.Success);
+        _label = new LabelDto();
+        await LoadAsync();
+    });
+
+    private Task SavePresetAsync() => RunAsync(async () =>
+    {
+        _preset = await Api.SavePresetAsync(_preset);
+        Snackbar.Add("Пресет збережено.", Severity.Success);
+        await LoadAsync();
+    });
+
+    private Task DeletePresetAsync(SearchPresetDto preset) => RunAsync(async () =>
+    {
+        await Api.DeletePresetAsync(preset.Id);
+        _preset = new SearchPresetDto();
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}

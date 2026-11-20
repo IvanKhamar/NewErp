@@ -31,7 +31,7 @@ API, tests and Blazor pages for each group, one branch and one PR per group. Ite
 | 5 | `feat/py-reports` | 29, 30, 31, 71 | merged |
 | 6 | `feat/py-order-tools` | 35–42 | merged (#41) |
 | 7 | `feat/py-product-form` | 43–45, 75, 76 | merged |
-| 8 | `feat/py-catalog-lists` | 46–52 (with 72 and 83, in PRs 8a–8f) | in progress: 72, 46, 52 done |
+| 8 | `feat/py-catalog-lists` | 46–52 (with 72 and 83, in PRs 8a–8f) | in progress: 72, 46–48, 52 done |
 | 9 | `feat/py-customers` | 53, 54 | TODO |
 | 10 | `feat/py-monobank` | 55, 56 | TODO |
 | 11 | `feat/py-marketing` | 57–62, 77 | TODO |
@@ -79,7 +79,7 @@ Things to know when continuing:
 
 ## 43–52. Catalog — Python 9e1df9d, 157844e, 4669ad9, f644db7, dc27a5a, 9ba10d9
 
-- **Status:** 43–45 DONE: `feat/py-product-form`, 2026-11-12 (the product form with attributes and downloads, the quick price edit, the CSV import, «зняти NEW»; the form's `modelInfo` is at most 255, as `db/reconstructed.sql` has it since item 72).. 46 and 52 DONE: `feat/py-catalog-prices`, 2026-11-20 (page `/app/catalog/prices`, admin only; the manufacturer picker comes with item 49). 47–51 TODO (group 8)
+- **Status:** 43–45 DONE: `feat/py-product-form`, 2026-11-12 (the product form with attributes and downloads, the quick price edit, the CSV import, «зняти NEW»; the form's `modelInfo` is at most 255, as `db/reconstructed.sql` has it since item 72).. 46 and 52 DONE: `feat/py-catalog-prices`, 2026-11-20 (page `/app/catalog/prices`, admin only; the manufacturer picker comes with item 49). 47 and 48 DONE: `feat/py-catalog-dictionaries`, 2026-11-20 (pages `/app/catalog/labels` and `/app/catalog/categories`; also `GET /catalog/categories/filters` for the category form). 49–51 TODO (group 8)
 - **Contract:** `POST /catalog/products`, `GET /catalog/products/{id}/edit`, `PUT /catalog/products/{id}`
   (dateModified, 409), `POST /catalog/products/{id}/copy`, `POST /catalog/products/remove-new`,
   `GET /catalog/products/form-lookups`; `POST /catalog/products/import/preview` and `/import` (CSV);

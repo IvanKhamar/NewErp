@@ -1,0 +1,62 @@
+@page "/catalog/categories"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@* Категорії магазину з деревом (Python first, пункт 48). *@
+
+<PageTitle>Категорії — NewErp</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+    <MudText Typo="Typo.h4">Категорії</MudText>
+    <MudSpacer />
+    <AuthorizeView Roles="@Access.CatalogBulk">
+        <MudButton Variant="Variant.Outlined" OnClick="RepairAsync" data-test="repair">Перебудувати дерево</MudButton>
+    </AuthorizeView>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@CategoryRoutes.New" data-test="new">Нова категорія</MudButton>
+</MudStack>
+
+<MudSimpleTable Dense="true" Hover="true" data-test="categories">
+    <thead><tr><th>Категорія</th><th>Порядок</th><th>Товарів</th><th>Увімкнена</th></tr></thead>
+    <tbody>
+        @foreach (var category in _categories)
+        {
+            <tr @onclick="() => Navigation.NavigateTo(CategoryRoutes.Edit(category.Id))" style="cursor: pointer">
+                <td>@category.Name</td>
+                <td>@category.SortOrder</td>
+                <td>@category.Products</td>
+                <td>@(category.Enabled ? "так" : "ні")</td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+
+@code {
+    private List<CategoryListItem> _categories = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _categories = await Api.CategoriesAsync();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+
+    private async Task RepairAsync()
+    {
+        try
+        {
+            var result = await Api.RepairCategoriesAsync();
+            Snackbar.Add($"Дерево перебудовано: категорій {result.Categories}.", Severity.Success);
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}
