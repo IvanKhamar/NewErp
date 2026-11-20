@@ -66,7 +66,7 @@ public sealed class StockService(IStockRepository repository, IStockLocationRepo
         repository.Add(m);
         await repository.SaveChangesAsync(ct);
 
-        return new StockMovementDto(m.Id, item.Id, m.Delta, m.StockBefore, m.StockAfter, m.Comment, m.UserId, m.Username, m.CreatedAt);
+        return new StockMovementDto(m.Id, item.Id, m.Delta, m.StockBefore ?? 0, m.StockAfter ?? 0, m.Comment, m.UserId ?? 0, m.Username, m.CreatedAt);
     }
 
     public async Task SetMinQuantityAsync(int itemId, decimal minQuantity, CancellationToken ct)

@@ -18,7 +18,7 @@ public sealed class StockRepository(ErpDbContext db) : IStockRepository
     public async Task<IReadOnlyList<StockSupplierDto>> ListSuppliersAsync(CancellationToken ct) =>
         await db.StockSuppliers.AsNoTracking()
             .OrderBy(s => s.Name)
-            .Select(s => new StockSupplierDto(s.Id, s.Name, s.Phone, s.Email, s.Categories, s.Notes))
+            .Select(s => new StockSupplierDto(s.Id, s.Name, s.Phone ?? "", s.Email ?? "", s.Categories ?? "", s.Notes ?? ""))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<StockItemDto>> ListItemsAsync(StockItemFilter filter, CancellationToken ct)
@@ -49,7 +49,7 @@ public sealed class StockRepository(ErpDbContext db) : IStockRepository
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
             .Select(m => new StockMovementDto(
                 m.Id, m.ItemId, m.Action == StockMovement.Use ? -m.Quantity : m.Quantity,
-                m.StockBefore, m.StockAfter, m.Comment, m.UserId, m.Username, m.CreatedAt))
+                m.StockBefore ?? 0, m.StockAfter ?? 0, m.Comment ?? "", m.UserId ?? 0, m.Username, m.CreatedAt))
             .ToListAsync(ct);
 
     public Task<bool> CategoryExistsAsync(int categoryId, CancellationToken ct) =>
@@ -85,5 +85,5 @@ public sealed class StockRepository(ErpDbContext db) : IStockRepository
         select new StockItemDto(
             i.Id, i.Name, i.Unit, i.CategoryId, c == null ? null : c.Name,
             i.SupplierId, s == null ? null : s.Name,
-            i.Quantity, i.MinQuantity, i.Quantity < i.MinQuantity, i.UsedFor, i.Price);
+            i.Quantity, i.MinQuantity, i.Quantity < i.MinQuantity, i.UsedFor ?? "", i.Price);
 }

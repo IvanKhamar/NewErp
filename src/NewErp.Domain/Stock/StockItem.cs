@@ -20,8 +20,8 @@ public class StockItem
             throw new DomainException("Ціна не може бути від'ємною.");
         CategoryId = categoryId;
         SupplierId = supplierId;
-        Name = RequireText(name, "Назва позиції", 150);
-        Unit = RequireText(unit, "Одиниця виміру", 16);
+        Name = RequireText(name, "Назва позиції", 255);
+        Unit = RequireText(unit, "Одиниця виміру", 32);
         UsedFor = usedFor?.Trim() ?? "";
         Price = price;
         SetMinQuantity(minQuantity);
@@ -42,7 +42,9 @@ public class StockItem
     public decimal MinQuantity { get; private set; }
 
     /// <summary>Для чого використовується (вільний текст зі старого модуля).</summary>
-    public string UsedFor { get; private set; } = "";
+    private string? _usedFor; // NULL в старій таблиці читається як ""
+
+    public string UsedFor { get => _usedFor ?? ""; private set => _usedFor = value; }
 
     /// <summary>Ціна за одиницю.</summary>
     public decimal Price { get; private set; }
@@ -60,6 +62,8 @@ public class StockItem
     {
         if (delta == 0)
             throw new DomainException("Зміна залишку не може дорівнювати нулю.");
+        if (decimal.Round(delta, Stocktaking.Scale) != delta)
+            throw new DomainException($"Зміна залишку: не більше {Stocktaking.Scale} знаків після коми.");
         if (Quantity + delta < 0)
             throw new DomainException($"Недостатньо залишку: є {Quantity} {Unit}, списується {-delta} {Unit}.");
 
@@ -68,14 +72,15 @@ public class StockItem
 
     /// <summary>
     /// Списання для виробництва, як у старому модулі: якщо залишку не вистачає, списується те, що є,
-    /// і залишок стає нулем. Повертає null, якщо списувати нічого.
+    /// і залишок стає нулем. Повертає null, якщо списувати нічого. Норма × штуки може мати більше знаків, ніж
+    /// тримає таблиця: її округлюємо до двох знаків половиною вгору, як округлював MySQL у старому модулі.
     /// </summary>
     public StockMovement? TakeUpTo(decimal wanted, string comment, int userId, string username, DateTime now)
     {
         if (wanted <= 0)
             throw new DomainException("Кількість для списання має бути більшою за нуль.");
 
-        var amount = Math.Min(wanted, Quantity);
+        var amount = Math.Min(decimal.Round(wanted, Stocktaking.Scale, MidpointRounding.AwayFromZero), Quantity);
         return amount > 0 ? Change(-amount, RequireText(comment, "Причина", 255), userId, username, now) : null;
     }
 

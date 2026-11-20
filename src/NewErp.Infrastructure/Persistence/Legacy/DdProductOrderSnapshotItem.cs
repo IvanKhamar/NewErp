@@ -5,6 +5,8 @@ namespace NewErp.Infrastructure.Persistence.Legacy;
 
 public partial class DdProductOrderSnapshotItem
 {
+    public int Id { get; set; }
+
     public int SnapshotId { get; set; }
 
     public int ProductId { get; set; }

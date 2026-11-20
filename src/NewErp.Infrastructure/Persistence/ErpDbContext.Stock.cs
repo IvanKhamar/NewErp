@@ -25,7 +25,7 @@ public partial class ErpDbContext
         {
             e.ToTable("dd_stock_categories");
             e.Property(x => x.Id).HasColumnName("category_id");
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(128);
             e.Property(x => x.SortOrder).HasColumnName("sort_order");
         });
 
@@ -33,11 +33,11 @@ public partial class ErpDbContext
         {
             e.ToTable("dd_stock_suppliers");
             e.Property(x => x.Id).HasColumnName("supplier_id");
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(150);
-            e.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(32);
-            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(96);
-            e.Property(x => x.Categories).HasColumnName("categories").HasMaxLength(255);
-            e.Property(x => x.Notes).HasColumnName("notes").HasColumnType("text");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(255);
+            e.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(64).IsRequired(false);
+            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(128).IsRequired(false);
+            e.Property(x => x.Categories).HasColumnName("categories").HasMaxLength(512).IsRequired(false);
+            e.Property(x => x.Notes).HasColumnName("notes").HasColumnType("text").IsRequired(false);
         });
 
         modelBuilder.Entity<StockItem>(e =>
@@ -46,18 +46,18 @@ public partial class ErpDbContext
             e.Property(x => x.Id).HasColumnName("item_id");
             e.Property(x => x.CategoryId).HasColumnName("category_id");
             e.Property(x => x.SupplierId).HasColumnName("supplier_id");
-            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(150);
-            e.Property(x => x.Unit).HasColumnName("unit").HasMaxLength(16);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(255);
+            e.Property(x => x.Unit).HasColumnName("unit").HasMaxLength(32);
             // Маркер паралельного доступу: якщо двоє одночасно змінюють залишок, EF перевіряє,
             // що stock у базі не змінився з моменту читання, інакше кидає DbUpdateConcurrencyException (Api поверне 409).
-            e.Property(x => x.Quantity).HasColumnName("stock").HasPrecision(12, 3).IsConcurrencyToken();
-            e.Property(x => x.MinQuantity).HasColumnName("min_stock").HasPrecision(12, 3);
-            e.Property(x => x.UsedFor).HasColumnName("used_for").HasMaxLength(255);
-            e.Property(x => x.Price).HasColumnName("price").HasPrecision(15, 4);
+            e.Property(x => x.Quantity).HasColumnName("stock").HasPrecision(10, 2).IsConcurrencyToken();
+            e.Property(x => x.MinQuantity).HasColumnName("min_stock").HasPrecision(10, 2);
+            e.Property(x => x.UsedFor).HasColumnName("used_for").HasMaxLength(512).IsRequired(false);
+            e.Property(x => x.Price).HasColumnName("price").HasPrecision(15, 2);
             e.Property(x => x.IsActive).HasColumnName("status");
             e.Ignore(x => x.IsBelowMinimum);
-            e.HasOne<StockCategory>().WithMany().HasForeignKey(x => x.CategoryId);
-            e.HasOne<StockSupplier>().WithMany().HasForeignKey(x => x.SupplierId);
+            e.HasOne<StockCategory>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<StockSupplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<StockMovement>(e =>
@@ -65,12 +65,12 @@ public partial class ErpDbContext
             e.ToTable("dd_stock_log");
             e.Property(x => x.Id).HasColumnName("log_id");
             e.Property(x => x.ItemId).HasColumnName("item_id");
-            e.Property(x => x.ItemName).HasColumnName("item_name").HasMaxLength(150);
-            e.Property(x => x.Action).HasColumnName("action").HasMaxLength(16);
-            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(12, 3);
-            e.Property(x => x.StockBefore).HasColumnName("stock_before").HasPrecision(12, 3);
-            e.Property(x => x.StockAfter).HasColumnName("stock_after").HasPrecision(12, 3);
-            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(255);
+            e.Property(x => x.ItemName).HasColumnName("item_name").HasMaxLength(255);
+            e.Property(x => x.Action).HasColumnName("action").HasColumnType("enum('use','restock','add','edit','delete')");
+            e.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(10, 2);
+            e.Property(x => x.StockBefore).HasColumnName("stock_before").HasPrecision(10, 2);
+            e.Property(x => x.StockAfter).HasColumnName("stock_after").HasPrecision(10, 2);
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(255).IsRequired(false);
             e.Property(x => x.UserId).HasColumnName("user_id");
             e.Property(x => x.Username).HasColumnName("username").HasMaxLength(20);
             e.Property(x => x.CreatedAt).HasColumnName("date_added").HasColumnType("datetime");

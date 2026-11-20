@@ -17,7 +17,7 @@ public sealed class PartnerRepository(ErpDbContext db, IOptions<ErpOptions> opti
     public async Task<IReadOnlyList<PartnerListItemDto>> ListAsync(CancellationToken ct) =>
         await db.Partners.AsNoTracking()
             .OrderBy(p => p.Name)
-            .Select(p => new PartnerListItemDto(p.Id, p.Code, p.Name, p.VendorName, p.FeedEnabled, p.IsActive,
+            .Select(p => new PartnerListItemDto(p.Id, p.Code, p.Name, p.VendorName ?? "", p.FeedEnabled, p.IsActive,
                 p.CategoryMap.Count, p.ProductMap.Count))
             .ToListAsync(ct);
 

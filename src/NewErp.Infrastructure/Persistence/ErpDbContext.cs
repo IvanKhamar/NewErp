@@ -250,13 +250,15 @@ public partial class ErpDbContext : DbContext
 
             entity.ToTable("dd_crosssell_item");
 
+            entity.HasIndex(e => new { e.Type, e.TargetId }, "type_target").IsUnique();
+
             entity.Property(e => e.CrosssellItemId).HasColumnName("crosssell_item_id");
             entity.Property(e => e.Discount)
                 .HasPrecision(5)
                 .HasColumnName("discount");
             entity.Property(e => e.TargetId).HasColumnName("target_id");
             entity.Property(e => e.Type)
-                .HasMaxLength(16)
+                .HasColumnType("enum('product','category')")
                 .HasColumnName("type");
         });
 
@@ -893,17 +895,17 @@ public partial class ErpDbContext : DbContext
 
             entity.ToTable("dd_product_manual_pin");
 
-            entity.HasIndex(e => new { e.GroupType, e.GroupKey }, "group");
+            entity.HasIndex(e => new { e.GroupType, e.GroupKey }, "group_key");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
             entity.Property(e => e.GroupKey)
-                .HasMaxLength(128)
+                .HasMaxLength(100)
                 .HasColumnName("group_key");
             entity.Property(e => e.GroupType)
-                .HasMaxLength(32)
+                .HasMaxLength(50)
                 .HasColumnName("group_type");
             entity.Property(e => e.Position).HasColumnName("position");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
@@ -971,16 +973,20 @@ public partial class ErpDbContext : DbContext
                 .HasColumnName("created_at");
             entity.Property(e => e.Note)
                 .HasMaxLength(255)
-                .HasDefaultValueSql("''")
                 .HasColumnName("note");
         });
 
         modelBuilder.Entity<DdProductOrderSnapshotItem>(entity =>
         {
-            entity.HasKey(e => new { e.SnapshotId, e.ProductId }).HasName("PRIMARY");
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
 
             entity.ToTable("dd_product_order_snapshot_item");
 
+            entity.HasIndex(e => e.ProductId, "product_id");
+
+            entity.HasIndex(e => e.SnapshotId, "snapshot_id");
+
+            entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.SnapshotId).HasColumnName("snapshot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
