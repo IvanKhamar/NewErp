@@ -57,6 +57,17 @@ public sealed class ProductsApi(HttpClient http)
     public async Task<ImportResult> ImportAsync(Stream file, string fileName) =>
         await ReadAsync<ImportResult>(await http.PostAsync("/catalog/products/import", FileForm(file, fileName)));
 
+    // ═══ Масові ціни (пункт 46) і фільтри розмірів (пункт 52) ═══
+
+    public async Task<PriceChangePreview> PreviewPricesAsync(PriceChangeRequest request) =>
+        await ReadAsync<PriceChangePreview>(await http.PostAsJsonAsync("/catalog/prices/preview", request));
+
+    public async Task<PriceChangeResult> ApplyPricesAsync(PriceChangeRequest request) =>
+        await ReadAsync<PriceChangeResult>(await http.PostAsJsonAsync("/catalog/prices/apply", request));
+
+    public async Task<SizeFilterResult> RebuildSizeFiltersAsync() =>
+        await ReadAsync<SizeFilterResult>(await http.PostAsync("/catalog/prices/size-filters", null));
+
     private static MultipartFormDataContent FileForm(Stream file, string fileName)
     {
         var content = new StreamContent(file);
