@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<PriceChangeService>();
         services.AddScoped<SizeFilterService>();
         services.AddScoped<CatalogDictionaryService>();
+        services.AddScoped<CatalogReferenceService>();
         services.AddScoped<PictureService>();
         services.AddScoped<PreOrderService>();
         services.AddScoped<MarketingService>();

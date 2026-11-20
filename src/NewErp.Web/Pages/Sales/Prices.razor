@@ -1,6 +1,7 @@
 @page "/catalog/prices"
 @attribute [Authorize(Roles = Access.CatalogBulk)]
 @inject ProductsApi Api
+@inject CatalogApi Catalog
 @inject ISnackbar Snackbar
 
 @* Масові ціни (Python first, пункт 46): спершу перегляд, потім запис; і фільтри розмірів (пункт 52). *@
@@ -54,10 +55,21 @@
         <div class="d-flex flex-wrap gap-2" data-test="categories">
             @foreach (var category in _categories)
             {
-                <MudCheckBox T="bool" Value="_categoryIds.Contains(category.Id)" ValueChanged="on => Toggle(category.Id, on)"
+                <MudCheckBox T="bool" Value="_categoryIds.Contains(category.Id)" ValueChanged="on => Toggle(_categoryIds, category.Id, on)"
                              Label="@category.Name" Dense="true" data-test="@($"category-{category.Id}")" />
             }
         </div>
+        @if (_manufacturers.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Виробники</MudText>
+            <div class="d-flex flex-wrap gap-2" data-test="manufacturers">
+                @foreach (var maker in _manufacturers)
+                {
+                    <MudCheckBox T="bool" Value="_manufacturerIds.Contains(maker.Id)" ValueChanged="on => Toggle(_manufacturerIds, maker.Id, on)"
+                                 Label="@maker.Name" Dense="true" data-test="@($"manufacturer-{maker.Id}")" />
+                }
+            </div>
+        }
     }
 
     <MudStack Row="true" Class="mt-3">
@@ -104,6 +116,8 @@
 @code {
     private IReadOnlyList<LookupItem> _categories = [];
     private readonly HashSet<int> _categoryIds = [];
+    private List<ManufacturerDto> _manufacturers = [];
+    private readonly HashSet<int> _manufacturerIds = [];
     private string _target = PriceChangeService.TargetPrice;
     private string _priceOperation = PriceChange.Add;
     private string _saleOperation = PriceChangeService.SetPercent;
@@ -113,19 +127,23 @@
     private PriceChangePreview? _preview;
     private bool _busy;
 
-    protected override Task OnInitializedAsync() => RunAsync(async () => _categories = await Api.CategoriesAsync());
+    protected override Task OnInitializedAsync() => RunAsync(async () =>
+    {
+        _categories = await Api.CategoriesAsync();
+        _manufacturers = await Catalog.ManufacturersAsync();
+    });
 
     private PriceChangeRequest Request() => new(
         _target, _target == PriceChangeService.TargetPrice ? _priceOperation : _saleOperation, _amount,
         _priceOperation is PriceChange.Multiply or PriceChange.Divide ? PriceChange.Amount : _unit,
-        _allProducts ? [] : _categoryIds.ToList(), [], _allProducts);
+        _allProducts ? [] : _categoryIds.ToList(), _allProducts ? [] : _manufacturerIds.ToList(), _allProducts);
 
-    private void Toggle(int id, bool on)
+    private void Toggle(HashSet<int> ids, int id, bool on)
     {
         if (on)
-            _categoryIds.Add(id);
+            ids.Add(id);
         else
-            _categoryIds.Remove(id);
+            ids.Remove(id);
         _preview = null;
     }
 

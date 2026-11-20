@@ -1,0 +1,134 @@
+@page "/catalog/references"
+@attribute [Authorize(Roles = Access.Orders)]
+@inject CatalogApi Api
+@inject ISnackbar Snackbar
+
+@* Довідники каталогу старої адмінки (Python first, пункт 49). Що є в товарах, видалити не можна. *@
+
+<PageTitle>Довідники — NewErp</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-3">Довідники каталогу</MudText>
+
+<MudTabs Elevation="0" Outlined="true" Rounded="true" TabPanelsClass="pa-3">
+    <MudTabPanel Text="Фільтри"><ReferenceGroups Kind="filters" /></MudTabPanel>
+    <MudTabPanel Text="Атрибути"><ReferenceGroups Kind="attributes" /></MudTabPanel>
+    <MudTabPanel Text="Опції"><ReferenceGroups Kind="options" /></MudTabPanel>
+    <MudTabPanel Text="Виробники">
+        <MudSimpleTable Dense="true" Hover="true" data-test="manufacturers">
+            <thead><tr><th>Виробник</th><th>Картинка</th><th>Порядок</th><th>Товарів</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var maker in _manufacturers)
+                {
+                    <tr @onclick="() => _maker = maker" style="cursor: pointer">
+                        <td>@maker.Name</td>
+                        <td>@maker.Image</td>
+                        <td>@maker.SortOrder</td>
+                        <td>@maker.Products</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@(maker.Products > 0)" OnClick="() => DeleteMakerAsync(maker)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" Style="max-width: 640px">
+            <MudText Typo="Typo.subtitle1">@(_maker.Id == 0 ? "Новий виробник" : $"Виробник «{_maker.Name}»")</MudText>
+            <MudTextField @bind-Value="MakerName" Label="Назва" MaxLength="64" data-test="maker-name" />
+            <MudTextField @bind-Value="MakerImage" Label="Картинка (catalog/...)" MaxLength="255" />
+            <MudNumericField T="int" @bind-Value="MakerSort" Label="Порядок" />
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveMakerAsync" data-test="maker-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _maker = new ManufacturerDto()">Новий</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+    <MudTabPanel Text="Завантаження">
+        <MudText Typo="Typo.body2" Class="mb-2">Тут лише записи; самі файли лежать у storage/download вітрини.</MudText>
+        <MudSimpleTable Dense="true" Hover="true" data-test="downloads">
+            <thead><tr><th>Назва</th><th>Файл</th><th>Ім'я для покупця</th><th>Товарів</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var download in _downloads)
+                {
+                    <tr @onclick="() => _download = download" style="cursor: pointer">
+                        <td>@download.Name</td>
+                        <td>@download.Filename</td>
+                        <td>@download.Mask</td>
+                        <td>@download.Products</td>
+                        <td><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@(download.Products > 0)" OnClick="() => DeleteDownloadAsync(download)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudPaper Class="pa-3 mt-2" Style="max-width: 640px">
+            <MudText Typo="Typo.subtitle1">@(_download.Id == 0 ? "Нове завантаження" : $"Завантаження «{_download.Name}»")</MudText>
+            <MudTextField @bind-Value="DownloadName" Label="Назва" MaxLength="64" />
+            <MudTextField @bind-Value="DownloadFile" Label="Ім'я файлу (без папок)" MaxLength="160" data-test="download-file" />
+            <MudTextField @bind-Value="DownloadMask" Label="Ім'я для покупця (порожньо — як файл)" MaxLength="128" />
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveDownloadAsync" data-test="download-save">Зберегти</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="() => _download = new DownloadDto()">Нове</MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<ManufacturerDto> _manufacturers = [];
+    private List<DownloadDto> _downloads = [];
+    private ManufacturerDto _maker = new();
+    private DownloadDto _download = new();
+
+    // Форма редагує копію: record незмінний, тож кожне поле — with.
+    private string MakerName { get => _maker.Name; set => _maker = _maker with { Name = value }; }
+    private string MakerImage { get => _maker.Image; set => _maker = _maker with { Image = value }; }
+    private int MakerSort { get => _maker.SortOrder; set => _maker = _maker with { SortOrder = value }; }
+    private string DownloadName { get => _download.Name; set => _download = _download with { Name = value }; }
+    private string DownloadFile { get => _download.Filename; set => _download = _download with { Filename = value }; }
+    private string DownloadMask { get => _download.Mask; set => _download = _download with { Mask = value }; }
+
+    protected override Task OnInitializedAsync() => RunAsync(async () =>
+    {
+        _manufacturers = await Api.ManufacturersAsync();
+        _downloads = await Api.DownloadsAsync();
+    });
+
+    private Task SaveMakerAsync() => RunAsync(async () =>
+    {
+        await Api.SaveManufacturerAsync(_maker);
+        _manufacturers = await Api.ManufacturersAsync();
+        _maker = new ManufacturerDto();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteMakerAsync(ManufacturerDto maker) => RunAsync(async () =>
+    {
+        await Api.DeleteManufacturerAsync(maker.Id);
+        _manufacturers = await Api.ManufacturersAsync();
+        _maker = new ManufacturerDto();
+    });
+
+    private Task SaveDownloadAsync() => RunAsync(async () =>
+    {
+        await Api.SaveDownloadAsync(_download);
+        _downloads = await Api.DownloadsAsync();
+        _download = new DownloadDto();
+        Snackbar.Add("Збережено.", Severity.Success);
+    });
+
+    private Task DeleteDownloadAsync(DownloadDto download) => RunAsync(async () =>
+    {
+        await Api.DeleteDownloadAsync(download.Id);
+        _downloads = await Api.DownloadsAsync();
+        _download = new DownloadDto();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.Message, Severity.Error);
+        }
+    }
+}
